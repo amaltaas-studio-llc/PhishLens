@@ -149,7 +149,11 @@ mechanisms exist purely to keep legitimate mail at zero.
 - **Sender-domain redirects.** Newsletter platforms rewrite every link through their own redirector while
   the anchor text names the real destination, which is exactly the pattern the strongest link rule looks
   for. Links whose host is on the *sender's own registrable domain* are exempt from the mismatch and
-  redirect rules, which covers every such platform without needing a list of them.
+  redirect rules, which covers every such platform without needing a list of them. The same exemption
+  applies when the anchor is prose rather than a URL: a social footer links the networks it has profiles
+  on *by name*, so "LinkedIn" pointing at the sender's own click tracker is a profile link, not a brand
+  claim. Both exemptions yield when the message claims to *be* the brand in question, which is where
+  reputation is genuinely being borrowed.
 - **Word-boundary brand matching.** Short brand keywords (`irs`, `aws`) must match as whole folded words,
   or "first" and "lawsuit" become brand claims once separators are stripped for comparison.
 - **The AI dead zone.** Verdicts below 45/100, and any verdict no deterministic check corroborates, score
@@ -207,11 +211,12 @@ it is the marker that gets the feature switched off.
 
 ## Confidence in the numbers
 
-880 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
-`test/fixtures/` holds 20 messages: a plain legitimate message, a legitimate password reset, a legitimate
+885 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
+`test/fixtures/` holds 21 messages: a plain legitimate message, a legitimate password reset, a legitimate
 reply into an existing thread, a newsletter with many links, a newsletter whose links are all rewritten
-through its platform's click tracker, an invoice, PayPal phishing, a Microsoft lookalike domain, a brand
-spoof from an unlisted lead-generation sender, an anchor-URL mismatch, a punycode link, an IP-address URL,
+through its platform's click tracker, an institutional newsletter whose social footer names each network it
+links to, an invoice, PayPal phishing, a Microsoft lookalike domain, a brand spoof from an unlisted
+lead-generation sender, an anchor-URL mismatch, a punycode link, an IP-address URL,
 a ZIP attachment, an executable attachment, a gift-card scam, a fake payroll change, an MFA-code request,
 two reply-chain hijacks — one by a lookalike domain, one reusing a participant's name — and a storage-quota
 lure built so that every field has an innocent answer, which is the fixture that documents the most about

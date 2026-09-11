@@ -107,6 +107,16 @@ function anchorTextBrandMismatch(context: AnalysisContext): SecuritySignal[] {
       if (brand.domains.includes(link.registrable)) break;
       // The destination is a lookalike of this brand — reported by the lookalike rule instead.
       if (brandOwningDomain(link.registrable)?.id === brand.id) break;
+      // Bulk senders rewrite every href through their own click-tracking host, so a footer that links
+      // its social profiles by name — "LinkedIn", "Instagram", "YouTube" — has an anchor naming a brand
+      // and a destination that is not that brand's. That is what a social footer *is*. The sender is
+      // borrowing nobody's reputation, only routing through itself, which is the whole point of
+      // `onSenderDomain`.
+      //
+      // Yields when the message claims to be this brand, where the label is bait rather than a profile
+      // link: a message presenting itself as LinkedIn, with a "LinkedIn" link to its own domain, is the
+      // deception this rule exists for.
+      if (link.onSenderDomain && context.primaryClaim?.brand.id !== brand.id) break;
 
       findings.push(
         signal({

@@ -1,0 +1,31 @@
+{
+  "name": "legitimate-institutional-newsletter",
+  "description": "False-positive regression, observed in production: a university department's alumni newsletter whose footer links its social profiles by name — LinkedIn, Instagram, YouTube, Facebook — while every href is rewritten through the sender's own click-tracking subdomain. The anchor names a brand and the destination is not that brand's domain, so before the onSenderDomain guard each footer icon produced a separate 'high' anchor/brand mismatch, maxed the link category and floored the message at 50/100 'Suspicious'. Naming the network you have a profile on is what a social footer is for, and every bulk sender that rewrites links produces this shape.",
+  "email": {
+    "senderName": "Northwind Institute of Technology Communications",
+    "senderEmail": "communications@news.northwind-tech.edu",
+    "recipientEmail": "sam.okafor@northwind-logistics.com",
+    "subject": "Holodecks // Pumpkin Spice // Deuce @ 3 a.m.",
+    "bodyText": "Dear alumni and friends,\n\nThis month: a graduate team rebuilt the department's motion lab as a walk-in volumetric display, and the write-up is worth your time even if you have never touched a headset. Elsewhere in the building, the food science group has opinions about why the pumpkin spice supply chain peaks in August, and our robotics second-years explain what happens when a delivery rover meets a sprinkler at three in the morning.\n\nAlso inside: two new named professorships, a call for mentors for the spring capstone cycle, and the reunion weekend schedule.\n\nFollow along on LinkedIn, Instagram, YouTube and Facebook.\n\nYou are receiving this because you are an alumnus or subscribed to departmental news. Manage your subscription or unsubscribe at any time.",
+    "links": [
+      { "text": "Read the full story", "href": "https://click.news.northwind-tech.edu/?qs=ABB7InYiOjEsImQiOjQ5OTV9AAoAAAAABKfFYi1AOqaY1" },
+      { "text": "the write-up", "href": "https://click.news.northwind-tech.edu/?qs=CCD8LmZiOjIsImQiOjUxMjB9AAoAAAAABKfFYi2BPqbZ2" },
+      { "text": "call for mentors", "href": "https://click.news.northwind-tech.edu/?qs=EEF9MnBjOjMsImQiOjUyNDF9AAoAAAAABKfFYi3CQrcA3" },
+      { "text": "reunion weekend schedule", "href": "https://click.news.northwind-tech.edu/?qs=GGH0NnFkOjQsImQiOjUzNjJ9AAoAAAAABKfFYi4DRsdB4" },
+      { "text": "LinkedIn", "href": "https://click.news.northwind-tech.edu/?qs=IIJ1PnJlOjUsImQiOjU0ODN9AAoAAAAABKfFYi5EStuC5" },
+      { "text": "Instagram", "href": "https://click.news.northwind-tech.edu/?qs=KKL2QnNmOjYsImQiOjU2MDR9AAoAAAAABKfFYi6FTuvD6" },
+      { "text": "YouTube", "href": "https://click.news.northwind-tech.edu/?qs=MMN3RnRnOjcsImQiOjU3MjV9AAoAAAAABKfFYi7GUwwE7" },
+      { "text": "Facebook", "href": "https://click.news.northwind-tech.edu/?qs=OOP4SnVoOjgsImQiOjU4NDZ9AAoAAAAABKfFYi8HVxxF8" },
+      { "text": "Manage your subscription", "href": "https://click.news.northwind-tech.edu/subscription_center.aspx?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9" },
+      { "text": "unsubscribe", "href": "https://click.news.northwind-tech.edu/subscription_center.aspx?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6Ik9GRiJ9" }
+    ],
+    "attachments": [],
+    "auth": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass",
+      "signedBy": "northwind-tech.edu",
+      "mailedBy": "bounce.news.northwind-tech.edu"
+    }
+  }
+}

@@ -28,6 +28,7 @@ const LEGITIMATE_FIXTURES = [
   'legitimate-password-reset',
   'legitimate-newsletter',
   'legitimate-substack-newsletter',
+  'legitimate-institutional-newsletter',
   'legitimate-invoice',
   'legitimate-thread-reply',
 ];
@@ -392,6 +393,59 @@ describe('click tracking on the sender own domain', () => {
     const baited = analyzeDeterministic(bait, { now: FIXED_NOW });
     expect(hasSignal(baited, 'link.displayed_url_mismatch')).toBe(true);
     expect(signalFor(baited, 'link.displayed_url_mismatch')?.severity).toBe('critical');
+  });
+});
+
+/**
+ * The same guard, for the rule whose anchor text is prose rather than a URL. A social footer links the
+ * networks it has profiles on *by name*, through the sender's own click tracker, so every bulk sender
+ * produces "anchor names a brand, destination is not that brand's" — the observed false positive.
+ *
+ * As with its sibling, the guard must not become a way to launder a brand claim by pointing the link at
+ * a domain you control, so the last test asserts it yields when the message claims to be the brand.
+ */
+describe('a social footer routed through the sender own tracker', () => {
+  const result = analyzeFixture('legitimate-institutional-newsletter');
+
+  it('does not read profile links named after their networks as impersonation', () => {
+    expect(hasSignal(result, 'link.anchor_brand_mismatch')).toBe(false);
+  });
+
+  it('leaves the newsletter low with no high finding to floor it', () => {
+    expect(result.classification).toBe('low');
+  });
+
+  it('still fires when the tracker is not the sender own domain', () => {
+    const base = loadFixture('legitimate-institutional-newsletter').email;
+    const elsewhere = analyzeDeterministic(
+      {
+        ...base,
+        links: [toEmailLink({ text: 'LinkedIn', href: 'https://unrelated-redirector.example/?qs=IIJ1' })],
+      },
+      { now: FIXED_NOW },
+    );
+
+    expect(hasSignal(elsewhere, 'link.anchor_brand_mismatch')).toBe(true);
+  });
+
+  it('still fires when the message claims to be the brand it links to', () => {
+    const base = loadFixture('legitimate-institutional-newsletter').email;
+    const bait: EmailMessage = {
+      ...base,
+      senderName: 'LinkedIn Security',
+      senderEmail: 'security@linked-in-alerts.example',
+      subject: 'Your LinkedIn account requires verification',
+      bodyText:
+        'Your LinkedIn account has been flagged for unusual activity. Confirm your details to restore access.',
+      links: [
+        toEmailLink({ text: 'LinkedIn', href: 'https://linked-in-alerts.example/verify?id=3311' }),
+      ],
+      auth: undefined,
+    };
+
+    expect(hasSignal(analyzeDeterministic(bait, { now: FIXED_NOW }), 'link.anchor_brand_mismatch')).toBe(
+      true,
+    );
   });
 });
 
