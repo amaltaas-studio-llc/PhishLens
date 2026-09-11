@@ -218,7 +218,7 @@ describe('the diagnostic report', () => {
  */
 describe('the session health tally', () => {
   const clean: SelectorProbe[] = [{ group: 'senderSpan', scope: 'message', candidate: 0 }];
-  const drifting: SelectorProbe[] = [{ group: 'senderSpan', scope: 'document', candidate: 2 }];
+  const drifting: SelectorProbe[] = [{ group: 'senderSpan', scope: 'message', candidate: 2 }];
 
   it('counts messages and the parts that went unread', () => {
     const log = new HealthLog();
@@ -291,10 +291,35 @@ describe('the session health tally', () => {
     const log = new HealthLog();
     log.record([], true, () => [
       { group: 'attachmentChip', scope: 'none', candidate: -1 },
-      { group: 'warningBanner', scope: 'document', candidate: 4 },
+      { group: 'body', scope: 'message', candidate: 3 },
     ]);
 
-    expect(log.summary().drifted).toEqual(['warningBanner']);
+    expect(log.summary().drifted).toEqual(['body']);
+  });
+
+  /**
+   * The other half of the same production report: `warningBanner` came back as `document #4`, which reads
+   * like a group hanging on by its last candidate and is nothing of the sort. The probe searches the page
+   * once the message comes up empty, and the page of a message with no warning on it always holds
+   * something for `role="alert"` to find. Counting that made the row fire on ordinary mail just as surely
+   * as counting a no-match did.
+   */
+  it('does not read a page-wide match as drift in a group read from the message', () => {
+    const log = new HealthLog();
+    log.record([], true, () => [{ group: 'warningBanner', scope: 'document', candidate: 4 }]);
+
+    expect(log.summary().drifted).toEqual([]);
+  });
+
+  /** The inverse: for the groups genuinely read from the page, a page match is the one that counts. */
+  it('reports a late candidate in a group that is read from the page', () => {
+    const log = new HealthLog();
+    log.record([], true, () => [
+      { group: 'subject', scope: 'document', candidate: 3 },
+      { group: 'conversationRoot', scope: 'document', candidate: 0 },
+    ]);
+
+    expect(log.summary().drifted).toEqual(['subject']);
   });
 
   /**

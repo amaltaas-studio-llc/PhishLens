@@ -771,12 +771,19 @@ how often, and which selector groups did not match their preferred candidate. Th
 part — a group working on candidate 3 of 4 is one Gmail release from not working, and reporting it *while it
 still works* is the entire point.
 
-A group matching *nothing* is deliberately not drift. Most of the selector table is expected to miss on any
-given message: there are no attachments, no quoted reply, nothing collapsed, no list rows, and no
-unverified-sender avatar when authentication passed. Treating a miss as a fallback made the warning fire on
-every healthy session, which is worse than not having it — a drift row nobody believes is a drift row nobody
-reads. Real breakage of a group that should have matched surfaces through the part it failed to read, or
-through the message it made unscorable.
+Two things are deliberately *not* drift, and both were learned by shipping them as drift. A group matching
+**nothing** is not, because most of the selector table is expected to miss on any given message: there are
+no attachments, no quoted reply, nothing collapsed, no list rows, and no unverified-sender avatar when
+authentication passed. And a group that missed inside the message and then matched **on the page** is not,
+because the probe searches the page as a second pass and the page of a perfectly ordinary message always
+holds something for a broad last-resort candidate to find — `warningBanner` ends in a `role="alert"`
+selector, and Gmail's live regions carry that role. `PAGE_SCOPED` in `selectors.ts` names the groups the
+code genuinely reads from the page, and for those the second pass is the one that counts.
+
+Each of those made the warning fire on essentially every healthy session, which is worse than not having it:
+a drift row nobody believes is a drift row nobody reads. Real breakage of a group that should have matched
+surfaces through the part it failed to read, or through the message it made unscorable, and the copied
+report still lists it.
 
 Two details are deliberate. Probing walks every candidate in `selectors.ts` against the DOM, so it runs on
 the first message of the session — establishing a baseline, including a group already limping — and

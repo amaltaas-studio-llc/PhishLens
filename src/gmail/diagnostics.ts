@@ -21,7 +21,7 @@
 import type { MessagePart } from '../shared/types.js';
 import type { TabHealth } from '../shared/messaging.js';
 import type { MessageHandle } from './adapter.js';
-import { SELECTORS } from './selectors.js';
+import { PAGE_SCOPED, SELECTORS } from './selectors.js';
 
 /** Where a selector group found its first match, or that it found none. */
 type Scope = 'message' | 'document' | 'none';
@@ -51,6 +51,25 @@ export function probeSelectors(handle: MessageHandle): SelectorProbe[] {
     }
     return { group, scope: 'none' as const, candidate: -1 };
   });
+}
+
+/**
+ * Whether a probe describes a selector that has decayed: a later candidate matched, in the scope the
+ * code reads that group from.
+ *
+ * Both halves are load-bearing, and each was learned by getting it wrong. A group that matched *nothing*
+ * is not drift, because most of the table is expected to miss on an ordinary message — no attachments, no
+ * quoted reply, nothing collapsed, and no unverified-sender avatar precisely when the sender
+ * authenticated. And a group found on the page after missing inside the message is not drift either: it
+ * was located somewhere the adapter never looks, which says nothing about the selector's health.
+ *
+ * A genuinely broken selector is not silent. It shows up as the part it failed to read, or as a message
+ * that could not be scored, both of which the health tally counts separately, and the probe still records
+ * it as NO MATCH in the report.
+ */
+export function hasDrifted(probe: SelectorProbe): boolean {
+  const expected = PAGE_SCOPED.has(probe.group) ? 'document' : 'message';
+  return probe.candidate > 0 && probe.scope === expected;
 }
 
 function firstMatch(root: ParentNode, candidates: readonly string[]): number {

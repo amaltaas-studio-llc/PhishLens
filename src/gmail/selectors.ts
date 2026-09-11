@@ -102,12 +102,20 @@ export const SELECTORS = {
     '.aSG .aV3',
   ],
 
-  /** Gmail's own red warning banner. */
+  /**
+   * Gmail's own red warning banner.
+   *
+   * The last candidate is far broader than anything else in this file, and safe only because of where
+   * it is read: `readGmailWarning` accepts the text only when it reads as a verdict about the message,
+   * so matching one of Gmail's other live regions yields nothing rather than a phantom finding. Do not
+   * copy the pattern to a group whose match is used directly.
+   */
   warningBanner: [
     '.gJ .aiG',
     'div[jsname="ohI2vc"]',
     '.PhishingBanner',
     '.ni .n4',
+    '.aiG',
     'div[role="alert"]',
   ],
 
@@ -167,6 +175,27 @@ export const SELECTORS = {
   /** Gmail's account chrome, whose `aria-label` contains the signed-in address. */
   accountLink: ['a[aria-label*="@"]'],
 } as const satisfies Record<string, readonly string[]>;
+
+/**
+ * The groups read from the page rather than from inside one message.
+ *
+ * Only the drift probe needs this, and only to keep one distinction straight: a group that misses inside
+ * the message and then matches somewhere on the page has not fallen through to a worse selector, it has
+ * been found somewhere the adapter would never look. Without the distinction every message with no
+ * warning banner reported `warningBanner` as drifting, because the page always holds something carrying
+ * `role="alert"` for the last candidate to find.
+ *
+ * The list groups belong here even though the code reads them from a row, not the page: a probe holding
+ * one open message cannot reach a row, so the page is the closest scope it can honestly report.
+ */
+export const PAGE_SCOPED: ReadonlySet<string> = new Set([
+  'conversationRoot',
+  'subject',
+  'accountLink',
+  'listRow',
+  'listSender',
+  'listSubjectCell',
+]);
 
 /** Returns the first element matching any candidate selector, or `null`. */
 export function queryFirst(root: ParentNode, candidates: readonly string[]): Element | null {

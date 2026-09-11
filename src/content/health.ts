@@ -16,7 +16,7 @@
  */
 import type { MessagePart } from '../shared/types.js';
 import type { TabHealth } from '../shared/messaging.js';
-import { buildHealthReport, type SelectorProbe } from '../gmail/diagnostics.js';
+import { buildHealthReport, hasDrifted, type SelectorProbe } from '../gmail/diagnostics.js';
 
 export class HealthLog {
   #seen = 0;
@@ -47,17 +47,11 @@ export class HealthLog {
   /**
    * The counts the popup words a row from.
    *
-   * `drifted` is every group that matched on something *other than* its preferred candidate. A group on
-   * candidate 3 of 4 is the shape of decay: it works today and is one Gmail release from not working, and
-   * reporting it while it still works is the entire point.
-   *
-   * A group that matched nothing (`candidate === -1`) is deliberately not drift. Most of the table is
-   * *expected* to miss on any given message — no attachments, no quoted reply, nothing collapsed in a
-   * single-message thread, no list rows while a message is open, and no unauthenticated-sender avatar
-   * precisely when the sender authenticated. Counting those made the popup warn about a Gmail change on
-   * essentially every healthy session, which is worse than silence: this row only works if it is rare.
-   * A selector that has genuinely stopped matching shows up as an unread part or an unscorable message,
-   * both counted above, and the report still lists it as NO MATCH.
+   * `drifted` is every group that matched a later candidate than its preferred one — a group on candidate
+   * 3 of 4 is the shape of decay, working today and one Gmail release from not working, and reporting it
+   * while it still works is the entire point. What does and does not count as that is `hasDrifted`, next
+   * to the probe that produces the scopes it reasons about; the popup row is only worth having if it stays
+   * rare, so the cases it excludes matter more than the case it includes.
    */
   summary(): TabHealth {
     return {
@@ -66,7 +60,7 @@ export class HealthLog {
       misses: [...this.#misses]
         .map(([part, count]) => ({ part, count }))
         .sort((a, b) => b.count - a.count),
-      drifted: this.#probes.filter((probe) => probe.candidate > 0).map((probe) => probe.group),
+      drifted: this.#probes.filter(hasDrifted).map((probe) => probe.group),
     };
   }
 
