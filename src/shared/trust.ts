@@ -60,23 +60,32 @@ export function matchingTrustEntry(
 /**
  * Whether Gmail's own surfaces prove this message came from the sender's domain.
  *
- * Strict on purpose. DMARC passing means the message aligned with the From domain under a policy that
- * domain published, and an aligned DKIM signature means the domain signed the message itself. SPF alone
- * is not accepted: it authenticates the envelope rather than the From header, so it passes for mail that
- * merely *claims* the From address — which is the one case this function exists to exclude.
+ * Strict about *what* counts. DMARC passing means the message aligned with the From domain under a policy
+ * that domain published, and an aligned DKIM signature means the domain signed the message itself. SPF
+ * alone is never accepted: it authenticates the envelope rather than the From header, so it passes for
+ * mail that merely *claims* the From address — the one case this function exists to exclude. A `?` avatar
+ * means Gmail could not verify the sender at all, which overrides anything else read from the page.
  *
- * Everything here is best-effort, because a content script reads rendered HTML rather than headers. An
- * absent details table therefore returns `false`, and trust simply does not apply. That is the safe
- * direction: the cost is a false positive the user has already seen, and the alternative is an allowlist
- * that works on unauthenticated mail.
+ * Liberal about *where* the evidence comes from, which it has to be. Named verdicts (`dkim: pass`) are
+ * only ever scraped from a tooltip that most Gmail builds do not have, so requiring one made this
+ * function return `false` for every message and the trust feature unreachable. An aligned `signed-by`
+ * row is the same proof by another route: Gmail renders it with the DKIM `d=` domain of a signature it
+ * verified, and omits it entirely when there is no valid signature. Presence *is* the verdict.
+ *
+ * Still best-effort, because a content script reads rendered HTML rather than headers, and the rows live
+ * behind Gmail's "show details" toggle. No evidence returns `false` and trust does not apply — the safe
+ * direction, since the cost is a false positive the user has already seen and the alternative is an
+ * allowlist that works on unauthenticated mail.
  */
 export function isSenderProven(auth: EmailAuthInfo | undefined, senderDomain: string): boolean {
   if (auth === undefined || senderDomain === '') return false;
   if (auth.spf === 'fail' || auth.dkim === 'fail' || auth.dmarc === 'fail') return false;
+  if (auth.unauthenticatedIndicator === true) return false;
   if (auth.dmarc === 'pass') return true;
+  if (auth.dkim !== undefined && auth.dkim !== 'pass') return false;
 
   const signedBy = normalizeDomain(auth.signedBy ?? '');
-  return auth.dkim === 'pass' && signedBy !== '' && sameRegistrableDomain(signedBy, senderDomain);
+  return signedBy !== '' && sameRegistrableDomain(signedBy, senderDomain);
 }
 
 /**

@@ -171,8 +171,10 @@ The whole design is about the fact that this is the most attractive setting in t
 attacker. Four constraints, each with a test:
 
 - **Authentication-gated.** Trust applies only when Gmail's own summary says the message passed
-  authentication for that domain (`isSenderProven`). A spoofed message from a trusted domain is scored as
-  though the list were empty, and the card says the trust was not applied.
+  authentication for that domain (`isSenderProven`): DMARC passing, or a `signed-by` domain that aligns
+  with the sender. SPF alone is refused, and the unverified-sender avatar overrides everything. A spoofed
+  message from a trusted domain is scored as though the list were empty, and the card says the trust was
+  not applied.
 - **Identity findings are never dampened.** Only `content` and `authentication` findings can soften.
   Trusting `paypal.com` has no effect on a lookalike of it, which is the attack trust would otherwise
   enable.
@@ -205,7 +207,7 @@ it is the marker that gets the feature switched off.
 
 ## Confidence in the numbers
 
-876 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
+880 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
 `test/fixtures/` holds 20 messages: a plain legitimate message, a legitimate password reset, a legitimate
 reply into an existing thread, a newsletter with many links, a newsletter whose links are all rewritten
 through its platform's click tracker, an invoice, PayPal phishing, a Microsoft lookalike domain, a brand

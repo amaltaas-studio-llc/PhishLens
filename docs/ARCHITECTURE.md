@@ -534,6 +534,15 @@ but the message did not prove it came from there. This is what stops the obvious
 `supplier.example` to the list must not make a *spoofed* `supplier.example` quieter, and since PhishLens
 has no headers of its own, Gmail's verdict is the only evidence available that the domain was really used.
 
+What counts as that verdict is narrow, but where it may be read from cannot be. Requiring a named
+`dkim: pass` made the gate unsatisfiable in practice: those verdicts are scraped from a tooltip that most
+Gmail builds do not carry, so every real message arrived with a `signed-by` row and no verdict at all, and
+the feature was unreachable rather than merely conservative. An aligned `signed-by` is now accepted as the
+same proof, because Gmail renders that row with the `d=` domain of a signature it verified and omits it
+when there is none — presence is the verdict. A scraped verdict still overrules the row when the two
+disagree, and the `?` avatar overrules everything. SPF alone is still refused: it authenticates the
+envelope, not the From header, which is the case the gate exists for.
+
 **Identity findings are untouchable.** Only `content` and `authentication` findings can be dampened.
 Trusting `paypal.com` has no effect on `paypa1.com`, on a display name claiming PayPal from elsewhere, or
 on a punycode lookalike — which is the attack that a naive substring-matching trust list would create,

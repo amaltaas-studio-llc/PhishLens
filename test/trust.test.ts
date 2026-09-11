@@ -136,6 +136,48 @@ describe('isSenderProven', () => {
     expect(isSenderProven({}, 'ledgerworks-billing.com')).toBe(false);
     expect(isSenderProven({ dmarc: 'pass', spf: 'fail' }, 'ledgerworks-billing.com')).toBe(false);
   });
+
+  /**
+   * The shape the DOM adapter actually produces, and the reason this gate once rejected every message
+   * in existence: named `dkim`/`dmarc` verdicts are scraped from a tooltip most Gmail builds do not
+   * carry, so a real message arrives with a `signed-by` row and no verdict at all. Gmail only renders
+   * that row for a signature it verified, so its presence is the verdict.
+   */
+  it('accepts an aligned signed-by row with no named verdict', () => {
+    expect(
+      isSenderProven(
+        { spf: 'pass', signedBy: 'ledgerworks-billing.com', mailedBy: 'ledgerworks-billing.com' },
+        'mail.ledgerworks-billing.com',
+      ),
+    ).toBe(true);
+  });
+
+  it('still requires the signature to align', () => {
+    expect(isSenderProven({ signedBy: 'bulk-sender.test' }, 'ledgerworks-billing.com')).toBe(false);
+    expect(isSenderProven({ mailedBy: 'ledgerworks-billing.com' }, 'ledgerworks-billing.com')).toBe(
+      false,
+    );
+  });
+
+  it('lets an explicit non-pass verdict overrule the row', () => {
+    // A scraped verdict is better evidence than the row's presence, in the one direction that matters.
+    for (const dkim of ['neutral', 'softfail', 'none'] as const) {
+      expect(isSenderProven({ dkim, signedBy: 'ledgerworks-billing.com' }, 'ledgerworks-billing.com')).toBe(
+        false,
+      );
+    }
+  });
+
+  it('rejects a sender Gmail itself could not verify', () => {
+    // The `?` avatar is Gmail saying it failed to establish the sender. Nothing else on the page
+    // outranks that, including a signature that happens to align.
+    expect(
+      isSenderProven(
+        { signedBy: 'ledgerworks-billing.com', unauthenticatedIndicator: true },
+        'ledgerworks-billing.com',
+      ),
+    ).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
