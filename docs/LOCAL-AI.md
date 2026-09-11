@@ -236,6 +236,11 @@ Connect, and handed back when you change the address. A default install still as
 `https://mail.google.com/*` and nothing else — a blanket `http://*/*` in `host_permissions` would make
 every user pay a permission for a feature most will not enable.
 
+The plaintext half of that permission is spelled out as `localhost` and `127.0.0.1` rather than as a
+wildcard, which has one visible consequence: **use `127.0.0.1` rather than `[::1]`**. Chrome's match
+patterns cannot express an IPv6 literal, so the address field will accept `http://[::1]:11434` and Connect
+will then be unable to ask for it. Both reach the same process.
+
 The timeout is 45 seconds, against 20 for the on-device model, because the work is happening on your
 hardware and a 7B model on a CPU can take most of a minute on a long message. The card shows `pending`
 throughout and the deterministic score is already on screen, so the wait costs latency on the AI section

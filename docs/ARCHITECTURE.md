@@ -825,10 +825,16 @@ that it is careful. The rule that carries the weight is that anything *not* loop
 **An optional host permission, granted per origin.** A model server can be on any host and port, so
 reaching one needs a host permission, and the obvious route — adding `http://localhost/*` to
 `host_permissions` — charges every user a permission for a feature most will never enable, and breaks the
-"two permissions" claim that the README leads with. Instead `optional_host_permissions` covers the broad
+"two permissions" claim that the README leads with. Instead `optional_host_permissions` carries the
 patterns, and the options page requests the single typed origin on a click. A default install is unchanged;
 the grant is per-origin, prompted by Chrome, listed in `chrome://extensions`, and released when the address
 changes.
+
+Only the TLS pattern there is broad. Plaintext is confined to `http://localhost/*` and `http://127.0.0.1/*`,
+because a wildcard would ask to reach plaintext hosts `normalizeModelBaseUrl` refuses to produce — reach
+that could never be exercised is reach not worth holding, and the widest pattern in a manifest is the first
+thing anyone auditing it reads. The cost is that `http://[::1]:…` is now configurable but not grantable,
+since Chrome's match patterns cannot express an IPv6 literal; `127.0.0.1` reaches the same process.
 
 **The endpoint is never taken from a message.** The content script sends only the two prompt strings; the
 worker reads the URL and model name from settings. Passing the endpoint through the message channel would

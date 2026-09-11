@@ -22,7 +22,7 @@
   },
   "permissions": ["storage"],
   "host_permissions": ["https://mail.google.com/*"],
-  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "optional_host_permissions": ["http://localhost/*", "http://127.0.0.1/*", "https://*/*"],
   "background": {
     "service_worker": "background.js",
     "type": "module"
