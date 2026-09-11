@@ -47,9 +47,17 @@ export class HealthLog {
   /**
    * The counts the popup words a row from.
    *
-   * `drifted` is every group that did not match its *preferred* candidate, which includes groups that
-   * matched nothing at all. A group on candidate 3 of 4 is the shape of decay: it works today and is one
-   * Gmail release from not working, and reporting it while it still works is the entire point.
+   * `drifted` is every group that matched on something *other than* its preferred candidate. A group on
+   * candidate 3 of 4 is the shape of decay: it works today and is one Gmail release from not working, and
+   * reporting it while it still works is the entire point.
+   *
+   * A group that matched nothing (`candidate === -1`) is deliberately not drift. Most of the table is
+   * *expected* to miss on any given message — no attachments, no quoted reply, nothing collapsed in a
+   * single-message thread, no list rows while a message is open, and no unauthenticated-sender avatar
+   * precisely when the sender authenticated. Counting those made the popup warn about a Gmail change on
+   * essentially every healthy session, which is worse than silence: this row only works if it is rare.
+   * A selector that has genuinely stopped matching shows up as an unread part or an unscorable message,
+   * both counted above, and the report still lists it as NO MATCH.
    */
   summary(): TabHealth {
     return {
@@ -58,7 +66,7 @@ export class HealthLog {
       misses: [...this.#misses]
         .map(([part, count]) => ({ part, count }))
         .sort((a, b) => b.count - a.count),
-      drifted: this.#probes.filter((probe) => probe.candidate !== 0).map((probe) => probe.group),
+      drifted: this.#probes.filter((probe) => probe.candidate > 0).map((probe) => probe.group),
     };
   }
 

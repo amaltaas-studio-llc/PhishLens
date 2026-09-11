@@ -762,6 +762,13 @@ how often, and which selector groups did not match their preferred candidate. Th
 part — a group working on candidate 3 of 4 is one Gmail release from not working, and reporting it *while it
 still works* is the entire point.
 
+A group matching *nothing* is deliberately not drift. Most of the selector table is expected to miss on any
+given message: there are no attachments, no quoted reply, nothing collapsed, no list rows, and no
+unverified-sender avatar when authentication passed. Treating a miss as a fallback made the warning fire on
+every healthy session, which is worse than not having it — a drift row nobody believes is a drift row nobody
+reads. Real breakage of a group that should have matched surfaces through the part it failed to read, or
+through the message it made unscorable.
+
 Two details are deliberate. Probing walks every candidate in `selectors.ts` against the DOM, so it runs on
 the first message of the session — establishing a baseline, including a group already limping — and
 thereafter only when something went unread; doing it per message would be work spent on the case where

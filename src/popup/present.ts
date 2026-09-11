@@ -183,11 +183,13 @@ export function healthRow(health: TabHealth): HealthRow | null {
     };
   }
 
+  // Worded around what the reader loses rather than around candidate lists: this is the one row that
+  // fires while nothing is wrong yet, so it has to earn attention without a symptom to point at.
   if (health.drifted.length > 0) {
     return {
-      headline: 'Reading Gmail through a fallback',
+      headline: 'A Gmail change may soon break some checks',
       detail:
-        'Everything is being read, but not by the first method PhishLens tries — which usually means Gmail has moved something and the preferred one will stop working. Reporting it now is what gets it fixed before it does.',
+        'Everything is being checked normally today, but Gmail has moved part of its page and PhishLens is reading it a backup way. Copying the report below into an issue gets it fixed before anything stops working. It contains none of your mail.',
     };
   }
 

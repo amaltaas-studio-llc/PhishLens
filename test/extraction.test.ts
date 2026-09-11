@@ -267,6 +267,37 @@ describe('the session health tally', () => {
   });
 
   /**
+   * Observed in production: a healthy session reported drift in six groups and the popup warned that
+   * Gmail had changed, because a no-match was counted as a fallback. Most of the selector table is
+   * *expected* to miss on any given message — nothing collapsed in a single-message thread, no quoted
+   * reply, no attachments, no list rows while a message is open, and no unauthenticated-sender avatar
+   * exactly when the sender authenticated. A warning that fires on every ordinary session is one nobody
+   * reads by the time it means something.
+   */
+  it('does not read an absent group as drift', () => {
+    const log = new HealthLog();
+    log.record([], true, () => [
+      { group: 'senderSpan', scope: 'message', candidate: 0 },
+      { group: 'attachmentChip', scope: 'none', candidate: -1 },
+      { group: 'quotedContent', scope: 'none', candidate: -1 },
+      { group: 'listRow', scope: 'none', candidate: -1 },
+      { group: 'unauthenticatedIndicator', scope: 'none', candidate: -1 },
+    ]);
+
+    expect(log.summary().drifted).toEqual([]);
+  });
+
+  it('still reports a real fallback alongside groups that are simply absent', () => {
+    const log = new HealthLog();
+    log.record([], true, () => [
+      { group: 'attachmentChip', scope: 'none', candidate: -1 },
+      { group: 'warningBanner', scope: 'document', candidate: 4 },
+    ]);
+
+    expect(log.summary().drifted).toEqual(['warningBanner']);
+  });
+
+  /**
    * The same claim as the single-message report, for the button that copies this one. Both formatters are
    * pure so that this can be asked at all: given only counts, part names and selector groups there is no
    * path by which a message could reach the clipboard.

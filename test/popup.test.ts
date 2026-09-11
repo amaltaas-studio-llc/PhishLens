@@ -195,15 +195,23 @@ describe('healthRow', () => {
     expect(row?.detail).toMatch(/still scored/i);
   });
 
-  it('reports a selector list running on a fallback before it breaks', () => {
+  /**
+   * The only row that speaks up while every check is still working, so it is worded as the warning it
+   * is. It must not read as a present failure — someone who concludes their scores are already wrong
+   * will stop trusting the ones that are fine.
+   */
+  it('warns about a selector list running on a fallback before it breaks', () => {
     const row = healthRow(health({ drifted: ['senderEmail'] }));
-    expect(row?.headline).toMatch(/fallback/i);
+    expect(row?.headline).toMatch(/may soon/i);
+    expect(row?.detail).toMatch(/normally today/i);
+    expect(row?.headline).not.toMatch(/fallback|selector|candidate/i);
   });
 
   it('promises the report holds no mail, on every branch that offers one', () => {
     const rows = [
       healthRow(health({ unscorable: 2 })),
       healthRow(health({ misses: [{ part: 'subject', count: 2 }] })),
+      healthRow(health({ drifted: ['senderEmail'] })),
     ];
     for (const row of rows) {
       expect(row?.detail).toMatch(/none of your mail/i);
