@@ -37,6 +37,14 @@ import { SELECTORS, queryAll, queryAllUnion, queryFirst } from './selectors.js';
 /** Upper bound on links extracted from one message. A hostile message can contain thousands. */
 const MAX_LINKS = 300;
 const MAX_ATTACHMENTS = 60;
+/**
+ * Upper bound on quoted subtrees consulted when excluding quoted links.
+ *
+ * A deeply nested reply chain produces one per round, and `.im` in the candidate list matches broadly, so
+ * this is attacker-influenced like everything else derived from a message. Exceeding it costs precision in
+ * the safe direction: a link in the twentieth quoted block is read as though the sender wrote it.
+ */
+const MAX_QUOTED_SUBTREES = 20;
 
 /** Runs an extraction step, returning a fallback if it throws for any reason. */
 function attempt<T>(label: string, fn: () => T, fallback: T): T {
@@ -602,13 +610,27 @@ function normalizeBodyWhitespace(text: string): string {
 // Links
 // ---------------------------------------------------------------------------
 
+/**
+ * Anchors the sender wrote, which is not the same as anchors in the element.
+ *
+ * Quoted subtrees are skipped for the reason `extractBody` removes them from the text: what is analysed is
+ * what *this* message added. Reading them left the two halves of one extraction disagreeing — a reply to a
+ * phish contributed the phish's links, scored against the person who replied, while the body text that
+ * would explain them had already been stripped. A finding pointing at a link whose surrounding sentence
+ * the engine cannot see is exactly the unverifiable finding this project treats as worse than none.
+ *
+ * Containment rather than a second clone: the quoted nodes are located once and each anchor tested against
+ * them, so Gmail's own nodes are never mutated and the clone in `extractBody` stays the only copy made.
+ */
 function extractLinks(bodyElement: Element | null): EmailLink[] {
   if (bodyElement === null) return [];
   const links: EmailLink[] = [];
   const seen = new Set<string>();
+  const quoted = queryAllUnion(bodyElement, SELECTORS.quotedContent).slice(0, MAX_QUOTED_SUBTREES);
 
   for (const anchor of queryAll(bodyElement, SELECTORS.bodyLink)) {
     if (links.length >= MAX_LINKS) break;
+    if (quoted.some((block) => block.contains(anchor))) continue;
 
     // `getAttribute` rather than `.href`: the property resolves relative URLs against the current
     // document, which would silently turn a broken href into a plausible mail.google.com URL.

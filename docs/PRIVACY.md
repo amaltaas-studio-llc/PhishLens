@@ -34,7 +34,7 @@ If a future feature seems to need something broader, that is a signal to reconsi
 ## Where data lives
 
 **Extracted from Gmail** — sender name and address, Reply-To, subject, visible body text (truncated,
-quoted replies removed), link anchor text and hrefs, attachment filenames and extensions, the delivered-to
+quoted replies removed), the anchor text and hrefs of links in that same part of the message, attachment filenames and extensions, the delivered-to
 address, Gmail's own authentication summary when it is exposed in the DOM, and the names and addresses of
 whoever sent the earlier messages in the open conversation. That last one is needed to tell a reply from a
 party already in a thread from one imitating them, and like everything else it is read from what is

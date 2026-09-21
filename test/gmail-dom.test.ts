@@ -150,6 +150,28 @@ describe('reading an ordinary message out of the page', () => {
     expect(email.links[0]?.text).toBe('Track your parcel');
   });
 
+  /**
+   * The two halves of one extraction have to agree about what the message is. `extractBody` has always
+   * dropped quoted replies; `extractLinks` read them, so replying to a phish contributed the phish's
+   * links — scored against the person who replied — while the sentences that would explain them were
+   * already gone. Asserted in both directions, because "ignore quoted content" is easy to overshoot into
+   * ignoring the reply itself.
+   */
+  it('reads links the sender wrote and not links they quoted', () => {
+    render({
+      body: 'Is this genuine? I have not clicked anything.',
+      links: [['our usual portal', 'https://portal.northwind-logistics.com/login']],
+      quoted:
+        'From: security@paypa1-alerts.example<br><a href="https://paypa1-alerts.example/verify">Verify your account now</a>',
+    });
+
+    const { email } = extract();
+    expect(email.links.map((l) => l.href)).toEqual([
+      'https://portal.northwind-logistics.com/login',
+    ]);
+    expect(email.bodyText).not.toContain('Verify your account');
+  });
+
   it('reads attachment filenames from the footer chips', () => {
     render({ attachments: ['Consignment_4471.pdf'] });
     expect(extract().email.attachments.map((a) => a.extension)).toEqual(['pdf']);
