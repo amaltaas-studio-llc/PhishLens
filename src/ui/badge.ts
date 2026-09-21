@@ -5,6 +5,7 @@
  * contents in a shadow root. Gmail's own nodes are never modified, reordered, or re-styled, and no
  * listener is added to anything Gmail owns.
  */
+import { countedFindings } from '../analysis/engine.js';
 import type { AnalysisResult, Classification } from '../shared/types.js';
 import { createShadowHost, el } from './dom.js';
 import { BADGE_CSS } from './styles.js';
@@ -100,7 +101,7 @@ export class Badge {
     );
     button.setAttribute(
       'aria-label',
-      ariaLabel(state, result.score, result.signals.filter((s) => s.score > 0).length),
+      ariaLabel(state, result.score, countedFindings(result).length),
     );
     button.disabled = false;
   }

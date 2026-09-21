@@ -213,3 +213,21 @@ export function observedSignals(result: AnalysisResult): SecuritySignal[] {
 export function assessmentSignals(result: AnalysisResult): SecuritySignal[] {
   return result.signals.filter((s) => s.category === 'llm');
 }
+
+/**
+ * The signals a count shown to a reader should include.
+ *
+ * Not every signal, because the engine also emits observations that exist for transparency and never
+ * contributed anything — `authentication.passed` is on nearly every legitimate message — and counting
+ * those tells someone with a clean inbox that PhishLens found one thing on mail where it found nothing.
+ * That is the reassuring surface being wrong, which is the direction this project cares most about.
+ *
+ * Dampened findings count despite scoring zero: something *was* found and then softened because a
+ * verified sender explains it, which is why the card still lists it.
+ *
+ * Exported because the badge's label and the popup's count must agree. They were computed separately
+ * and did not.
+ */
+export function countedFindings(result: AnalysisResult): SecuritySignal[] {
+  return result.signals.filter((s) => s.score > 0 || s.dampened === true);
+}

@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildContext } from '../src/analysis/context.js';
 import type { ThreadParty } from '../src/analysis/context.js';
-import { analyze, analyzeDeterministic } from '../src/analysis/engine.js';
+import { analyze, analyzeDeterministic, countedFindings } from '../src/analysis/engine.js';
 import { CATEGORY_WEIGHTS } from '../src/analysis/scoring/config.js';
 import { findParticipantLookalike } from '../src/analysis/rules/thread.js';
 import { __testables as contentTestables } from '../src/analysis/rules/content.js';
@@ -93,6 +93,31 @@ describe('legitimate email', () => {
 
   it('reports that the attachment is not suspicious rather than staying silent', () => {
     expect(hasSignal(result, 'attachment.none_suspicious')).toBe(true);
+  });
+
+  /**
+   * Those two transparency signals are why a count of findings cannot be a count of signals. Ordinary
+   * authenticated mail carries both, so counting every signal told a reader with a clean inbox that
+   * PhishLens had found something, on the surface most likely to be read alone. The badge counted
+   * correctly and the popup did not, which is how the disagreement was noticed.
+   */
+  it('counts none of its transparency signals as findings', () => {
+    expect(result.signals.length).toBeGreaterThan(0);
+    expect(countedFindings(result)).toEqual([]);
+  });
+
+  /**
+   * The other direction, because scoring zero is not the test. A combination finding from a sender the
+   * reader verified is zeroed and kept, and it is exactly the kind of thing they should be told about:
+   * something was found, and the reason it stopped counting is one they can see and undo.
+   */
+  it('counts a finding that was dampened to zero', () => {
+    const [note] = result.signals;
+    expect(note).toBeDefined();
+    if (note === undefined) return;
+
+    const dampened = { ...result, signals: [{ ...note, score: 0, dampened: true }] };
+    expect(countedFindings(dampened)).toHaveLength(1);
   });
 
   it('contributes nothing from the llm category', () => {

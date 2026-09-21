@@ -54,6 +54,17 @@ describe('headline', () => {
     expect(clean.note).toMatch(/checks found (nothing|anything)/i);
   });
 
+  /**
+   * A finding can be listed and still contribute nothing: dampening zeroes a combination finding when
+   * the sender is one the reader verified. Claiming the score is built from readable findings while the
+   * score is zero reads as a bug in the extension, which costs more than the sentence gains.
+   */
+  it('does not claim a zero score was built out of findings', () => {
+    const note = headline(scored({ score: 0, classification: 'low', findings: 2 })).note;
+    expect(note).not.toMatch(/every point/i);
+    expect(note).toMatch(/added to the score/i);
+  });
+
   it('tells a tab that predates the extension to reload', () => {
     expect(headline({ kind: 'unreachable' }).note).toMatch(/reload/i);
   });

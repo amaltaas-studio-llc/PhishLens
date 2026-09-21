@@ -13,6 +13,7 @@
 import {
   analyze,
   analyzeDeterministic,
+  countedFindings,
   isSemanticSettled,
   withSemanticStatus,
 } from '../analysis/engine.js';
@@ -369,13 +370,17 @@ export class Controller {
     const result = active.result;
     if (result === null) return { kind: 'pending' };
 
+    // Counted rather than every signal, so the popup agrees with the badge and does not announce a
+    // finding on a message where the only signal is "authentication passed".
+    const counted = countedFindings(result);
+
     return {
       kind: 'scored',
       score: result.score,
       classification: result.classification,
-      findings: result.signals.length,
+      findings: counted.length,
       // Already ordered as the card orders them, so these are the findings a reader would see first.
-      headlines: result.signals.slice(0, POPUP_HEADLINES).map((signal) => signal.title),
+      headlines: counted.slice(0, POPUP_HEADLINES).map((signal) => signal.title),
       semantic: active.semantic,
     };
   }

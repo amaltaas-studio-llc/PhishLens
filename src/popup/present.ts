@@ -112,10 +112,15 @@ export function headline(state: PopupState): Headline {
         label: CLASSIFICATION_LABELS[state.classification],
         score: `${String(state.score)}/100`,
         tone: state.classification,
+        // Three cases rather than two, because a finding can be reported and still contribute nothing:
+        // dampening zeroes a combination finding on mail from a sender you have verified, and claiming
+        // that the score is made of readable findings when the score is zero reads as a glitch.
         note:
           state.findings === 0
             ? 'None of the technical checks found anything.'
-            : 'Every point of this score comes from a finding you can read.',
+            : state.score === 0
+              ? 'What was found is listed in the card, and none of it added to the score.'
+              : 'Every point of this score comes from a finding you can read.',
       };
   }
 }
