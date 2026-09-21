@@ -1,0 +1,246 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * The adapter against markup, rather than around it.
+ *
+ * Everything else in this suite runs in plain Node, and for the detection engine that is a feature: the
+ * rules are pure, so they need no DOM and the suite stays fast enough to run on every save. But it left
+ * `src/gmail/` — the layer that decides whether any of it happens at all — asserted only through helpers
+ * reached via `__testables`. Two bugs walked straight through that gap:
+ *
+ *  - The trust gate required a named `dkim: pass`, which is only ever scraped from a tooltip most Gmail
+ *    builds do not render. Every fixture supplies `auth` as a JSON block, so nothing noticed that the
+ *    condition was unsatisfiable against what `extractAuth` can actually read. The feature was
+ *    unreachable in production and green in CI.
+ *  - `extractBody` strips quoted replies and `extractLinks` did not, because no test ever ran both over
+ *    one tree.
+ *
+ * **What these tests do and do not prove.** They prove the adapter's logic: that a details table becomes
+ * an `EmailAuthInfo`, that a quoted reply is excluded, that an unread part is reported as unread rather
+ * than silently dropped. They do *not* prove the selectors still match Gmail, because the markup here was
+ * written from the same table the code reads. Nothing in a repository can prove that — it needs the live
+ * product, which is what `src/content/health.ts` and the copied diagnostic are for. The structures below
+ * follow a real session diagnostic (`table.cf.gJ` for the details table, `span[email]` for the sender)
+ * rather than being invented, so they are at least a record of markup that existed.
+ *
+ * Markup is built with `DOMParser`, not `innerHTML`: the ban on parsing HTML applies here too, and a test
+ * suite is a strange place to make the one exception.
+ */
+import { beforeEach, describe, expect, it } from 'vitest';
+
+import { isScorable } from '../src/gmail/adapter.js';
+import { GmailDomAdapter } from '../src/gmail/dom-adapter.js';
+import { isSenderProven } from '../src/shared/trust.js';
+
+// ---------------------------------------------------------------------------
+// A Gmail-shaped page
+// ---------------------------------------------------------------------------
+
+interface PageOptions {
+  /** The `mailed-by` / `signed-by` rows Gmail renders in the details table. */
+  details?: Record<string, string>;
+  /** Anchors in the body, as `[text, href]`. */
+  links?: [string, string][];
+  /** Body content quoted from an earlier message, which analysis must not read. */
+  quoted?: string;
+  attachments?: string[];
+  senderName?: string;
+  senderEmail?: string;
+  subject?: string;
+  body?: string;
+  /** Gmail's own red banner, or an unrelated live region, depending on what is being asserted. */
+  banner?: { text: string; role: 'warning' | 'unrelated' };
+}
+
+const DEFAULTS = {
+  senderName: 'Northwind Logistics',
+  senderEmail: 'notifications@northwind-logistics.com',
+  subject: 'Your delivery is scheduled',
+  body: 'Your consignment leaves the depot on Tuesday morning.',
+};
+
+function render(options: PageOptions = {}): void {
+  const o = { ...DEFAULTS, ...options };
+
+  const detailRows = Object.entries(o.details ?? {})
+    .map(([label, value]) => `<tr><td class="gL">${label}:</td><td class="gM">${value}</td></tr>`)
+    .join('');
+
+  const anchors = (o.links ?? [])
+    .map(([text, href]) => `<a href="${href}">${text}</a>`)
+    .join(' ');
+
+  const chips = (o.attachments ?? [])
+    .map((filename) => `<span class="aV3">${filename}</span>`)
+    .join('');
+
+  // Both forms go *inside* the message, which is the only place `extractAuth` looks — and which the first
+  // candidate for the group (`.gJ .aiG`) already implies, since `.gJ` is part of the message header. An
+  // unrelated live region placed on the page outside the message would make the negative case pass for
+  // the wrong reason: nothing would have been found, rather than found and judged not to be a verdict.
+  const banner =
+    o.banner === undefined
+      ? ''
+      : o.banner.role === 'warning'
+        ? `<div class="gJ"><div class="aiG">${o.banner.text}</div></div>`
+        : `<div role="alert">${o.banner.text}</div>`;
+
+  // `.hP` for the subject and `div[role="main"]` for the conversation root are the page-level structures;
+  // everything inside `div[data-message-id]` is the message the adapter reads.
+  const html = `<!doctype html><html><body>
+    <a aria-label="Northwind Mail (reader@northwind-logistics.com)" href="#"></a>
+    <div role="main">
+      <h2 class="hP">${o.subject}</h2>
+      <div data-message-id="msg-18f2a0c" class="gs">
+        ${banner}
+        <div class="gE iv gt">
+          <table class="cf gJ">
+            <tr><td><span class="gD" email="${o.senderEmail}" name="${o.senderName}">${o.senderName}</span></td></tr>
+            ${detailRows}
+          </table>
+          <td class="gH"><div class="gK">10:24</div></td>
+        </div>
+        <div class="ii gt">
+          <div class="a3s aiL">
+            <p>${o.body}</p>
+            ${anchors}
+            ${o.quoted === undefined ? '' : `<blockquote class="gmail_quote">${o.quoted}</blockquote>`}
+          </div>
+        </div>
+        <div class="aQH">${chips}</div>
+      </div>
+    </div>
+  </body></html>`;
+
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+  document.body.replaceChildren(...parsed.body.childNodes);
+}
+
+/** Extraction of whatever `render` last drew, or a failure that says which step gave up. */
+function extract(): ReturnType<GmailDomAdapter['extract']> {
+  const adapter = new GmailDomAdapter();
+  const handle = adapter.currentMessage();
+  if (handle === null) throw new Error('currentMessage() found no message in the rendered page');
+  return adapter.extract(handle);
+}
+
+beforeEach(() => {
+  document.body.replaceChildren();
+});
+
+// ---------------------------------------------------------------------------
+
+describe('reading an ordinary message out of the page', () => {
+  it('reads the sender, subject and body', () => {
+    render();
+    const { email } = extract();
+
+    expect(email.senderEmail).toBe('notifications@northwind-logistics.com');
+    expect(email.senderName).toBe('Northwind Logistics');
+    expect(email.subject).toBe('Your delivery is scheduled');
+    expect(email.bodyText).toContain('leaves the depot on Tuesday');
+  });
+
+  it('reads links with the href as written, not as the document would resolve it', () => {
+    render({ links: [['Track your parcel', 'https://track.northwind-logistics.com/c/9f2a']] });
+    const { email } = extract();
+
+    expect(email.links).toHaveLength(1);
+    expect(email.links[0]?.href).toBe('https://track.northwind-logistics.com/c/9f2a');
+    expect(email.links[0]?.text).toBe('Track your parcel');
+  });
+
+  it('reads attachment filenames from the footer chips', () => {
+    render({ attachments: ['Consignment_4471.pdf'] });
+    expect(extract().email.attachments.map((a) => a.extension)).toEqual(['pdf']);
+  });
+
+  it('reports nothing missing, so the message is scorable', () => {
+    render();
+    const { missing } = extract();
+
+    expect(missing).toEqual([]);
+    expect(isScorable(missing)).toBe(true);
+  });
+});
+
+/**
+ * The gate that was unsatisfiable. Gmail renders `signed-by` with the domain of a signature it verified
+ * and omits the row when there is none, so the row's presence is the verdict — but the named verdicts the
+ * gate used to demand are scraped from a details tooltip that most builds do not carry. Asserted here,
+ * through the DOM, because asserting it on a hand-written `auth` block is what hid the bug.
+ */
+describe('authentication read from the details table', () => {
+  it('reads mailed-by and signed-by as the domains they name', () => {
+    render({
+      details: {
+        'mailed-by': 'bounce.northwind-logistics.com',
+        'signed-by': 'northwind-logistics.com',
+      },
+    });
+
+    const auth = extract().email.auth;
+    expect(auth?.mailedBy).toBe('bounce.northwind-logistics.com');
+    expect(auth?.signedBy).toBe('northwind-logistics.com');
+  });
+
+  it('proves the sender from an aligned signed-by row alone, with no verdict anywhere', () => {
+    render({ details: { 'signed-by': 'northwind-logistics.com' } });
+
+    const auth = extract().email.auth;
+    expect(auth?.dkim).toBeUndefined();
+    expect(auth?.dmarc).toBeUndefined();
+    expect(isSenderProven(auth, 'northwind-logistics.com')).toBe(true);
+  });
+
+  it('does not prove a sender whose signature belongs to someone else', () => {
+    render({
+      senderEmail: 'billing@northwind-invoices.example',
+      details: { 'signed-by': 'northwind-logistics.com' },
+    });
+
+    expect(isSenderProven(extract().email.auth, 'northwind-invoices.example')).toBe(false);
+  });
+
+  it('does not prove a sender from an envelope alone', () => {
+    render({ details: { 'mailed-by': 'northwind-logistics.com' } });
+    expect(isSenderProven(extract().email.auth, 'northwind-logistics.com')).toBe(false);
+  });
+});
+
+describe('Gmail’s own warning banner', () => {
+  it('reads a banner that is a verdict about the message', () => {
+    render({
+      banner: { text: 'This message seems dangerous. Similar messages were used to steal people’s personal information.', role: 'warning' },
+    });
+
+    expect(extract().email.auth?.gmailWarning).toBeDefined();
+  });
+
+  /**
+   * The page always holds something with `role="alert"` — Gmail's live regions carry it — which is why
+   * the last candidate in that selector group is safe only because the text is judged afterwards. If a
+   * stray live region could become a warning, every message would carry Gmail's own verdict.
+   */
+  it('reads an unrelated live region as no warning at all', () => {
+    render({ banner: { text: 'Conversation marked as read.', role: 'unrelated' } });
+    expect(extract().email.auth?.gmailWarning).toBeUndefined();
+  });
+});
+
+/**
+ * The failure the project refuses to accept is a confident all-clear on a message nobody read. It is
+ * worth asserting through the DOM as well as through the rule, because the interesting half is that the
+ * adapter *notices*: a sender it could not parse has to arrive as an unread part rather than as an empty
+ * string that scores like ordinary mail.
+ */
+describe('a message the page will not give up', () => {
+  it('reports an unreadable sender as unread rather than as absent', () => {
+    render({ senderEmail: '', senderName: '' });
+    const { email, missing } = extract();
+
+    expect(email.senderEmail ?? '').toBe('');
+    expect(missing).toContain('sender');
+    expect(isScorable(missing)).toBe(false);
+  });
+});

@@ -73,7 +73,7 @@ why the whole detection engine runs under `vitest` in plain Node.
 | **esbuild**, not Vite | Three entry points with three different output contracts: the content script must be an IIFE, since MV3 declared content scripts are classic scripts, while the worker and options page are ESM. Vite's main advantage is a dev server, which is worth little when the primary UI only exists injected into Gmail's DOM. esbuild also keeps the dependency tree small, which matters for a security tool that asks to read your mail. Full build is ~50 ms. |
 | Vitest | ESM-native, no transform config, and fast enough that the fixture suite is usable as an inner-loop tool. |
 | ESLint + `typescript-eslint` (`strictTypeChecked`) | Flags `any`, unused vars and floating promises, plus `no-innerHTML` / `no-eval` house rules that make the XSS posture mechanical rather than aspirational. |
-| Zero runtime dependencies | `"dependencies": {}`. Everything shipped into the browser is in `src/` and can be read end to end. |
+| Zero runtime dependencies | `"dependencies": {}`. Everything shipped into the browser is in `src/` and can be read end to end. `jsdom` is a dev dependency and reaches one test file: the alternative was leaving the layer that reads Gmail's markup asserted only through helpers, which is where two production bugs came from. |
 
 ## The UI harness
 
@@ -124,7 +124,9 @@ UI change is one command away from being reflected in the README instead of sile
 
 ## Testing
 
-899 tests, all in plain Node — no Chrome, no Gmail, no network.
+910 tests, all in plain Node — no Chrome, no Gmail, no network. One file asks for a DOM and gets it from
+`jsdom`, which is why that is the only dev dependency here that is not a build or lint tool; see the note
+below the table.
 
 | File | Covers |
 | --- | --- |
@@ -142,6 +144,16 @@ UI change is one command away from being reflected in the README instead of sile
 | `test/trust.test.ts` | Each of the four limits on trusted senders, from both sides: that trust dampens what it should, and that it does nothing at all when authentication did not prove the sender, against an identity finding, or against a `high` finding. |
 | `test/triage.test.ts` | The sender-only verdicts, that none of them can read as an all-clear, that no low-scoring fixture is marked, and the allowlist guard that fails when a new identity rule is classified as neither safe nor unsafe for a list row. |
 | `test/popup.test.ts` | The popup's wording for every state — in particular that "nothing was found" and "nothing was checked" never share a phrasing — and the health line for each shape of extraction failure. |
+| `test/gmail-dom.test.ts` | The adapter against Gmail-shaped markup: sender, subject, body, links and attachment chips read out of a rendered page, authentication read from the details table, a warning banner distinguished from an unrelated live region, and an unreadable sender reported as unread rather than empty. The only file that needs a DOM. |
+
+**What the DOM tests prove, and what they cannot.** They prove the adapter's logic — that a details table
+becomes an `EmailAuthInfo`, that an unread part is reported rather than dropped. They do not prove the
+selectors still match Gmail, because the markup is written from the same table the code reads. Nothing in a
+repository can prove that; it needs the live product, which is what the session health tally and the
+copied diagnostic in the popup exist for. The value is that a refactor can no longer quietly break
+extraction, and that a gate like `isSenderProven` is now asserted against what the adapter can actually
+read rather than against a hand-written `auth` block — which is precisely how it came to be unsatisfiable
+in production while passing in CI.
 
 Fixture philosophy and the both-directions assertion are described in
 [DETECTION.md](DETECTION.md#confidence-in-the-numbers).
