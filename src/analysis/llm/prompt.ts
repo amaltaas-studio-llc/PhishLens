@@ -27,6 +27,15 @@ import { SEMANTIC_CATEGORIES } from '../../shared/types.js';
 /** Hard cap on body text sent to any model, local or cloud. */
 export const MAX_PROMPT_BODY_CHARS = 4000;
 /**
+ * Ceiling on either half of a prompt at the point it leaves the extension.
+ *
+ * Not a tuning knob, and deliberately far above anything this file produces: `buildUserPrompt` bounds the
+ * body and every header, so an honest prompt is a few thousand characters. It exists because the service
+ * worker receives those strings over a runtime message rather than building them, and the one part of the
+ * extension with network access should not assume its caller was the one that did the bounding.
+ */
+export const MAX_PROMPT_CHARS = 16_000;
+/**
  * Header fields are bounded separately from the body. A display name or subject is attacker-controlled
  * and has no natural length limit, so without this a 100 kB subject line would push the body out of
  * the model's context — a cheap way to blind the semantic layer while keeping the prompt "valid".

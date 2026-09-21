@@ -889,6 +889,15 @@ configured backend would therefore be subject to CORS, and since `content-type: 
 CORS-safelisted, would have to answer a preflight. Building the backend means deciding between a
 per-origin grant like §6's and CORS headers on the service.
 
+A second consequence is structural, and was a real hole rather than a change of assumptions. Redaction is
+built in the content script and the worker is the only thing that can send it, so forwarding the payload as
+received put the guarantee on the wrong side of the message channel: any surface able to call `sendMessage`
+could have posted whatever it liked to a configured backend, and every test pinning the contract would
+still have passed, because they test the builder. `sanitizeCloudPayload` re-imposes the field list, the
+lengths and the shapes at the point of the `fetch`, and the prompt strings for a model server are bounded
+there too. The principle generalises: a validation that runs anywhere other than the egress point is a
+convention, not a control.
+
 ---
 
 ## 7. Privacy model

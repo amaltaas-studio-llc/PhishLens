@@ -35,8 +35,11 @@ import {
   isModelServerConfigured,
   normalizeSettings,
 } from '../shared/settings.js';
+import { truncate } from '../shared/text.js';
 import type { Settings } from '../shared/types.js';
 import { parseSemanticAnalysis } from '../analysis/llm/parse.js';
+import { MAX_PROMPT_CHARS } from '../analysis/llm/prompt.js';
+import { sanitizeCloudPayload } from '../analysis/llm/redact.js';
 import {
   MAX_TOKENS,
   REQUEST_VARIANTS,
@@ -88,6 +91,13 @@ async function cloudAnalyze(request: CloudAnalyzeRequest): Promise<ExtensionResp
     return { ok: false, error: 'cloud analysis is not enabled' };
   }
 
+  // Rebuilt to the contract rather than forwarded. See `sanitizeCloudPayload`: the redaction is only a
+  // guarantee if it is applied where the request is made.
+  const payload = sanitizeCloudPayload(request.payload);
+  if (payload === null) {
+    return { ok: false, error: 'analysis payload was not usable' };
+  }
+
   const endpoint = `${settings.backendBaseUrl}/api/analyze`;
   const controller = new AbortController();
   const timer = setTimeout(() => {
@@ -98,7 +108,7 @@ async function cloudAnalyze(request: CloudAnalyzeRequest): Promise<ExtensionResp
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify(request.payload),
+      body: JSON.stringify(payload),
       signal: controller.signal,
       // No cookies or cached credentials are attached: this is an anonymous call to our own API, and
       // it must not become a way to correlate a browsing identity with mailbox content.
@@ -141,9 +151,12 @@ async function modelServerAnalyze(request: ModelServerAnalyzeRequest): Promise<E
     return { ok: false, error: 'no model server is configured' };
   }
 
+  // Bounded here as well as in `buildUserPrompt`, for the same reason the cloud payload is rebuilt: these
+  // strings arrive over a message, and an unbounded one would be serialised and sent by the only part of
+  // the extension that can reach the network.
   const messages = [
-    { role: 'system', content: request.payload.system },
-    { role: 'user', content: request.payload.user },
+    { role: 'system', content: truncate(asPromptText(request.payload.system), MAX_PROMPT_CHARS) },
+    { role: 'user', content: truncate(asPromptText(request.payload.user), MAX_PROMPT_CHARS) },
   ];
 
   for (const [index, extras] of REQUEST_VARIANTS.entries()) {
@@ -156,6 +169,11 @@ async function modelServerAnalyze(request: ModelServerAnalyzeRequest): Promise<E
   }
 
   return { ok: false, error: 'model server did not accept any supported request shape' };
+}
+
+/** A prompt half is a string or it is nothing; the type says so but the message channel cannot. */
+function asPromptText(value: unknown): string {
+  return typeof value === 'string' ? value : '';
 }
 
 /**

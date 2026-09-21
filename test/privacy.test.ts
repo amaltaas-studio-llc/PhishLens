@@ -13,7 +13,12 @@
 import { describe, expect, it } from 'vitest';
 import { resolveAnalyzer } from '../src/analysis/llm/index.js';
 import { ModelServerAnalyzer } from '../src/analysis/llm/model-server.js';
-import { buildCloudPayload, describeNameShape, redactAddresses } from '../src/analysis/llm/redact.js';
+import {
+  buildCloudPayload,
+  describeNameShape,
+  redactAddresses,
+  sanitizeCloudPayload,
+} from '../src/analysis/llm/redact.js';
 import {
   DEFAULT_SETTINGS,
   isCloudConfigured,
@@ -461,6 +466,98 @@ describe('describeNameShape', () => {
 
   it('collapses an unbounded name to a bounded description', () => {
     expect(describeNameShape('word '.repeat(1000)).length).toBeLessThan(60);
+  });
+});
+
+/**
+ * The builder is not where the guarantee lives. It runs in the content script; the service worker is what
+ * opens the socket, and it is handed the built payload over a runtime message. So every assertion above
+ * describes a function the network never sees the output of directly, and a caller that skipped it — a
+ * compromised content script, or any other surface able to reach `sendMessage` — could have posted an
+ * unredacted mailbox while all of those tests still passed.
+ *
+ * These assert the same contract at the egress point, against payloads the builder could not have
+ * produced.
+ */
+describe('sanitizeCloudPayload: the contract re-imposed where the request is made', () => {
+  it('reduces a smuggled full address to its domain', () => {
+    const payload = sanitizeCloudPayload({
+      ...buildCloudPayload(RICH_EMAIL, []),
+      senderDomain: 'security-noreply@rnicrosoft-online.com',
+    });
+
+    expect(payload?.senderDomain).toBe('');
+    expect(JSON.stringify(payload)).not.toContain('security-noreply');
+  });
+
+  it('re-redacts addresses in a body excerpt that arrived with them intact', () => {
+    const payload = sanitizeCloudPayload({
+      ...buildCloudPayload(RICH_EMAIL, []),
+      bodyExcerpt: 'Contact jane.okonkwo@northwind-logistics.com to confirm.',
+    });
+
+    expect(payload?.bodyExcerpt).not.toContain('jane.okonkwo@');
+    expect(payload?.bodyExcerpt).toContain('<address@northwind-logistics.com>');
+  });
+
+  it('refuses a display name arriving in the field that exists to carry none', () => {
+    const payload = sanitizeCloudPayload({
+      ...buildCloudPayload(RICH_EMAIL, []),
+      senderNameShape: 'Microsoft Account Team',
+    });
+
+    expect(payload?.senderNameShape).toBe('unknown');
+    expect(JSON.stringify(payload)).not.toContain('Microsoft Account Team');
+  });
+
+  it('drops the subdomains a link domain can use to name a recipient', () => {
+    const payload = sanitizeCloudPayload({
+      ...buildCloudPayload(RICH_EMAIL, []),
+      linkDomains: ['jane-okonkwo.tracking.account-verify.example'],
+    });
+
+    expect(payload?.linkDomains).toEqual(['account-verify.example']);
+  });
+
+  it('bounds fields that arrived unbounded', () => {
+    const payload = sanitizeCloudPayload({
+      ...buildCloudPayload(RICH_EMAIL, []),
+      subject: 'x'.repeat(5000),
+      bodyExcerpt: 'y'.repeat(500_000),
+      linkDomains: Array.from({ length: 400 }, (_v, i) => `d${String(i)}.example`),
+      attachmentExtensions: Array.from({ length: 100 }, (_v, i) => `ext${String(i)}`),
+      deterministicSignalIds: Array.from({ length: 400 }, (_v, i) => `content.urgency.${String(i)}`),
+    });
+
+    expect(payload?.subject.length).toBeLessThanOrEqual(300);
+    expect(payload?.bodyExcerpt.length).toBeLessThanOrEqual(4000);
+    expect(payload?.linkDomains.length).toBeLessThanOrEqual(25);
+    expect(payload?.attachmentExtensions.length).toBeLessThanOrEqual(15);
+    expect(payload?.deterministicSignalIds.length).toBeLessThanOrEqual(40);
+  });
+
+  it('adds no field of its own, whatever it was given', () => {
+    const payload = sanitizeCloudPayload({
+      ...buildCloudPayload(RICH_EMAIL, []),
+      recipientEmail: 'jane.okonkwo@northwind-logistics.com',
+      messageId: 'thread-18f2a',
+      raw: { senderEmail: 'DoNoT.rEpLy@mt50sys.com' },
+    });
+
+    for (const forbidden of ['recipientEmail', 'messageId', 'raw', 'senderEmail', 'senderName']) {
+      expect(payload).not.toHaveProperty(forbidden);
+    }
+    // The domain survives inside the body's redacted placeholder, which is deliberate; the address does not.
+    expect(JSON.stringify(payload)).not.toContain('jane.okonkwo@northwind-logistics.com');
+    expect(JSON.stringify(payload)).not.toContain('thread-18f2a');
+  });
+
+  // An array included on purpose: it is an object to `typeof`, and reading fields off one yields a
+  // payload of empty strings rather than a refusal, which is a request worth not making.
+  it('refuses anything that is not a payload at all', () => {
+    for (const value of [null, undefined, 'a string', 42, [], () => undefined]) {
+      expect(sanitizeCloudPayload(value)).toBeNull();
+    }
   });
 });
 

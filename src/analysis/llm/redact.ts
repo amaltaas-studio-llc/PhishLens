@@ -21,6 +21,12 @@ import { MAX_PROMPT_BODY_CHARS } from './prompt.js';
 
 export type CloudPayload = CloudAnalyzeRequest['payload'];
 
+/** The bounds of the contract, named because two functions have to agree on them. */
+const MAX_SUBJECT_CHARS = 300;
+const MAX_LINK_DOMAINS = 25;
+const MAX_ATTACHMENT_EXTENSIONS = 15;
+const MAX_SIGNAL_IDS = 40;
+
 export function buildCloudPayload(
   email: EmailMessage,
   deterministicSignalIds: readonly string[],
@@ -29,7 +35,7 @@ export function buildCloudPayload(
   const replyToDomain = addressDomain(email.replyTo);
 
   return {
-    subject: truncate(collapseWhitespace(email.subject ?? ''), 300),
+    subject: truncate(collapseWhitespace(email.subject ?? ''), MAX_SUBJECT_CHARS),
     bodyExcerpt: redactAddresses(truncate(email.bodyText, MAX_PROMPT_BODY_CHARS)),
     senderDomain,
     // The display name's *shape* is what matters for impersonation, not the name itself.
@@ -41,12 +47,94 @@ export function buildCloudPayload(
           .map((l) => registrableDomain(l.normalizedDomain))
           .filter((d) => d !== ''),
       ),
-    ].slice(0, 25),
+    ].slice(0, MAX_LINK_DOMAINS),
     attachmentExtensions: [
       ...new Set(email.attachments.map((a) => a.extension.toLowerCase()).filter((e) => e !== '')),
-    ].slice(0, 15),
-    deterministicSignalIds: [...deterministicSignalIds].slice(0, 40),
+    ].slice(0, MAX_ATTACHMENT_EXTENSIONS),
+    deterministicSignalIds: [...deterministicSignalIds].slice(0, MAX_SIGNAL_IDS),
   };
+}
+
+/**
+ * Re-imposes the contract above on a payload that arrived over a runtime message.
+ *
+ * `buildCloudPayload` runs in the content script, but the service worker is the only part of the
+ * extension that can reach the network, and it is handed the built payload rather than the message.
+ * Trusting that hand-off means the redaction this file exists to guarantee is enforced nowhere the
+ * network can see it: any surface able to call `sendMessage` — including a content script running on a
+ * page that has found a way to talk to it — could post a full mailbox to a configured backend, and the
+ * tests pinning this contract would still pass, because they test the builder.
+ *
+ * So the fields, lengths and shapes are checked again here, at the egress point. A field that cannot be
+ * made to fit is dropped rather than corrected, since a value we cannot recognise is one we cannot
+ * describe, and something that is not an object at all is refused outright.
+ */
+export function sanitizeCloudPayload(raw: unknown): CloudPayload | null {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
+  const source = raw as Record<string, unknown>;
+
+  const senderDomain = domainOnly(source['senderDomain']);
+  const replyToDomain = domainOnly(source['replyToDomain']);
+  const shape = typeof source['senderNameShape'] === 'string' ? source['senderNameShape'] : '';
+
+  return {
+    subject: truncate(collapseWhitespace(asString(source['subject'])), MAX_SUBJECT_CHARS),
+    bodyExcerpt: redactAddresses(truncate(asString(source['bodyExcerpt']), MAX_PROMPT_BODY_CHARS)),
+    senderDomain,
+    // A shape is a hyphenated vocabulary this file controls. Anything else is reported as `unknown`
+    // rather than passed through, because a display name is exactly what this field exists not to carry,
+    // and `unknown` is not a value `describeNameShape` can produce — so it also says where it came from.
+    senderNameShape: /^[a-z-]{1,64}$/u.test(shape) ? shape : 'unknown',
+    ...(replyToDomain !== '' && replyToDomain !== senderDomain ? { replyToDomain } : {}),
+    linkDomains: registrableList(source['linkDomains'], MAX_LINK_DOMAINS),
+    attachmentExtensions: patternList(
+      source['attachmentExtensions'],
+      MAX_ATTACHMENT_EXTENSIONS,
+      /^[a-z0-9]{1,16}$/u,
+    ),
+    deterministicSignalIds: patternList(
+      source['deterministicSignalIds'],
+      MAX_SIGNAL_IDS,
+      /^[a-z0-9_.]{1,64}$/u,
+    ),
+  };
+}
+
+function asString(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+/** A bare hostname, or nothing. A local part reaching here would be the leak the payload is shaped to avoid. */
+function domainOnly(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  const domain = normalizeDomain(value);
+  if (domain === '' || domain.length > 253 || /[@/\s]/u.test(domain)) return '';
+  return domain;
+}
+
+/** Registrable domains only: a subdomain can name the recipient, which is why the contract drops them. */
+function registrableList(value: unknown, max: number): string[] {
+  if (!Array.isArray(value)) return [];
+  const out = new Set<string>();
+  for (const entry of value) {
+    const registrable = registrableDomain(domainOnly(entry));
+    if (registrable !== '') out.add(registrable);
+    if (out.size >= max) break;
+  }
+  return [...out];
+}
+
+function patternList(value: unknown, max: number, pattern: RegExp): string[] {
+  if (!Array.isArray(value)) return [];
+  const out = new Set<string>();
+  for (const entry of value) {
+    if (typeof entry !== 'string') continue;
+    const normalized = entry.trim().toLowerCase();
+    if (!pattern.test(normalized)) continue;
+    out.add(normalized);
+    if (out.size >= max) break;
+  }
+  return [...out];
 }
 
 /**

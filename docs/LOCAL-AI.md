@@ -272,9 +272,12 @@ The properties this shape is chosen for:
 - **One egress point.** Only the service worker makes network requests, so there is exactly one function
   to audit. Its `fetch` uses `credentials: 'omit'` and `redirect: 'error'`, so it cannot follow a redirect
   to another origin or attach ambient cookies.
-- **One redaction function.** `buildCloudPayload` (`src/analysis/llm/redact.ts`) decides what leaves, and
-  `test/privacy.test.ts` asserts field by field what it keeps *and* what must not be present, so a field
-  added carelessly later fails the suite.
+- **One redaction function, applied where the socket is.** `buildCloudPayload`
+  (`src/analysis/llm/redact.ts`) decides what leaves, and `test/privacy.test.ts` asserts field by field
+  what it keeps *and* what must not be present, so a field added carelessly later fails the suite. The
+  builder runs in the content script, though, and the worker is handed its output over a runtime message —
+  so the worker re-imposes the same contract with `sanitizeCloudPayload` before sending. Without that, the
+  guarantee would hold only for callers that chose to honour it, which is not what a guarantee is.
 - **Deterministic findings travel as ids**, not re-derived, so the backend never needs the data required
   to recompute them. This is also why the payload may carry `linkDomains` when the local prompt withholds
   them: they arrive next to the verdicts already reached about them, as context for a judgement rather
