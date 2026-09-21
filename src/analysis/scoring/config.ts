@@ -187,8 +187,6 @@ export const DETECTION_TUNING = Object.freeze({
   minThreadNameChars: 5,
   /** Subdomain label count above which the structure itself is suspicious. */
   maxReasonableSubdomainLabels: 4,
-  /** Number of distinct link domains above which a message is "link-heavy" (newsletter shape). */
-  linkHeavyDomainCount: 8,
   /** Number of links above which a message is bulk-mail shaped. */
   bulkMailLinkCount: 12,
   /** Body length below which "no text, only links/images" is suspicious. */

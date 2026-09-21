@@ -29,7 +29,7 @@ npm test             # vitest run
 npm run test:watch
 npm run test:coverage
 
-npm run verify       # lint && typecheck && test — the gate before committing
+npm run verify       # lint, typecheck, test, build, dist check — the gate before committing
 ```
 
 The icons in `dist/icons/` are generated at build time by `scripts/gen-icons.mjs` rather than committed as
@@ -124,7 +124,7 @@ UI change is one command away from being reflected in the README instead of sile
 
 ## Testing
 
-912 tests, all in plain Node — no Chrome, no Gmail, no network. One file asks for a DOM and gets it from
+913 tests, all in plain Node — no Chrome, no Gmail, no network. One file asks for a DOM and gets it from
 `jsdom`, which is why that is the only dev dependency here that is not a build or lint tool; see the note
 below the table.
 
@@ -210,7 +210,8 @@ no longer runs the next time the floor moves. Add an aggregate job with a stable
 
 ## Conventions
 
-- `npm run verify` must pass before a commit. It is what CI runs.
+- `npm run verify` must pass before a commit. It is what CI runs. It ends with a build and `check:dist`
+  because a suite that never loads the extension cannot tell you that the extension no longer loads.
 - All scoring numbers live in `src/analysis/scoring/config.ts`. A magic number elsewhere is a bug.
 - All Gmail selectors live in `src/gmail/selectors.ts`.
 - New detection behaviour comes with a fixture and assertions in both directions — that it fires when it

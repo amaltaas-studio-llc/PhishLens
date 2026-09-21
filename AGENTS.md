@@ -20,10 +20,14 @@ cannot infer from the code.
 ## Definition of done
 
 ```bash
-npm run verify   # lint && typecheck && test — all three, every time
+npm run verify   # lint, typecheck, test, build, check:dist — all five, every time
 ```
 
-CI runs exactly this on Node 22.13.0 and 24. Do not finish a task with a failing or skipped check, and
+The build and the dist check are in there because a green test run says nothing about whether the thing
+loads: a bundle renamed without updating `options.html`, or a manifest referencing a file the build no
+longer emits, passes lint, typecheck and every test. It costs about two seconds.
+
+CI runs the same checks on Node 22.13.0 and 24. Do not finish a task with a failing or skipped check, and
 do not weaken a lint rule, loosen a `tsconfig` option, or delete an assertion to make something pass. If a
 rule seems wrong, say so instead of routing around it.
 

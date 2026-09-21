@@ -7,7 +7,7 @@ they disagree is the day one of them is silently wrong.
 
 Quick orientation, all of it expanded in `AGENTS.md`:
 
-- `npm run verify` (lint, typecheck, test) is the definition of done.
+- `npm run verify` (lint, typecheck, test, build, dist check) is the definition of done.
 - Never put message content into the DOM as HTML; use `el({ text })` from `src/ui/dom.ts`.
 - All scoring numbers belong in `src/analysis/scoring/config.ts`; all Gmail selectors in
   `src/gmail/selectors.ts`.

@@ -130,6 +130,17 @@ export const MAX_TRUSTED_SENDERS = 50;
 export const MAX_ENTRY_CHARS = 254;
 
 /**
+ * And bounded again in total, because the two limits above do not compose: fifty entries at the maximum
+ * address length is about 13 KB, which the 8 KB cap they were chosen to respect would reject — a write
+ * that fails, taking every other setting in the same item with it.
+ *
+ * Reaching this needs deliberately absurd addresses; the realistic fifty-entry list is well under 2 KB.
+ * It is here because a quota error is the worst way to discover an arithmetic slip, and because the
+ * comment above claimed a guarantee the numbers did not provide.
+ */
+const MAX_TRUST_LIST_CHARS = 6000;
+
+/**
  * Coerces a stored trust list into one that cannot surprise the matcher: lowercased, deduplicated,
  * bounded in both length and count, and containing nothing that is neither an address nor a domain.
  *
@@ -145,12 +156,16 @@ export function normalizeTrustList(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
 
   const seen = new Set<string>();
+  let chars = 0;
   for (const value of raw) {
     if (typeof value !== 'string') continue;
     const entry = value.trim().toLowerCase();
     if (entry === '' || entry.length > MAX_ENTRY_CHARS) continue;
     if (!isPlausibleEntry(entry)) continue;
+    if (seen.has(entry)) continue;
+    if (chars + entry.length > MAX_TRUST_LIST_CHARS) break;
     seen.add(entry);
+    chars += entry.length;
     if (seen.size >= MAX_TRUSTED_SENDERS) break;
   }
   return [...seen];

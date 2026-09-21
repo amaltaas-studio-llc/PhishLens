@@ -300,10 +300,15 @@ export class Panel {
         el('h3', { class: 'section-title', text: 'Why' }),
         el('p', {
           class: 'section-note',
+          // "Nothing of concern" is only true when the notes below are transparency — authentication
+          // passed, no attachment was suspicious. A dampened finding is also scoreless, and saying nothing
+          // was of concern directly above one contradicts the list a reader is looking at.
           text:
             scoring.length > 0
               ? 'Observed — technical checks on this message.'
-              : 'Observed — technical checks found nothing of concern.',
+              : notes.some((s) => s.dampened === true)
+                ? 'Observed — nothing counted towards the score, for the reasons given.'
+                : 'Observed — technical checks found nothing of concern.',
         }),
         el('ul', {
           children:

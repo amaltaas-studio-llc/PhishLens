@@ -359,6 +359,23 @@ describe('normalizeTrustList', () => {
     expect(normalizeTrustList(raw)).toHaveLength(MAX_TRUSTED_SENDERS);
     expect(normalizeTrustList('not a list')).toEqual([]);
   });
+
+  /**
+   * The count and the per-entry length were each chosen against the 8 KB `storage.sync` item cap, but
+   * together they permit about 13 KB — a write that fails and takes every other setting in the same item
+   * with it. Absurd input, real consequence, and a quota error is the worst way to find out.
+   */
+  it('bounds the serialised size, not only the number of entries', () => {
+    const long = `${'a'.repeat(240)}.example`;
+    const raw = Array.from({ length: MAX_TRUSTED_SENDERS }, (_, i) => `s${String(i)}${long}`);
+    const serialized = JSON.stringify(normalizeTrustList(raw));
+
+    expect(serialized.length).toBeLessThan(8000);
+    // Still accepts a realistic list of that size, which is what the bound must not cost.
+    expect(
+      normalizeTrustList(Array.from({ length: MAX_TRUSTED_SENDERS }, (_, i) => `sender${String(i)}.example`)),
+    ).toHaveLength(MAX_TRUSTED_SENDERS);
+  });
 });
 
 describe('withTrustedSender / withoutTrustedSender', () => {

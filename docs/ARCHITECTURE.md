@@ -964,7 +964,8 @@ Every string from an email is treated as attacker-controlled.
 
 ## 9. Shipping: CI, packaging, and the UI harness
 
-`npm run verify` (lint + typecheck + test) is the gate, and `.github/workflows/ci.yml` runs it on the
+`npm run verify` (lint, typecheck, test, then a build and the dist check) is the gate, and
+`.github/workflows/ci.yml` runs it on the
 `engines` floor (Node 22.13.0) as well as the current LTS, because the floor is a promise and an untested
 promise is a guess.
 

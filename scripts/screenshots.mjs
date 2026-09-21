@@ -4,7 +4,7 @@
  *
  * Uses headless Chrome's own `--screenshot` rather than Puppeteer or Playwright: this repository ships
  * zero runtime dependencies and keeps its dev tree small on purpose, and a browser automation stack is
- * a large amount of supply chain to own for four PNGs. The cost is that each shot is a separate process
+ * a large amount of supply chain to own for five PNGs. The cost is that each shot is a separate process
  * and the window size is the only cropping tool, which is why the harness has a `view=card` mode sized
  * to the card.
  *
