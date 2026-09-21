@@ -142,6 +142,20 @@ export const SELECTORS = {
   headerRightCluster: ['td.gH div.gK', 'td.gH.bAk', 'td.gH', '.gH .gK'],
 
   /**
+   * Where the badge goes when none of the above is there.
+   *
+   * A group of its own despite overlapping `senderHeaderBlock`, because the two lists are consumed
+   * differently: that one is read as text and may legitimately name a `<table>`, and appending an element
+   * inside a table is a layout accident rather than a worse position. Kept here rather than inline in
+   * `dom-adapter.ts` for the reason the whole file exists — when Gmail moves its markup, one file should
+   * need editing, and a list that lives beside the code that uses it is the one nobody remembers to change.
+   *
+   * Every candidate is a placement, not a requirement. A badge on the wrong line is an acceptable
+   * outcome; no badge is not.
+   */
+  headerFallbackBlock: ['.gE.iv.gt', '.gE', '.iw', '.gK', '.go', '.hb'],
+
+  /**
    * A row in a message list — inbox, search results, a label.
    *
    * `tr.zA` is the long-standing one and `[role="row"]` is the semantic fallback, which also matches

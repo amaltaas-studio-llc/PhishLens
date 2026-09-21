@@ -124,7 +124,7 @@ UI change is one command away from being reflected in the README instead of sile
 
 ## Testing
 
-910 tests, all in plain Node — no Chrome, no Gmail, no network. One file asks for a DOM and gets it from
+912 tests, all in plain Node — no Chrome, no Gmail, no network. One file asks for a DOM and gets it from
 `jsdom`, which is why that is the only dev dependency here that is not a build or lint tool; see the note
 below the table.
 

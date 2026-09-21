@@ -25,6 +25,9 @@
  *
  * Markup is built with `DOMParser`, not `innerHTML`: the ban on parsing HTML applies here too, and a test
  * suite is a strange place to make the one exception.
+ *
+ * Keep the markup *valid*. An HTML parser silently discards a `<td>` that is not inside a row, so invalid
+ * fixture markup does not fail — it quietly tests a different tree than the one written here.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 
@@ -95,10 +98,12 @@ function render(options: PageOptions = {}): void {
         ${banner}
         <div class="gE iv gt">
           <table class="cf gJ">
-            <tr><td><span class="gD" email="${o.senderEmail}" name="${o.senderName}">${o.senderName}</span></td></tr>
+            <tr>
+              <td><span class="gD" email="${o.senderEmail}" name="${o.senderName}">${o.senderName}</span></td>
+              <td class="gH"><div class="gK">10:24</div></td>
+            </tr>
             ${detailRows}
           </table>
-          <td class="gH"><div class="gK">10:24</div></td>
         </div>
         <div class="ii gt">
           <div class="a3s aiL">
@@ -175,6 +180,22 @@ describe('reading an ordinary message out of the page', () => {
   it('reads attachment filenames from the footer chips', () => {
     render({ attachments: ['Consignment_4471.pdf'] });
     expect(extract().email.attachments.map((a) => a.extension)).toEqual(['pdf']);
+  });
+
+  /**
+   * The badge has to land somewhere. Every candidate is a placement rather than a requirement, so the
+   * assertion is not *which* element wins but that the search degrades: with the timestamp cluster gone,
+   * a worse position inside the header is found, and the message is still annotated.
+   */
+  it('finds somewhere in the header to attach the badge, and keeps finding one as candidates vanish', () => {
+    render();
+    const preferred = new GmailDomAdapter().currentMessage()?.headerElement;
+    expect(preferred?.className).toContain('gK');
+
+    document.querySelector('td.gH')?.remove();
+    const fallback = new GmailDomAdapter().currentMessage()?.headerElement;
+    expect(fallback).not.toBeNull();
+    expect(fallback?.className).toContain('gE');
   });
 
   it('reports nothing missing, so the message is scorable', () => {

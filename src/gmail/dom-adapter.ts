@@ -863,20 +863,19 @@ function isExpanded(element: Element): boolean {
  * Preference order is deliberate. The right-hand cluster of the header row is tried first, because
  * that places the badge on the sender's line, in the space beside the timestamp. The header container
  * is only a fallback: a badge appended there becomes the container's last block and renders on a line
- * of its own underneath the recipient row, which is where it used to sit.
+ * of its own underneath the recipient row, which is where it used to sit. The first element child is the
+ * last resort, since a badge somewhere in the header beats no badge.
  *
- * Every candidate is a placement, not a requirement — if Gmail's markup has moved on, a worse
- * position is an acceptable outcome and no position is not.
+ * Both lists live in `selectors.ts`, which is the whole of the reasoning: they used to be one group plus
+ * six class names written out here, and the copy that sits next to its caller is the one that gets missed
+ * when Gmail moves.
  */
 function findHeaderAnchorPoint(element: Element): Element | null {
-  const inline = queryFirst(element, SELECTORS.headerRightCluster);
-  if (inline !== null) return inline;
-
-  for (const selector of ['.gE.iv.gt', '.gE', '.iw', '.gK', '.go', '.hb']) {
-    const found = element.querySelector(selector);
-    if (found !== null) return found;
-  }
-  return element.firstElementChild;
+  return (
+    queryFirst(element, SELECTORS.headerRightCluster) ??
+    queryFirst(element, SELECTORS.headerFallbackBlock) ??
+    element.firstElementChild
+  );
 }
 
 export const __testables = {
