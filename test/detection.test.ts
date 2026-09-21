@@ -280,6 +280,15 @@ describe('obvious PayPal phishing', () => {
     expect(hasSignal(result, 'content.combo.threat_and_credential_request')).toBe(true);
   });
 
+  /** The other half of the correlation: a brand *was* identified, so the finding names it. */
+  it('names the brand it found when reporting impersonation with a credential request', () => {
+    const correlated = signalFor(result, 'identity.impersonation_with_credential_request');
+    expect(correlated).toBeDefined();
+    expect(correlated?.title).toContain('PayPal');
+    expect(correlated?.description).toContain('PayPal');
+    expect(correlated?.evidence?.value).toBe(loadFixture('paypal-phish').email.senderEmail);
+  });
+
   it('reaches high risk on deterministic signals alone, with no llm contribution', () => {
     expect(result.categoryScores.llm).toBe(0);
     expect(result.classification).toBe('high-risk');
@@ -634,6 +643,19 @@ describe('MFA code request', () => {
 
   it('recognises the sender domain as imitating the recipient’s own domain', () => {
     expect(hasSignal(result, 'identity.lookalike_of_recipient_domain')).toBe(true);
+  });
+
+  /**
+   * The correlation that makes this more than a code request, and the case that exposed its wording. The
+   * impersonation here is of the reader's own employer, which no brand table contains — so a description
+   * built from `primaryClaim` called it "a known organisation" and named nothing the reader could check.
+   */
+  it('describes the impersonation it actually found, without inventing an organisation', () => {
+    const correlated = signalFor(result, 'identity.impersonation_with_credential_request');
+    expect(correlated).toBeDefined();
+    expect(correlated?.description).toMatch(/imitates the recipient/iu);
+    expect(correlated?.description).not.toMatch(/a known organisation/iu);
+    expect(correlated?.title).not.toMatch(/a known organisation/iu);
   });
 
   it('scores high risk', () => {

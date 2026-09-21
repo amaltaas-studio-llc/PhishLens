@@ -29,7 +29,19 @@ const FINANCIAL_REQUEST_THEMES = [
 ];
 
 function present(signals: readonly SecuritySignal[], ids: readonly string[]): boolean {
-  return signals.some((s) => ids.some((id) => s.id === id || s.id.startsWith(`${id}.`)));
+  return matchedId(signals, ids) !== undefined;
+}
+
+/** Which of `ids` fired, rather than whether one did, for a finding that has to describe what it saw. */
+function matchedId(
+  signals: readonly SecuritySignal[],
+  ids: readonly string[],
+): string | undefined {
+  for (const s of signals) {
+    const base = ids.find((id) => s.id === id || s.id.startsWith(`${id}.`));
+    if (base !== undefined) return base;
+  }
+  return undefined;
 }
 
 /**
@@ -76,24 +88,27 @@ function impersonationWithCredentialAsk(
   signals: readonly SecuritySignal[],
   context: AnalysisContext,
 ): SecuritySignal[] {
-  const impersonates = present(signals, [
-    'identity.display_name_impersonation',
-    // An organisation the brand table has never heard of impersonates just as effectively; the shape of
-    // the attack does not depend on us having enumerated the victim.
-    'identity.unsupported_org_claim',
-    'identity.lookalike_sender_domain',
-    'identity.brand_domain_in_subdomain',
-    'identity.sender_punycode_domain',
-    'identity.lookalike_of_recipient_domain',
-  ]);
+  const impersonation = matchedId(signals, [...IMPERSONATION_SIGNALS]);
   const asksForCredentials = present(signals, [
     'content.credential_verification',
     'content.mfa_request',
     'link.credential_link_unrelated_domain',
   ]);
-  if (!impersonates || !asksForCredentials) return [];
+  if (impersonation === undefined || !asksForCredentials) return [];
 
-  const brandLabel = context.primaryClaim?.brand.label ?? 'a known organisation';
+  // Named only when the signal that fired is one about a claimed brand *and* a claim was identified.
+  // Three of the triggers are not: a domain imitating the reader's own employer, an organisation the
+  // brand table has never heard of, and a punycode domain all describe impersonation of something this
+  // finding cannot name. Reading the label off `primaryClaim` regardless meant a critical finding could
+  // announce "presents itself as a known organisation" in exactly the cases where no organisation was
+  // recognised, or name a brand mentioned in the body while the impersonation was of the recipient.
+  const brand = BRAND_CLAIM_SIGNALS.has(impersonation)
+    ? context.primaryClaim?.brand.label
+    : undefined;
+  const how =
+    brand !== undefined
+      ? `presents itself as ${brand} from a domain that organisation does not control`
+      : (IMPERSONATION_DESCRIPTIONS[impersonation] ?? 'is not the party it appears to be');
 
   return [
     signal({
@@ -101,11 +116,44 @@ function impersonationWithCredentialAsk(
       category: 'identity',
       severity: 'critical',
       score: 40,
-      title: 'Sender is impersonating a known organisation and asking for credentials',
-      description: `The sender presents itself as ${brandLabel} from a domain that organisation does not control, and the message asks the recipient to sign in, confirm account details, or supply an authentication code. Those two facts together describe a credential-harvesting attempt.`,
+      title:
+        brand !== undefined
+          ? `Sender is impersonating ${brand} and asking for credentials`
+          : 'Sender is not who it appears to be, and the message asks for credentials',
+      description: `The sender ${how}, and the message asks the recipient to sign in, confirm account details, or supply an authentication code. Those two facts together describe a credential-harvesting attempt.`,
+      // The pairing is a synthesis of two reported facts, but a reader still has to be able to check the
+      // half this finding is named for, and the sender line is where they would look.
+      ...(context.senderEmail === '' ? {} : { evidence: { value: context.senderEmail } }),
     }),
   ];
 }
+
+/**
+ * The impersonation signals that make a credential request a credential-harvesting attempt, and how to
+ * describe each when there is no brand to name. An organisation the brand table has never heard of
+ * impersonates just as effectively; the shape of the attack does not depend on us having enumerated the
+ * victim, which is why the list is wider than the brand table.
+ */
+const IMPERSONATION_DESCRIPTIONS: Record<string, string> = {
+  'identity.display_name_impersonation': 'presents itself as an organisation it does not send from',
+  'identity.unsupported_org_claim': 'presents itself as an organisation it does not send from',
+  'identity.lookalike_sender_domain': 'sends from a domain that imitates a real one',
+  'identity.brand_domain_in_subdomain':
+    'buries a real organisation’s name in a domain that organisation does not own',
+  'identity.sender_punycode_domain':
+    'sends from a non-Latin domain spelled to resemble a familiar one',
+  'identity.lookalike_of_recipient_domain':
+    'sends from a domain that imitates the recipient’s own',
+};
+
+const IMPERSONATION_SIGNALS = Object.keys(IMPERSONATION_DESCRIPTIONS);
+
+/** Those of the above whose subject is a brand this engine can name. */
+const BRAND_CLAIM_SIGNALS: ReadonlySet<string> = new Set([
+  'identity.display_name_impersonation',
+  'identity.lookalike_sender_domain',
+  'identity.brand_domain_in_subdomain',
+]);
 
 /**
  * An attachment that executes code, delivered with a delivery/invoice/document pretext. The pretext
