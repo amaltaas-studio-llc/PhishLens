@@ -246,7 +246,14 @@ mechanisms exist purely to keep legitimate mail at zero.
   `.me` and `.live` appear in brand `domains` as `me.com` and `live.com`, and treating the TLDs as owned
   would hand those identities to every registrant. Without this, an authenticated notice from a brand's own
   TLD whose display name named the brand was brand impersonation at `high` — half the score, and a marker on
-  the inbox row, for mail whose provenance is better established than most.
+  the inbox row, for mail whose provenance is better established than most. The same question is asked of a
+  link's *destination*, and getting that wrong cost more, because the rule it tripped is the most confident
+  one there is. A brand's footer shows its `.com` address and links to a short name under its own TLD, so a
+  displayed address leading to the brand's own redirector read as an address leading somewhere the brand was
+  not: `critical`, 45 points, 75/100 High Risk on a genuine card issuer's refund notice — earned by the line
+  telling the reader where to report a phishing email. The exemption is scoped to the brand the *displayed*
+  address names rather than to any brand, so showing one brand's address while linking to another's is still
+  reported; otherwise every brand in the table would be a usable disguise for every other.
 - **The AI dead zone.** Verdicts below 45/100, and any verdict no deterministic check corroborates, score
   zero. See [LOCAL-AI.md](LOCAL-AI.md).
 - **Trusted senders.** The user's own answer to a false positive, and the only one on this list that is
@@ -302,7 +309,7 @@ it is the marker that gets the feature switched off.
 
 ## Confidence in the numbers
 
-1105 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
+1123 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
 `test/fixtures/` holds 25 messages: a plain legitimate message, a legitimate password reset, a legitimate
 one-time code being delivered, a legitimate reply into an existing thread, a newsletter with many links, a
 newsletter whose links are all rewritten through its platform's click tracker, an institutional newsletter

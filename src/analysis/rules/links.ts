@@ -50,6 +50,18 @@ function displayedUrlMismatch(context: AnalysisContext): SecuritySignal[] {
     const brand = brandOwningDomain(link.displayedRegistrable);
     const impersonatesBrand = brand !== undefined;
 
+    // One of a brand's own names linking to another of them. A footer reading "report a suspicious email
+    // at brand.com/phishing" whose href is a short name under the brand's own TLD is the brand's own
+    // redirector, and the anti-phishing advice in genuine mail is where that shape appears most — so the
+    // rule was at its most confident, `critical`, on the one sentence written to prevent the attack.
+    //
+    // Scoped to the brand the *displayed* domain names, not to any brand, so it cannot launder a claim:
+    // showing one brand's domain while linking to a different brand's is still a mismatch. The
+    // destination is checked with `brandOwns`, which counts the brand's top-level domains — comparing
+    // against `domains` alone is what left the gap, since no list of second-level names covers a TLD
+    // whose every registration is the brand's by registry agreement.
+    if (brand !== undefined && brandOwns(brand, link.registrable)) continue;
+
     // The same rewrite, done by a platform we have not listed: the href points back at the sender's
     // own domain. Newsletter platforms (Substack, beehiiv, Kit) send from and redirect through one
     // domain, so every outbound link in a newsletter reads as a mismatch — the observed false

@@ -1298,6 +1298,47 @@ describe("a sender on a brand's own top-level domain", () => {
     expect(result.categoryScores.link).toBe(0);
   });
 
+  /**
+   * The displayed/actual mismatch rule, asked the same ownership question about the *destination*. It
+   * matched a brand on the anchor text and then said "the real destination does not [belong to it]"
+   * without ever checking, so a brand's own short-link domain was somewhere the brand was not: 45 points,
+   * `critical`, and the sentence that earned it was the footer telling the reader where to report a
+   * phishing email. Both directions matter here, because the anchor text naming a brand's domain is also
+   * the strongest link signal there is when the destination really is elsewhere.
+   */
+  it('does not read a brand own short-link domain as a mismatch with its own address', () => {
+    const result = analyzeDeterministic(genuine, { now: FIXED_NOW });
+    expect(hasSignal(result, 'link.displayed_url_mismatch')).toBe(false);
+    expect(result.categoryScores.link).toBe(0);
+    expect(result.classification).toBe('low');
+  });
+
+  it('still reports that address shown against a destination the brand does not own', () => {
+    const result = analyzeDeterministic(
+      {
+        ...genuine,
+        links: [toEmailLink({ text: 'apple.com/security', href: 'https://apple-id-security.example/verify' })],
+      },
+      { now: FIXED_NOW },
+    );
+
+    expect(signalFor(result, 'link.displayed_url_mismatch.0')?.severity).toBe('critical');
+  });
+
+  /**
+   * Scoped to the brand the anchor text names, not to whether *some* brand owns the destination —
+   * otherwise showing one brand's address while linking to another's would suppress itself, and every
+   * brand in the table would be a usable disguise for every other.
+   */
+  it('still reports one brand address shown against another brand destination', () => {
+    const result = analyzeDeterministic(
+      { ...genuine, links: [toEmailLink({ text: 'apple.com/security', href: 'https://microsoft.com/verify' })] },
+      { now: FIXED_NOW },
+    );
+
+    expect(signalFor(result, 'link.displayed_url_mismatch.0')?.severity).toBe('critical');
+  });
+
   it('still flags the same claim from a domain outside that TLD', () => {
     const result = analyzeDeterministic(
       { ...genuine, senderEmail: 'no-reply@apple-savings-notice.com', auth: undefined },

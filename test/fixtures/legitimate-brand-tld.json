@@ -1,16 +1,17 @@
 {
   "name": "legitimate-brand-tld",
-  "description": "False-positive resistance for a sender on a brand's own top-level domain. A name under `.apple` can only be Apple's — ICANN's Specification 13 restricts registrations in a brand TLD to the operator, its affiliates and its trademark licensees — but the brand table checked a claim against a handful of listed `.com` domains, so an authenticated notice with a display name saying Apple, sent from Apple's own TLD, was reported as Apple impersonation at `high` and scored 50/100 Suspicious on that one finding. The point of the fixture is that the impersonation rule must still recognise the claim; what changed is that the claim is now satisfied, not that the name stopped making one.",
+  "description": "False-positive resistance for a sender on a brand's own top-level domain. A name under `.apple` can only be Apple's — ICANN's Specification 13 restricts registrations in a brand TLD to the operator, its affiliates and its trademark licensees — but the brand table checked a claim against a handful of listed `.com` domains, so an authenticated notice with a display name saying Apple, sent from Apple's own TLD, was reported as Apple impersonation at `high` and scored 50/100 Suspicious on that one finding. The point of the fixture is that the impersonation rule must still recognise the claim; what changed is that the claim is now satisfied, not that the name stopped making one.\n\nThe security-advice link carries the second half of the same mistake, found in a genuine card issuer's refund notice. Its footer showed the brand's `.com` domain and linked to a short name under the brand's own TLD, which the displayed/actual mismatch rule read as a brand's address leading somewhere that was not the brand — `critical`, 45 points, 75/100 High Risk. The link that did it was the one telling the reader where to report a phishing email.",
   "email": {
     "senderName": "Apple Savings Support",
     "senderEmail": "no_reply@post.notices.apple",
     "replyTo": "no-reply@post.notices.apple",
     "recipientEmail": "sam.okafor@northwind-logistics.com",
     "subject": "The rate on your savings account is changing",
-    "bodyText": "The annual percentage yield on your savings account is changing.\n\nFrom the first of next month the rate becomes 3.65% APY. The new rate applies automatically and there is nothing for you to do.\n\nYou can see your balance, the interest earned so far and the full rate history at any time.\n\nRates are variable and may change again.",
+    "bodyText": "The annual percentage yield on your savings account is changing.\n\nFrom the first of next month the rate becomes 3.65% APY. The new rate applies automatically and there is nothing for you to do.\n\nYou can see your balance, the interest earned so far and the full rate history at any time.\n\nRates are variable and may change again.\n\nTo learn more about email security, or to report a message you think is not from us, visit apple.com/security.",
     "links": [
       { "text": "View your balance", "href": "https://notices.apple/savings/balance" },
-      { "text": "Rate history", "href": "https://notices.apple/savings/rates" }
+      { "text": "Rate history", "href": "https://notices.apple/savings/rates" },
+      { "text": "apple.com/security", "href": "https://notices.apple/security" }
     ],
     "attachments": [],
     "auth": {
