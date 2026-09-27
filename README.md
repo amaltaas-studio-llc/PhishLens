@@ -1,172 +1,118 @@
 # PhishLens
 
-[![CI](https://github.com/nilayk/PhishLens/actions/workflows/ci.yml/badge.svg)](https://github.com/nilayk/PhishLens/actions/workflows/ci.yml)
-[![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](#licence)
-[![Chrome MV3](https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4.svg)](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3)
+### A second look before you click.
 
-**PhishLens tells you how risky an email is, and shows you exactly why.**
+**Spot signs of phishing in Gmail, with explanations you can check for yourself.**
 
-It is a Chrome extension for Gmail. Open a message and it puts a small badge next to the sender's
-address. Click the badge and it explains its reasoning, finding by finding, in plain words. Everything
-happens on your own computer — no account, no server, nothing uploaded.
+PhishLens is a free, open-source Chrome extension that adds a risk badge to the email you're reading.
+Click it to see what looks unusual, why it matters, and the evidence behind the score.
+Analysis runs on your computer by default. No PhishLens account or API key is required.
 
-![PhishLens in a Gmail message: a High Risk badge in the header and the explanation card open in the corner](docs/assets/in-message.png)
+**[Download PhishLens](https://github.com/nilayk/PhishLens/releases/latest)** ·
+[Installation](#install) · [Privacy](#your-mail-stays-yours) ·
+[Get help](https://github.com/nilayk/PhishLens/issues)
 
-## What you see
+[![Latest release](https://img.shields.io/github/v/release/nilayk/PhishLens)](https://github.com/nilayk/PhishLens/releases/latest)
+[![Licence: MIT](https://img.shields.io/badge/Licence-MIT-blue.svg)](LICENSE)
 
-The badge is always there while you read, and it stays out of the way:
+![PhishLens showing a High Risk badge beside a sender and an explanation of a lookalike domain and a misleading link.](docs/assets/in-message.png)
 
-![The badge in four states: Low Risk 12/100, Suspicious 50/100, High Risk 75/100, and a dashed grey "Not checked" on a message whose sender could not be read](docs/assets/badges.png)
+## See what deserves a closer look
 
-| Badge | Score | What it means |
-| --- | --- | --- |
-| ✓ **Low Risk** | 0–24 | Nothing of concern was found. Ordinary mail looks like this. |
-| ! **Caution** | 25–49 | Something is a little unusual. Worth a second look, probably fine. |
-| ⚠ **Suspicious** | 50–74 | Several things do not add up. Do not enter a password or pay anything. |
-| ⛔ **High Risk** | 75–100 | This has the hallmarks of a real attack. Do not click the links. |
-| ? **Not checked** | — | Rare. PhishLens could not read part of the message, usually because Gmail changed its layout, so it did not score it. **Not a verdict of safe** — treat the message as though PhishLens were not installed, and click the badge for a report you can send us. |
+A familiar name can hide an unfamiliar address. A convincing link can lead somewhere else.
+PhishLens brings those details into view while you read.
 
-Clicking it opens a card in the corner with the whole reasoning. Hovering a finding highlights the
-part of the message it is about, so you can see the problem yourself rather than take our word for it:
+- **Check the sender.** Find lookalike domains, misleading display names, and replies that imitate someone already in a conversation.
+- **Understand the links.** See when a link's visible text and destination disagree, or a trusted name is buried in an unrelated address.
+- **Notice risky requests.** Get findings about requests for verification codes, payment changes, gift cards, and pressure to act quickly.
+- **Inspect attachment names.** Flag executable files and disguised extensions without opening or downloading them.
+- **Read the reasons.** Open the badge for individual findings and a score breakdown. Hover over supported findings to highlight the relevant part of the message.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/card-dark.png">
-  <img src="docs/assets/card-light.png" width="400" alt="The explanation card showing a score of 76 out of 100, High Risk, followed by individual findings: the sender domain imitates Microsoft, and a link places Microsoft's name in front of an unrelated domain.">
-</picture>
-
-Two things about that card are deliberate. Findings are worded to be *checkable* — "the sender domain
-is `rnicrosoft-online.com`, which is not a domain Microsoft owns" is something you can verify — and the
-score's arithmetic is shown at the bottom, so a number you disagree with is a number you can take apart.
-
-### The toolbar button
-
-Clicking PhishLens in the Chrome toolbar tells you what it is doing right now: the verdict for the tab
-you are on, whether the AI part is working, and a link to fix it if not. If the extension has been
-failing to read your messages — usually because Gmail changed its layout — this is where it says so, and
-where you can copy a short report to paste into an issue. The report contains counts and selector names,
-never anything from your mail.
-
-### When it is wrong about someone
-
-Some senders are unusual and legitimate — a supplier billing from a different domain than their website,
-a newsletter tool sending on a brand's behalf. If PhishLens keeps flagging one, you can mark it as
-trusted from the card, and its wording and urgency findings stop counting for that sender.
-
-It is a deliberately narrow tool, because "trusted sender" is exactly the setting an attacker would want
-to reach:
-
-- It only applies when Gmail says the message really did come from that domain. A spoofed message from a
-  sender on your list is scored as though the list were empty.
-- It never silences the identity checks. If the domain is a lookalike, you still hear about it, trusted
-  or not — trusting `paypal.com` cannot make `paypa1.com` quiet.
-- Nothing disappears. Findings it dampens are still listed, marked as dampened, and the card always says
-  the sender is trusted with a one-click undo.
-
-## How it works
-
-Most of what makes a phishing email detectable is not a matter of opinion. Whether the link that says
-`login.microsoftonline.com` actually goes to `session-verify-portal.net` is a fact, and code gets it
-right every time. So PhishLens checks the facts first, and only asks an AI model about the things that
-genuinely need judgement, like whether the tone is trying to rush you.
-
-![How PhishLens analyses a message: read from the page, extract fields, run deterministic checks, produce a score, show the badge and card. An optional on-device AI adjusts but cannot originate a score. Every stage is inside the browser.](docs/assets/pipeline.svg)
-
-**What it checks.** Sender addresses that imitate a real company, lookalike and non-Latin domains
-designed to read as familiar ones, links whose visible text disagrees with where they go, redirect
-chains, raw IP addresses, dangerous and disguised attachment types, requests for passwords or payment,
-manufactured urgency, and Gmail's own authentication results. Roughly forty checks in all.
-
-**About the AI.** If your Chrome has a built-in on-device model, PhishLens can also ask it to read the
-wording. That is entirely optional, it runs on your machine, and it is kept on a short leash: it is
-worth at most 15 of the 100 points, it is not allowed to reason about domains or links, and it cannot
-raise a score on its own — only sharpen one the factual checks already support. If there is no model, or
-you switch it off, the extension works exactly as before and the card says so instead of staying quiet.
-
-If you already run models yourself — **Ollama, LM Studio, Docker Model Runner** — you can point PhishLens
-at one instead, and get better-written reasons from a larger model. It still cannot raise a score on its
-own, and it still only sees the subject and body, never the links or domains. [Setting that
-up.](docs/LOCAL-AI.md#your-own-model-server)
+PhishLens is a reading aid. It does not block links, downloads, or replies, and a low score does not guarantee that a message is safe.
 
 ## Install
 
-PhishLens is not on the Chrome Web Store, so you install it yourself. It takes a minute and needs
-**Chrome 120 or newer**.
+**For Gmail in desktop Chrome 120 or later.** PhishLens does not run in the Gmail mobile apps or other email clients.
 
-1. Download `phishlens-<version>.zip` from the
-   [latest release](https://github.com/nilayk/PhishLens/releases/latest) and unzip it.
-2. Open `chrome://extensions` in Chrome.
-3. Turn on **Developer mode** (top right).
-4. Click **Load unpacked** and choose the unzipped folder.
-5. A welcome page opens explaining what happens next. Then open Gmail, open any message you received,
-   and look to the right of the sender's address.
+Download the packaged extension from GitHub and load it into Chrome:
 
-That is it. There is nothing to sign up for and no settings you have to change.
+1. Open the **[latest release](https://github.com/nilayk/PhishLens/releases/latest)** and download `phishlens-<version>.zip` under **Assets**. Choose the extension ZIP, not GitHub's **Source code** downloads.
+2. Unzip it into a folder you'll keep on your computer.
+3. Enter `chrome://extensions` in Chrome's address bar and turn on **Developer mode**.
+4. Click **Load unpacked** and select the extracted folder containing `manifest.json`.
+5. Open or refresh Gmail, then open a received message. Look for the badge beside the sender.
 
-Settings live behind the toolbar button, or at `chrome://extensions` → PhishLens → **Details** →
-**Extension options**. Building from source instead takes two commands and is covered in
-[the development guide](docs/DEVELOPMENT.md).
+No model setup is needed to use the core checks. Pin PhishLens from Chrome's Extensions menu for quick access to its status and settings.
+
+**Updating a manual installation:** download and extract the newer release into the same extension folder, then click **Reload** on PhishLens at `chrome://extensions` and refresh Gmail. Manual installations do not update automatically from GitHub.
+
+Want to build the current source yourself? Follow the [development guide](docs/DEVELOPMENT.md). Published downloads can lag behind the source on this page; check the [release notes](https://github.com/nilayk/PhishLens/releases) for the version you install.
+
+## What the badge means
+
+The score summarises the evidence PhishLens found. It is not a percentage chance that the message is phishing.
+
+| Badge | Score | How to read it |
+| --- | --- | --- |
+| **Low Risk** | 0–24 | Few or no warning signs were found in the available evidence. This is not an all-clear. |
+| **Caution** | 25–49 | Some details deserve a closer look. Open the badge to see why. |
+| **Suspicious** | 50–74 | Significant warning signs were found. Verify the request through a known contact or website before acting. |
+| **High Risk** | 75–100 | Strong warning signs were found. Avoid using the message's links or attachments to follow up. |
+| **Not checked** | — | PhishLens could not read enough to assess the message. This is not a judgement of safety. |
+
+![The badge beside four senders: Low Risk 12/100, Suspicious 50/100, High Risk 75/100, and a dashed grey Not checked badge on a message whose sender could not be read.](docs/assets/badges.png)
+
+The explanation card separates observed findings from any optional AI assessment and supports light and dark mode.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/card-dark.png">
+  <img src="docs/assets/card-light.png" width="400" alt="The PhishLens explanation card with a risk score and individual findings showing the evidence behind it.">
+</picture>
 
 ## Your mail stays yours
 
-This is a tool that reads your email, so it should be held to a high standard about what it does with
-it. Concretely:
+An extension that reads email should be clear about what it does with it.
 
-- **Nothing is uploaded.** In the configuration you just installed, PhishLens makes no network requests
-  at all. Not to us — there is no "us" — and not to anyone else.
-- **Nothing is stored.** The message is analysed in memory while it is on screen and then dropped.
-  Nothing is written to disk except the handful of settings you choose.
-- **Nothing in an email is ever opened.** No link is requested, no attachment is downloaded, no image is
-  fetched. Every check is done on the text. A phishing site never learns you looked at its email.
-- **It asks for two permissions**, both visible in the extension's manifest: access to
-  `mail.google.com` (to read the message you are looking at) and `storage` (for your settings). No
-  browsing history, no other sites, no downloads, no cookies.
-- **No accounts, no telemetry, no analytics.** Nothing counts how often you use it.
+- **No uploads by default.** PhishLens analyses messages in the browser without making network requests in its default configuration.
+- **No account, analytics, or telemetry.** There is no PhishLens service collecting your reading activity.
+- **No saved email archive.** Message content is not written to persistent storage. Analysis results may remain in memory until the tab closes. Your settings and any addresses or domains you choose to trust are saved using Chrome's storage.
+- **No opening message content.** PhishLens does not visit links, fetch images, or open attachments to inspect them. These checks use the text and filenames Gmail exposes.
+- **Limited access.** Installation grants access to Gmail and storage for settings. An optional model-server connection requires separate permission for the address you configure.
 
-Nothing above changes unless you deliberately change it. If you connect your own model server, the
-subject and body of the message you are reading go to the address you typed — which is why plain
-`http://` is only accepted for `localhost`, and why Chrome asks you to approve that one address before
-anything is sent. There is also a cloud mode that is designed but *not built*. [The full privacy and
-security model.](docs/PRIVACY.md)
+**If you choose a model server**, PhishLens sends the sender's display name, subject, and a body excerpt to that server. A remote server receives that content over the network; this is an explicit setting, not the default.
 
-## What it cannot do
+[Read the full privacy and security details →](docs/PRIVACY.md)
 
-Being clear about the limits is part of being trustworthy:
+## Make it work for you
 
-- **It is advisory.** It never blocks a link, an attachment, or a reply. It tells you; you decide.
-- **It can be wrong in both directions.** A phishing message written to look exactly like ordinary mail
-  will score low, and an unusual but genuine message can score higher than it deserves.
-- **It reads what Gmail shows.** No raw email headers, so its authentication checks rely on Gmail's own
-  summary. If Gmail changes how it builds its pages, some checks quietly stop finding things until the
-  extension is updated.
-- **Gmail on the web only.** Not the mobile apps, not other mail clients.
-- **It does not assess messages you wrote.** In a thread it looks at the most recent message you
-  *received*. If a thread's only open message is your own reply, no badge appears until you open one of
-  the received messages.
-- **English wording checks.** The language heuristics are English; a phishing email in another language
-  is still caught by the sender, link, and attachment checks, but not by the wording ones.
-- **It knows nothing about the world.** No blocklists, no reputation feeds, no record of past mail.
-  Everything comes from the message in front of it and the conversation it sits in, both already on your
-  screen, which is what lets it run entirely offline.
+Open **PhishLens in the Chrome toolbar → Settings** to adjust its behaviour.
 
-## Documentation
+**Keep the inbox quieter.** You can hide low-risk badges or turn on optional sender warnings in the message list. List warnings check sender identity only; an unmarked row has not been fully assessed.
 
-| Document | What is in it |
-| --- | --- |
-| [Detection and scoring](docs/DETECTION.md) | Every category of check, how the 0–100 score is assembled, and how false positives are held down. |
-| [Local AI](docs/LOCAL-AI.md) | The on-device model, connecting your own (Ollama, LM Studio, Docker Model Runner), what a model is allowed to do, and the cloud design that is not built. |
-| [Privacy and security](docs/PRIVACY.md) | Permissions, exactly what data exists and where, and the threat model. |
-| [Development](docs/DEVELOPMENT.md) | Building, testing, the UI harness, project layout, and releases. |
-| [Architecture](docs/ARCHITECTURE.md) | The long-form design record: every significant decision and why it was made that way. |
-| [AGENTS.md](AGENTS.md) | Instructions and invariants for AI coding agents working in this repository. |
+![An inbox list where most rows are unmarked and a few carry a small warning beside the subject.](docs/assets/inbox-list.png)
 
-## Contributing
+**Manage trusted senders.** For eligible messages, the explanation card lets you trust an address or domain. Trust can soften some findings when Gmail verifies the sender, but it does not remove findings or silence high-severity warnings. You can undo it from the card or settings.
 
-Bug reports about missed phishing or false alarms are the most valuable thing you can send, especially
-with the sender domain and link shapes that caused it — please do not paste real personal mail into an
-issue. A failing fixture in `test/fixtures/` is even better than a description.
+**Use optional AI.** Where Chrome makes an on-device model available, it can add an assessment of the wording. The core checks work without it. AI cannot remove their findings or raise the score without supporting evidence from those checks. Advanced users can connect their own model server. [AI availability and setup →](docs/LOCAL-AI.md)
 
-Before opening a pull request, run `npm run verify`.
+## Help and limitations
+
+**No badge?** Refresh Gmail after installing and open a received message. Your own outgoing replies are not assessed, and low-risk badges may be hidden by your settings. Click the toolbar icon to check the current status.
+
+**Seeing "Not checked", or a result that seems wrong?** The toolbar and explanation card can provide diagnostic information. [Report a problem](https://github.com/nilayk/PhishLens/issues), including your extension version and what you expected. Review anything you share and remove private email content, addresses, links, and screenshots of personal correspondence.
+
+PhishLens can miss phishing and can flag legitimate mail. It relies on what Gmail displays, so changes to Gmail's layout can affect extraction. Wording checks focus on English; sender, link, and filename checks can still help with other languages. It does not scan attachment contents or use live website-reputation services.
+
+## Open source
+
+This repository contains the source code for PhishLens. You can inspect how it works, build it yourself, report issues, or contribute improvements.
+
+[How detection works](docs/DETECTION.md) · [Build and contribute](docs/DEVELOPMENT.md) ·
+[Architecture](docs/ARCHITECTURE.md) · [Release history](https://github.com/nilayk/PhishLens/releases)
+
+For code contributions, run `npm run verify` before opening a pull request. Use fictional examples in tests and reports rather than publishing anyone's private mail.
 
 ## Licence
 
-MIT.
+PhishLens is free and open source under the [MIT licence](LICENSE).
+It is an independent project and is not affiliated with or endorsed by Google.

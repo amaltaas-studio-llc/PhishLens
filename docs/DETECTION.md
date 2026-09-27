@@ -15,6 +15,10 @@ reading — a model can help, and it is sometimes wrong. Mixing the two produces
 with. PhishLens keeps them apart the whole way through: separate detectors, a separate scoring category,
 a separate section of the card, and different wording in each.
 
+![A message is read from the page, its fields extracted, checked by deterministic rules, and scored before
+the badge and card are drawn. An optional on-device model adjusts the score but cannot originate one. Every
+stage runs inside the browser.](assets/pipeline.svg)
+
 ## What is checked
 
 Six groups of deterministic detectors, under `src/analysis/rules/`.
