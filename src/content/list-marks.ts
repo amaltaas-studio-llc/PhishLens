@@ -158,9 +158,12 @@ export class ListMarks {
 
     const recipient = this.#recipient();
 
+    const rows = rowsIn(root);
+    let addressable = 0;
     let marked = 0;
-    for (const row of rowsIn(root)) {
+    for (const row of rows) {
       const sender = readSender(row);
+      if (sender.senderEmail !== '') addressable += 1;
       /*
        * The key is everything the verdict was computed from.
        *
@@ -183,7 +186,16 @@ export class ListMarks {
       if (addMark(row, verdict)) marked += 1;
     }
 
-    if (marked > 0) logger.debug('list rows marked', { marked });
+    /*
+     * All three counts, every pass, and not just the marks.
+     *
+     * An unmarked inbox is the expected result — the floor is `high`, so ordinary mail earns nothing — and
+     * a stale row selector produces exactly the same silence. Logging only the marks made the two
+     * indistinguishable from outside, which is the question anyone debugging this actually has: rows at
+     * zero means the selectors no longer match Gmail's markup, and rows with addresses but no marks means
+     * the feature is working and has nothing to say.
+     */
+    logger.debug('list pass', { rows: rows.length, addressable, marked });
 
     if (this.#recipientEmail === '' && this.#accountWaits < MAX_ACCOUNT_WAITS) {
       this.#accountWaits += 1;
