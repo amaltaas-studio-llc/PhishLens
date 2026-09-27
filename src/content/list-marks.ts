@@ -34,6 +34,15 @@ const MAX_ROWS = 120;
 /** Quiet period after list churn. Longer than the message observer's: nothing here is time-critical. */
 const DEBOUNCE_MS = 300;
 
+/**
+ * Passes spent waiting for Gmail to render the address of the signed-in account, after which it is given
+ * up on rather than polled for as long as the tab is open.
+ *
+ * A retry is needed at all because nothing in the list changes when the address appears, and without one
+ * the recipient-lookalike check would be waiting on unrelated churn to notice.
+ */
+const MAX_ACCOUNT_WAITS = 20;
+
 /** The badge's glyphs, so a mark and the badge it precedes are recognisably the same vocabulary. */
 const GLYPHS: Readonly<Record<TriageSeverity, string>> = {
   high: '⚠',
@@ -60,6 +69,7 @@ export class ListMarks {
   #readAccount: () => string = () => '';
   /** Cached once found. It cannot change without a reload, and the read walks Gmail's chrome. */
   #recipientEmail = '';
+  #accountWaits = 0;
 
   start(root: Element, readAccount: () => string): void {
     this.stop();
@@ -79,6 +89,7 @@ export class ListMarks {
     this.#observer = null;
     if (this.#timer !== null) clearTimeout(this.#timer);
     this.#timer = null;
+    this.#accountWaits = 0;
     this.#clearAll();
     this.#root = null;
   }
@@ -100,9 +111,18 @@ export class ListMarks {
     let marked = 0;
     for (const row of rowsIn(root)) {
       const sender = readSender(row);
-      // The key includes the display name: the same address with a different name is a different claim,
-      // and the impersonation rules are largely about the name.
-      const key = `${sender.senderEmail}|${sender.senderName}`;
+      /*
+       * The key is everything the verdict was computed from.
+       *
+       * The display name, because the same address under a different name is a different claim and the
+       * impersonation rules are largely about the name. And the recipient, because it arrives *late*: the
+       * first passes run at `document_idle` with no account address, and `identity.lookalike_of_recipient_
+       * domain` — a `high` mark on a domain imitating the reader's own employer, which is the most valuable
+       * thing a row can say — cannot fire without it. Keyed on the sender alone, every row already on
+       * screen when the address resolved kept its "nothing to say here" and was skipped for the life of
+       * the tab, so the check only ever ran on mail that arrived later.
+       */
+      const key = `${recipient.recipientEmail ?? ''}|${sender.senderEmail}|${sender.senderName}`;
       if (row.getAttribute(MARKED_FOR) === key) continue;
 
       removeMark(row);
@@ -114,6 +134,11 @@ export class ListMarks {
     }
 
     if (marked > 0) logger.debug('list rows marked', { marked });
+
+    if (this.#recipientEmail === '' && this.#accountWaits < MAX_ACCOUNT_WAITS) {
+      this.#accountWaits += 1;
+      this.#schedule();
+    }
   }
 
   /** Resolved once per pass, and retried on later passes for as long as Gmail has not exposed it. */

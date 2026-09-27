@@ -782,6 +782,15 @@ for, and a row whose sender changed is re-evaluated rather than trusted. And a l
 constantly**, so passes are debounced, bounded to the rows on screen, and skip rows whose sender is
 unchanged, leaving a steady state of one attribute read per row.
 
+What a row records is everything its verdict was computed from, which includes the **signed-in address** —
+not because it changes, but because it arrives late. The first passes run at `document_idle`, before Gmail
+has rendered its account chrome, and `identity.lookalike_of_recipient_domain` cannot fire without it. That is
+the most valuable thing a row can say, since no brand table contains the reader's own employer. Keyed on the
+sender alone, every row on screen when the address resolved kept its "nothing to say" and was never looked at
+again, so the check only ever ran on mail that arrived afterwards. For the same reason the marker schedules
+its own retries, bounded, while the address is still unknown: nothing in the list necessarily changes at the
+moment it appears, so waiting for churn to notice is waiting on luck.
+
 The mark is inline-styled rather than given a stylesheet or a shadow root. A stylesheet in Gmail's page is a
 global this project does not otherwise create, and a shadow host per row is dozens of extra roots for one
 glyph; inline properties beat Gmail's own CSS without either. Where the glyph is inserted matters more than
