@@ -72,6 +72,13 @@ class FakeAdapter implements MailAdapter {
   view: RenderedView | null = null;
   rootAvailable = true;
   root = conversationRoot();
+  /**
+   * The elements a handle points at, held rather than made fresh per call, because the consumer *draws
+   * into* them: the badge is injected into the header. A fake handing out a new object each time would
+   * make "what I drew into is gone" indistinguishable from "nothing has changed".
+   */
+  messageElement = new FakeElement('DIV');
+  headerElement = new FakeElement('TD');
 
   observationRoot(): Element | null {
     return this.rootAvailable ? (this.root as unknown as Element) : null;
@@ -81,6 +88,12 @@ class FakeAdapter implements MailAdapter {
   replaceRoot(): void {
     this.root.isConnected = false;
     this.root = conversationRoot();
+  }
+
+  /** Gmail redrawing the message header with identical markup, which is what takes the badge with it. */
+  replaceHeader(): void {
+    this.headerElement.isConnected = false;
+    this.headerElement = new FakeElement('TD');
   }
 
   /** The observer never asks; it is on the interface for the list-row scanner. */
@@ -105,9 +118,9 @@ class FakeAdapter implements MailAdapter {
       messageId: this.view.messageId,
       threadId: this.view.threadId,
       priorSenders: [],
-      headerElement: null,
+      headerElement: this.headerElement as unknown as Element,
       bodyElement: null,
-      root: {} as Element,
+      root: this.messageElement as unknown as Element,
     };
   }
 
@@ -313,6 +326,27 @@ describe('redundant re-render suppression', () => {
     expect(messageEvents()).toHaveLength(2);
   });
 
+  /**
+   * A signature answers whether the message changed. It cannot answer whether what the consumer drew is
+   * still on screen, and those come apart: Gmail redraws the message header with equivalent markup, which
+   * takes the injected badge with it and leaves every byte of the extraction identical. Suppressing that
+   * as redundant removed the badge for the rest of the message's time on screen — silently, because from
+   * here nothing had changed.
+   */
+  it('re-emits when the header it reported was replaced by an identical one', () => {
+    adapter.route = THREAD_A_HASH;
+    adapter.view = thread('a', '1');
+    observer.start();
+    settle();
+    expect(messageEvents()).toHaveLength(1);
+
+    adapter.replaceHeader();
+    triggerMutation();
+    settle();
+
+    expect(messageEvents()).toHaveLength(2);
+  });
+
   it('re-emits when the body arrives after the header', () => {
     adapter.route = THREAD_A_HASH;
     adapter.view = { ...thread('a', '1'), bodyText: '' };
@@ -404,6 +438,34 @@ describe('staleness guard', () => {
 
     // Still A in the pane, now with the details panel expanded on it.
     adapter.view = { ...thread('a', '1'), auth: { spf: 'pass', mailedBy: 'northwind-tools.example' } };
+    triggerMutation();
+    settle(300);
+
+    expect(messageEvents()).toHaveLength(1);
+  });
+
+  /**
+   * The subject element is not part of the message.
+   *
+   * Gmail's thread perm id is read from the subject heading, which it renders separately from the
+   * conversation and swaps first: for a moment the heading names thread B while the message below it is
+   * still A's. Counting that id as part of *which message is rendered* let a heading update alone satisfy
+   * the guard, so the previous thread's message was emitted under the new route — the same failure the
+   * guard was narrowed to prevent, arriving through the one component of the identity that the message
+   * does not own.
+   */
+  it('does not emit the previous thread when only the subject heading has caught up', () => {
+    adapter.route = THREAD_A_HASH;
+    adapter.view = thread('a', '1');
+    observer.start();
+    settle();
+    expect(messageEvents()).toHaveLength(1);
+
+    navigate(THREAD_B_HASH);
+    settle(200);
+
+    // A's message, under B's heading.
+    adapter.view = { ...thread('a', '1'), threadId: 'thread-f:2' };
     triggerMutation();
     settle(300);
 
@@ -849,8 +911,19 @@ describe('signatures', () => {
       const initial = messageIdentity(base, email());
 
       expect(messageIdentity(handle('m2', 't1'), email())).not.toBe(initial);
-      expect(messageIdentity(handle('m1', 't2'), email())).not.toBe(initial);
       expect(messageIdentity(base, email({ senderEmail: 'b@example.com' }))).not.toBe(initial);
+    });
+
+    /**
+     * The thread perm id is read from the subject heading, which Gmail renders separately from the
+     * conversation and swaps first — so on its own it says the heading has caught up, not the message. It is
+     * still the only thing left to compare when the message carries no id of its own.
+     */
+    it('reads the thread only where the message has no id of its own', () => {
+      expect(messageIdentity(handle('m1', 't2'), email())).toBe(messageIdentity(base, email()));
+      expect(messageIdentity(handle('', 't2'), email())).not.toBe(
+        messageIdentity(handle('', 't1'), email()),
+      );
     });
   });
 

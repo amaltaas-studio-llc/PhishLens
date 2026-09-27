@@ -52,6 +52,16 @@ class FakeAdapter implements MailAdapter {
   readonly id = 'fake';
   #tree = drawMessage();
 
+  /**
+   * Gmail redrawing the message header from the same data, which is routine and which takes the injected
+   * badge with it. Everything the extraction reads is unchanged, so nothing in the message says so.
+   */
+  replaceHeader(): void {
+    const header = document.createElement('div');
+    this.#tree.root.replaceChild(header, this.#tree.header);
+    this.#tree = { ...this.#tree, header };
+  }
+
   observationRoot(): Element | null {
     return document.body;
   }
@@ -191,6 +201,11 @@ async function flush(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 let controller: Controller;
+let adapter: FakeAdapter;
+
+function badgeIsOnScreen(): boolean {
+  return document.querySelector('#phishlens-badge-host') !== null;
+}
 
 beforeEach(async () => {
   vi.useFakeTimers();
@@ -202,7 +217,8 @@ beforeEach(async () => {
   tabListeners = [];
   installChrome();
 
-  controller = new Controller(new FakeAdapter());
+  adapter = new FakeAdapter();
+  controller = new Controller(adapter);
   await controller.start();
   // The observer's debounce, then the deterministic pass, then the model being asked.
   await vi.advanceTimersByTimeAsync(500);
@@ -224,6 +240,31 @@ describe('a message opened with a model configured', () => {
     inferences[0]?.resolve(semantic());
     await flush();
 
+    expect(tabStatus()).toMatchObject({ kind: 'scored', semantic: 'ready' });
+  });
+
+  /**
+   * A header Gmail has redrawn from the same data takes the badge with it, and says nothing about it: every
+   * byte the extraction reads is identical, so the view signature matches and the event that would put the
+   * badge back was suppressed as redundant. The message then spent the rest of its time on screen with no
+   * badge — and on a `showBadgeWhenLow: false` install, no badge is also what a clean message looks like.
+   *
+   * The verdict must come back from the cache rather than from the model. Redrawing a header is not new
+   * evidence, and a round trip per redraw would be one per scroll on a slow connection.
+   */
+  it('puts the badge back when Gmail redraws the header, without asking the model again', async () => {
+    inferences[0]?.resolve(semantic());
+    await flush();
+    expect(badgeIsOnScreen()).toBe(true);
+
+    adapter.replaceHeader();
+    expect(badgeIsOnScreen()).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(500);
+    await flush();
+
+    expect(badgeIsOnScreen()).toBe(true);
+    expect(inferences).toHaveLength(1);
     expect(tabStatus()).toMatchObject({ kind: 'scored', semantic: 'ready' });
   });
 });

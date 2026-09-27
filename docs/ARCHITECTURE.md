@@ -238,7 +238,19 @@ every repaint into a re-analysis.
   covering every field never got asked to recompute — the retraction above could not fire on a collapse, and
   `invoice.pdf` becoming `invoice.exe` changed nothing. Attributes are filtered to the names the selectors
   read, derived from `SELECTORS` rather than listed, so a new candidate is watched without anyone
-  remembering to add it; the `style` and `jsaction` churn that comes with hovering is left alone.
+  remembering to add it; the `jsaction` churn that comes with hovering is left alone.
+- Selector dependencies are not the only dependencies, though. `style` and `hidden` appear in no selector and
+  are read directly by the hidden-text scan, so revealing a concealed paragraph changed the extracted body
+  and woke nothing. They are watched on the **message body subtree only**, named by the module that reads
+  them (`VISIBILITY_ATTRIBUTES`): `style` is the attribute Gmail writes most — sizing, animation, scroll
+  position — and almost nowhere outside a message does writing it change what the engine would read.
+- **Whether the elements last reported are still on screen is tracked separately from the signature.** The
+  signature answers "has the message changed", which is the wrong question for a header Gmail has redrawn
+  from the same data: the redraw takes the injected badge with it and leaves every byte of the extraction
+  identical, so suppressing it as redundant left the message on screen with no badge and nothing to say one
+  was ever due — indistinguishable, on a `showBadgeWhenLow: false` install, from a clean message. The
+  elements from the last emit are compared by reference, and a replacement re-emits; the verdict then comes
+  back from the cache, because a redraw is not new evidence.
 - The same observer watches the child lists of the container's **ancestors**, because a `MutationObserver`
   holds the node it was given. Gmail replaces the conversation container on some in-place actions, and the
   observer is then attached to an element outside the document, reporting nothing again for the lifetime of
@@ -277,9 +289,12 @@ changed since the last emit, because re-opening the same thread renders a byte-i
 still emit. `test/observer.test.ts` covers both directions, since every negative decision here is silent
 by design.
 
-**What the guard compares is not the signature.** It asks which message is rendered — ids and sender, and
-nothing about what the message says — while the signature above deliberately moves the moment any evidence
-changes. Comparing the signature conflated the two: expanding the details panel on the thread still in the
+**What the guard compares is not the signature.** It asks which message is rendered — the message's own id
+and its sender, and nothing about what the message says — while the signature above deliberately moves the
+moment any evidence changes. The thread perm id is read only where there is no message id to read, because
+it comes from the subject heading rather than from the message: Gmail renders the heading separately and
+swaps it first, so counting it let a heading naming the thread being opened satisfy the guard while the
+message below it was still the previous one. Comparing the signature conflated the two: expanding the details panel on the thread still in the
 pane changed it, the guard read that as Gmail having re-rendered for the new route, and the previous
 thread's message was emitted under the new thread's route with every id in the comparison agreeing that
 nothing had changed. The narrower comparison costs one case — where Gmail exposes no ids at all and the next

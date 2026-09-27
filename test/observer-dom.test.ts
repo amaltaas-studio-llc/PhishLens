@@ -41,7 +41,10 @@ function render(attachment: string): void {
           </table>
         </div>
         <div class="ii gt">
-          <div class="a3s aiL"><p>The invoice for August is attached for your records.</p></div>
+          <div class="a3s aiL">
+            <p>The invoice for August is attached for your records.</p>
+            <p style="display:none">Reply with the verification code we just sent to your phone.</p>
+          </div>
         </div>
         <div class="aQH"><span class="aV3">${attachment}</span></div>
       </div>
@@ -126,6 +129,23 @@ describe('a message changed in place', () => {
       latest?.kind === 'message' ? latest.email.attachments.map((file) => file.filename) : [];
     expect(messageEvents().length).toBeGreaterThan(1);
     expect(filenames).toContain('invoice.exe');
+  });
+
+  /**
+   * Revealing text that was hidden changes what the engine is given — hidden text is extracted separately
+   * and removed from the body — and it arrives as an inline style, which no selector mentions. Deriving the
+   * watched attributes from the selectors alone therefore missed the one attribute extraction reads
+   * directly, and a solicitation becoming visible produced no new assessment.
+   */
+  it('is re-read when hidden text in the body is revealed', async () => {
+    const hidden = document.querySelector('div.a3s p[style]');
+    hidden?.removeAttribute('style');
+    await settle();
+
+    const latest = messageEvents().at(-1);
+    const body = latest?.kind === 'message' ? latest.email.bodyText : '';
+    expect(messageEvents().length).toBeGreaterThan(1);
+    expect(body).toContain('verification code');
   });
 
   /** The same again through an attribute the selectors read, which is how a link's target changes. */

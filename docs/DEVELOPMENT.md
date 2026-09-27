@@ -124,7 +124,7 @@ UI change is one command away from being reflected in the README instead of sile
 
 ## Testing
 
-1022 tests, all in plain Node — no Chrome, no Gmail, no network. Four files ask for a DOM and get it from
+1027 tests, all in plain Node — no Chrome, no Gmail, no network. Four files ask for a DOM and get it from
 `jsdom`, which is why that is the only dev dependency here that is not a build or lint tool; see the note
 below the table.
 
@@ -148,7 +148,7 @@ below the table.
 | `test/observer-dom.test.ts` | The same observer over a real page and a real `MutationObserver`, because the file above fakes both and a fake calls its callback whatever it was told to watch: that a message collapsed in place is retracted, and that an attachment filename or a link target rewritten in place is read again. Needs a DOM. |
 | `test/list-marks.test.ts` | The list marker against inbox-shaped rows: that ordinary mail is left alone, that a recycled row is re-evaluated rather than trusted, that rows already on screen are re-triaged once Gmail exposes the signed-in address — which arrives after they do, and without which the check for a domain imitating the reader's own cannot run — and that marking survives Gmail replacing the region being watched. Needs a DOM. |
 | `test/settings.test.ts` | What each setting asks of a view already on screen, with a guard that fails until a newly added setting is classified — "changes nothing" being the one answer that cannot be right for something offered as a choice. |
-| `test/controller.test.ts` | The orchestration's timing, with the model's answer held as a promise this file resolves by hand: that a settings change abandons the inference it supersedes, that the superseded answer reaches neither the screen nor the cache, and that a presentation-only change leaves the inference running. Needs a DOM. |
+| `test/controller.test.ts` | The orchestration's timing, with the model's answer held as a promise this file resolves by hand: that a settings change abandons the inference it supersedes, that the superseded answer reaches neither the screen nor the cache, that a presentation-only change leaves the inference running, and that a header Gmail redraws gets its badge back from the cache rather than from the model. Needs a DOM. |
 
 **What the DOM tests prove, and what they cannot.** They prove the adapter's logic — that a details table
 becomes an `EmailAuthInfo`, that an unread part is reported rather than dropped. They do not prove the

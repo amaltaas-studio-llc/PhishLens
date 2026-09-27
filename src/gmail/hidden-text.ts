@@ -98,6 +98,18 @@ export function countContentChars(text: string): number {
   return (text.match(/[\p{L}\p{N}]/gu) ?? []).length;
 }
 
+/**
+ * The attributes this scan reads, named so that whatever *triggers* extraction can watch them.
+ *
+ * Neither appears in any selector, which is how the message observer came to ignore both: it derives the
+ * attributes it watches from `selectors.ts`, and a watch list built only from what is used to *find*
+ * elements misses what is used to *read* them. Removing `display:none` from a paragraph changes the
+ * extracted body — the concealed text moves from `hiddenText` into it — and produced no re-assessment.
+ */
+export const VISIBILITY_ATTRIBUTES: readonly string[] = ['style', 'hidden'];
+
+const HIDING_CANDIDATES = VISIBILITY_ATTRIBUTES.map((name) => `[${name}]`).join(',');
+
 export interface HiddenScan {
   /** Elements whose subtrees are hidden. Outermost only — a hidden child of a hidden parent is not extra. */
   roots: Element[];
@@ -121,7 +133,7 @@ export function findHiddenSubtrees(root: Element): HiddenScan {
   const techniques = new Set<string>();
   let scanned = 0;
 
-  for (const element of root.querySelectorAll('[style],[hidden]')) {
+  for (const element of root.querySelectorAll(HIDING_CANDIDATES)) {
     if (scanned >= MAX_ELEMENTS_SCANNED) break;
     scanned += 1;
 

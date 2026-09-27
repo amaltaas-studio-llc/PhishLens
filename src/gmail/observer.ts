@@ -44,6 +44,7 @@
 import { logger } from '../shared/logger.js';
 import type { EmailMessage, MessagePart } from '../shared/types.js';
 import type { MailAdapter, MessageHandle } from './adapter.js';
+import { VISIBILITY_ATTRIBUTES } from './hidden-text.js';
 import { observeWithPath } from './roots.js';
 import { OBSERVED_ATTRIBUTES } from './selectors.js';
 
@@ -123,6 +124,24 @@ export class GmailObserver {
    * rendered message against `identity` when the route has moved on from `routeThreadId`.
    */
   #lastEmit: { routeThreadId: string; identity: string } | null = null;
+  /**
+   * The elements the last emitted handle pointed at.
+   *
+   * Held because the consumer *draws into* them — the badge is injected into the header element — and a
+   * signature cannot answer whether what was drawn is still on screen. Gmail redraws the message header
+   * with equivalent markup, which takes the badge with it and leaves every byte of the extraction
+   * identical; read as redundant, the message then spent the rest of its time on screen with no badge and
+   * nothing to indicate one was ever due.
+   */
+  #reportedNodes: { root: Element; header: Element | null; body: Element | null } | null = null;
+  /**
+   * The body subtree whose inline styles are watched, kept so the watch follows the message.
+   *
+   * Scoped to the body rather than added to the root's filter because `style` is Gmail's most-written
+   * attribute — sizing, animation, scroll position — and almost none of it is inside a message. Only there
+   * does it decide what the engine reads. See `VISIBILITY_ATTRIBUTES`.
+   */
+  #watchedBody: Element | null = null;
   /** Thread id the *route* says should be on screen, used to detect route changes. */
   #expectedThreadId = '';
   #started = false;
@@ -165,6 +184,8 @@ export class GmailObserver {
     this.#lastSignature = '';
     this.#reported = false;
     this.#lastEmit = null;
+    this.#reportedNodes = null;
+    this.#watchedBody = null;
     this.#expectedThreadId = '';
   }
 
@@ -205,6 +226,16 @@ export class GmailObserver {
       attributeFilter: [...OBSERVED_ATTRIBUTES],
       characterData: true,
     });
+
+    // Plus the message body, for the attributes extraction reads rather than the ones selectors match.
+    const body = this.#watchedBody;
+    if (body?.isConnected === true) {
+      this.#mutationObserver.observe(body, {
+        attributes: true,
+        attributeFilter: [...VISIBILITY_ATTRIBUTES],
+        subtree: true,
+      });
+    }
 
     logger.debug('mutation observer attached', { root: root.tagName });
   }
@@ -268,6 +299,7 @@ export class GmailObserver {
         // arrived, which the consumer needs to hear whether or not anything was on screen before it.
         this.#lastSignature = '';
         this.#reported = false;
+        this.#reportedNodes = null;
         this.#onEvent({ kind: 'no-message', reason: 'reconciliation-timeout' });
       }
     }, this.#options.reconcileIntervalMs);
@@ -344,6 +376,7 @@ export class GmailObserver {
    */
   #retract(reason: 'navigated-away' | 'no-open-message'): void {
     this.#lastSignature = '';
+    this.#reportedNodes = null;
     if (!this.#reported) return;
 
     this.#reported = false;
@@ -399,15 +432,47 @@ export class GmailObserver {
     }
 
     const signature = viewSignature(routeThreadId, handle, email);
-    if (signature === this.#lastSignature) return false;
+    if (signature === this.#lastSignature && !this.#reportedNodesReplaced(handle)) return false;
 
     this.#lastSignature = signature;
     this.#reported = true;
     this.#lastEmit = { routeThreadId, identity };
+    this.#reportedNodes = {
+      root: handle.root,
+      header: handle.headerElement,
+      body: handle.bodyElement,
+    };
     this.#expectedThreadId = routeThreadId;
     logger.debug('message opened', { signature });
     this.#onEvent({ kind: 'message', signature, handle, email, missing });
+
+    // The watch follows the body, and re-registering means dropping the previous message's: a target stays
+    // observed until the observer is disconnected, so adding one per message opened would retain every
+    // detached body for the life of the tab.
+    if (handle.bodyElement !== this.#watchedBody) {
+      this.#watchedBody = handle.bodyElement;
+      this.#attachMutationObserver();
+    }
     return true;
+  }
+
+  /**
+   * Whether the elements last reported are no longer the ones rendered.
+   *
+   * Compared by reference, which is the question being asked: not "does this message look the same" — the
+   * signature answers that, and answers it identically for a header Gmail has redrawn from the same data —
+   * but "is the element the badge was put into still the element on screen". Where the message is gone
+   * rather than redrawn, `#readView` has already declined and the disappearance grace handles it.
+   */
+  #reportedNodesReplaced(handle: MessageHandle): boolean {
+    const reported = this.#reportedNodes;
+    if (reported === null) return false;
+
+    return (
+      reported.root !== handle.root ||
+      reported.header !== handle.headerElement ||
+      reported.body !== handle.bodyElement
+    );
   }
 }
 
@@ -445,7 +510,21 @@ export function viewSignature(
  * attributed to the wrong thread, which is the direction this project errs in.
  */
 export function messageIdentity(handle: MessageHandle, email: EmailMessage): string {
-  return [handle.messageId, handle.threadId, email.senderEmail ?? ''].join('|');
+  const sender = email.senderEmail ?? '';
+  /*
+   * The message's own id, and the thread's only when there is no message id to have.
+   *
+   * The thread perm id is read from the subject heading, which is not part of the message: Gmail renders it
+   * separately and swaps it first, so for a moment the heading names the thread being opened while the
+   * message below it is still the previous one. Counting it here let that heading update alone satisfy the
+   * guard, which is the failure the guard exists to prevent, arriving through the one component of the
+   * identity the message does not own. It stays as the fallback because with no message id it is the only
+   * thing distinguishing two threads, and a wrong answer there costs a reconciliation timeout, not a
+   * verdict on the wrong message.
+   */
+  return handle.messageId === ''
+    ? `thread:${handle.threadId}|${sender}`
+    : `message:${handle.messageId}|${sender}`;
 }
 
 /**
