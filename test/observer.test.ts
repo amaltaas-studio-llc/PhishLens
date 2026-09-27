@@ -32,15 +32,43 @@ interface RenderedView {
   bodyText: string;
 }
 
+/**
+ * The two properties the observer asks of an element: whether it is still in the document, and what
+ * encloses it. Both exist because Gmail replaces the conversation container rather than emptying it.
+ */
+class FakeElement {
+  isConnected = true;
+  readonly parentElement: FakeElement | null;
+
+  constructor(
+    readonly tagName: string,
+    parent: FakeElement | null = null,
+  ) {
+    this.parentElement = parent;
+  }
+}
+
+/** A conversation container inside a pane inside the body, which is the shape of the path Gmail swaps. */
+function conversationRoot(): FakeElement {
+  return new FakeElement('DIV', new FakeElement('DIV', new FakeElement('BODY')));
+}
+
 /** A Gmail stand-in whose route and rendered DOM can be moved independently, as Gmail's really are. */
 class FakeAdapter implements MailAdapter {
   readonly id = 'fake';
   route = '';
   view: RenderedView | null = null;
   rootAvailable = true;
+  root = conversationRoot();
 
   observationRoot(): Element | null {
-    return this.rootAvailable ? ({ tagName: 'DIV' } as unknown as Element) : null;
+    return this.rootAvailable ? (this.root as unknown as Element) : null;
+  }
+
+  /** Gmail re-rendering the conversation pane: a fresh container, the old one detached. */
+  replaceRoot(): void {
+    this.root.isConnected = false;
+    this.root = conversationRoot();
   }
 
   /** The observer never asks; it is on the interface for the list-row scanner. */
@@ -90,14 +118,16 @@ class FakeAdapter implements MailAdapter {
 class FakeMutationObserver {
   static instances: FakeMutationObserver[] = [];
   readonly callback: () => void;
+  /** Recorded because *what* is watched is the whole mechanism for noticing a replaced root. */
+  readonly targets: unknown[] = [];
 
   constructor(callback: () => void) {
     this.callback = callback;
     FakeMutationObserver.instances.push(this);
   }
 
-  observe(): void {
-    // The observer only needs the callback handle; what it observes is irrelevant here.
+  observe(target: unknown): void {
+    this.targets.push(target);
   }
 
   disconnect(): void {
@@ -105,10 +135,15 @@ class FakeMutationObserver {
   }
 }
 
-function triggerMutation(): void {
+function latestObserver(): FakeMutationObserver {
   const observers = FakeMutationObserver.instances;
   const latest = observers[observers.length - 1];
-  latest?.callback();
+  if (latest === undefined) throw new Error('no MutationObserver was attached');
+  return latest;
+}
+
+function triggerMutation(): void {
+  latestObserver().callback();
 }
 
 /**
@@ -164,7 +199,7 @@ beforeEach(() => {
     writable: true,
   });
   Object.defineProperty(globalThis, 'document', {
-    value: { body: { tagName: 'BODY' } },
+    value: { body: new FakeElement('BODY') },
     configurable: true,
     writable: true,
   });
@@ -403,6 +438,60 @@ describe('lifecycle', () => {
     settle();
 
     expect(messageEvents()).toHaveLength(2);
+  });
+
+  /**
+   * A MutationObserver holds the node it was given. Gmail replaces the conversation container on some
+   * in-place actions, not only on navigation, and the observer then sits on an element that is no longer
+   * in the document, reporting nothing ever again — on a page that still looks like it is working, with a
+   * badge still attached. Every other trigger in the observer is downstream of a mutation, so the
+   * watchers on the path out of the root are the only thing that makes the replacement noticeable.
+   */
+  describe('when Gmail replaces the conversation root', () => {
+    it('watches the path out of the root, not only the root', () => {
+      adapter.route = THREAD_A_HASH;
+      adapter.view = thread('a', '1');
+      observer.start();
+
+      const { targets } = latestObserver();
+      expect(targets).toContain(adapter.root);
+      expect(targets).toContain(adapter.root.parentElement);
+      expect(targets).toContain(adapter.root.parentElement?.parentElement);
+    });
+
+    it('reattaches to the replacement', () => {
+      adapter.route = THREAD_A_HASH;
+      adapter.view = thread('a', '1');
+      observer.start();
+      settle();
+      const attachments = FakeMutationObserver.instances.length;
+
+      adapter.replaceRoot();
+      // What the ancestor watchers deliver: the detached observer's last useful report.
+      triggerMutation();
+      settle();
+
+      expect(FakeMutationObserver.instances.length).toBe(attachments + 1);
+      expect(latestObserver().targets).toContain(adapter.root);
+    });
+
+    it('keeps reporting messages rendered into the replacement', () => {
+      adapter.route = THREAD_A_HASH;
+      adapter.view = thread('a', '1');
+      observer.start();
+      settle();
+
+      adapter.replaceRoot();
+      triggerMutation();
+      settle();
+
+      // The new container's own churn has to reach the observer, or the reattachment proved nothing.
+      adapter.view = thread('a2', '1');
+      triggerMutation();
+      settle();
+
+      expect(messageEvents().length).toBeGreaterThan(1);
+    });
   });
 
   it('survives an observation root that is not there yet', () => {

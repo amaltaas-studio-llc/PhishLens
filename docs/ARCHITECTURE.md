@@ -214,6 +214,13 @@ not cross them — otherwise widening the signature would have turned every repa
 
 - A debounced (200 ms) `MutationObserver` on the conversation container recomputes the signature.
   **Unchanged signature → no emit.** That kills redundant re-analysis.
+- The same observer watches the child lists of the container's **ancestors**, because a `MutationObserver`
+  holds the node it was given. Gmail replaces the conversation container on some in-place actions, and the
+  observer is then attached to an element outside the document, reporting nothing again for the lifetime of
+  the tab — with the previous badge still on screen, so nothing about the page suggests the extension has
+  stopped. A replacement is a child-list change on the parent, which is the one form of Gmail churn that
+  happens outside the observed subtree; watching `document.body` wholesale would catch it too, and would
+  also re-extract every time the chat roster changed. The root is re-resolved and reattached from there.
 - `hashchange`/`popstate` records the route's thread id as *expected* and starts a bounded
   reconciliation poll (every 120 ms, up to 4 s). An emit happens only once the rendered view differs
   from the one last reported. **A hash change whose DOM has not caught up produces no emit, rather

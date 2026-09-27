@@ -70,6 +70,9 @@ export interface ObserverOptions {
   reconcileTimeoutMs?: number;
 }
 
+/** Ancestors watched for the observed root being replaced. Enough to reach `<body>` from a Gmail pane. */
+const MAX_WATCHED_ANCESTORS = 24;
+
 const DEFAULTS = {
   debounceMs: 200,
   reconcileIntervalMs: 120,
@@ -82,6 +85,8 @@ export class GmailObserver {
   readonly #options: Required<ObserverOptions>;
 
   #mutationObserver: MutationObserver | null = null;
+  /** The element the observer was given, so its replacement can be noticed. */
+  #observedRoot: Element | null = null;
   #debounceTimer: ReturnType<typeof setTimeout> | null = null;
   #reconcileTimer: ReturnType<typeof setInterval> | null = null;
   #reconcileDeadline = 0;
@@ -128,6 +133,7 @@ export class GmailObserver {
     window.removeEventListener('popstate', this.#handleRouteChange);
     this.#mutationObserver?.disconnect();
     this.#mutationObserver = null;
+    this.#observedRoot = null;
     this.#clearDebounce();
     this.#stopReconciling();
     this.#lastSignature = '';
@@ -144,7 +150,10 @@ export class GmailObserver {
   #attachMutationObserver(): void {
     const root = this.#adapter.observationRoot() ?? document.body;
     this.#mutationObserver?.disconnect();
+    this.#observedRoot = root;
     this.#mutationObserver = new MutationObserver(() => {
+      // Before evaluating, because this may be the last mutation a detached observer ever reports.
+      this.#ensureObserving();
       this.#scheduleEvaluation();
     });
     this.#mutationObserver.observe(root, {
@@ -156,7 +165,42 @@ export class GmailObserver {
       attributes: false,
       characterData: false,
     });
+
+    /*
+     * The path from the root to the document, watched for the root being swapped out rather than
+     * changed. A MutationObserver holds the node it was given: when Gmail replaces the conversation
+     * container — which it does on some in-place actions, not only on navigation — the observer stays
+     * attached to an element no longer in the document and reports nothing ever again. Nothing else
+     * notices, because every other trigger in this file is downstream of a mutation, so the extension
+     * goes quiet on a page that still looks like it is working.
+     *
+     * `childList` without `subtree` on each ancestor is what makes that observable: replacing any node
+     * on the path is a child-list change on its parent, and this is the one form of Gmail churn that
+     * happens outside the observed subtree. The cost is a handful of targets that almost never fire,
+     * as against watching `document.body` wholesale — which would catch it too, and would also re-run
+     * extraction every time the chat roster or an advert changed.
+     */
+    for (const ancestor of pathToDocument(root)) {
+      this.#mutationObserver.observe(ancestor, { childList: true });
+    }
+
     logger.debug('mutation observer attached', { root: root.tagName });
+  }
+
+  /** Reattaches when the element being observed is no longer the one to observe. Cheap when it is. */
+  #ensureObserving(): void {
+    if (!this.#started) return;
+
+    const root = this.#adapter.observationRoot() ?? document.body;
+    const observed = this.#observedRoot;
+    if (observed === root && observed.isConnected) return;
+
+    logger.debug('observation root replaced, reattaching', {
+      connected: observed?.isConnected ?? false,
+    });
+    this.#attachMutationObserver();
+    // The replacement holds a different render, which nothing has looked at yet.
+    this.#lastSignature = '';
   }
 
   readonly #handleRouteChange = (): void => {
@@ -196,10 +240,6 @@ export class GmailObserver {
     this.#reconcileDeadline = Date.now() + this.#options.reconcileTimeoutMs;
 
     this.#reconcileTimer = setInterval(() => {
-      // The observation root may have been swapped out during navigation.
-      const root = this.#adapter.observationRoot();
-      if (root !== null && this.#mutationObserver === null) this.#attachMutationObserver();
-
       if (this.#evaluate()) {
         this.#stopReconciling();
         return;
@@ -239,6 +279,10 @@ export class GmailObserver {
    */
   #evaluate(): boolean {
     if (!this.#started) return false;
+
+    // Navigation is where Gmail most often replaces the conversation container, and the reconciliation
+    // poll is the one trigger that survives an observer left holding the old one.
+    this.#ensureObserving();
 
     const routeThreadId = this.#adapter.routeThreadId();
     if (routeThreadId === '') {
@@ -286,6 +330,22 @@ export class GmailObserver {
     this.#onEvent({ kind: 'message', signature, handle, email, missing });
     return true;
   }
+}
+
+/**
+ * The ancestors of an element, outward to the document.
+ *
+ * Bounded because it is walked on every reattachment and the shape of the page is Gmail's to change; the
+ * limit is generous enough to reach `<body>` from the conversation container several times over.
+ */
+function pathToDocument(element: Element): Element[] {
+  const path: Element[] = [];
+  let current: Element | null = element.parentElement ?? null;
+  while (current !== null && path.length < MAX_WATCHED_ANCESTORS) {
+    path.push(current);
+    current = current.parentElement ?? null;
+  }
+  return path;
 }
 
 /**
