@@ -656,6 +656,74 @@ describe('a verification code being delivered rather than solicited', () => {
   });
 });
 
+/**
+ * The second half of the same distinction, and the reason the first fix was not enough: dropping the
+ * pattern for "your verification code is 123456" left the one for "share your verification code", which
+ * the safety advice sitting beside every genuine code matches word for word. Every case here is a real
+ * sentence from transactional mail or a real phish; the point of the group is that the two populations are
+ * separated by what the negation attaches to, and nothing else.
+ */
+describe('a warning not to share a code, and the request that quotes it', () => {
+  const base = loadFixture('legitimate-verification-code').email;
+  const withBody = (bodyText: string): AnalysisResult =>
+    analyzeDeterministic({ ...base, bodyText }, { now: FIXED_NOW });
+
+  it('reads advice that names the code as advice, not as a request for it', () => {
+    const result = withBody(
+      'Your verification code is 482915. Never share your verification code with anyone.',
+    );
+
+    expect(hasSignal(result, 'content.mfa_request')).toBe(false);
+    expect(result.classification).toBe('low');
+  });
+
+  it.each([
+    'We will never ask you to send us your verification code.',
+    'Nobody from our support team will ever ask you to read out your verification code.',
+    'Do not share your verification code with anyone, including our own staff.',
+    "Don't forward your verification code to anyone who asks you for it.",
+    'You should never give your verification code to a caller.',
+    'We cannot ask you to provide your verification code, and we never will.',
+  ])('reads each ordinary phrasing of that advice the same way: %s', (advice) => {
+    const result = withBody(`Your verification code is 482915. ${advice}`);
+
+    expect(hasSignal(result, 'content.mfa_request')).toBe(false);
+  });
+
+  /**
+   * The evasion the suppression must not open. Quoting the provider's own warning costs an attacker one
+   * sentence, so a negation anywhere in the body cannot be allowed to stand for the whole message.
+   */
+  it('still reports a request that follows the advice', () => {
+    const result = withBody(
+      'Never share your verification code with anyone. To confirm this sign-in, reply to this email with the verification code shown above.',
+    );
+
+    expect(hasSignal(result, 'content.mfa_request')).toBe(true);
+    expect(signalFor(result, 'content.mfa_request')?.severity).toBe('high');
+  });
+
+  it('still reports a request with the advice appended to the same sentence', () => {
+    const result = withBody('Please send me your verification code, and never share it with anyone else.');
+
+    expect(hasSignal(result, 'content.mfa_request')).toBe(true);
+  });
+
+  /**
+   * A negation inside a demand is not advice against it. This is the sentence that makes the suppression
+   * conditional on what the negator is attached to rather than on its presence.
+   */
+  it.each([
+    'If you do not send us the verification code within ten minutes your account will be closed.',
+    'Unless you forward the verification code to this address, the transfer cannot be released.',
+    'Failure to provide the security code will result in your account being suspended.',
+  ])('still reports the demand that contains a negation: %s', (demand) => {
+    const result = withBody(demand);
+
+    expect(hasSignal(result, 'content.mfa_request')).toBe(true);
+  });
+});
+
 describe('MFA code request', () => {
   const result = analyzeFixture('mfa-code-request');
 

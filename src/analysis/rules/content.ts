@@ -34,6 +34,81 @@ interface ContentPattern {
   patterns: readonly RegExp[];
   /** How many distinct patterns must match before the theme is reported. */
   minMatches?: number;
+  /**
+   * Whether a negation in front of a match reverses its meaning, so the match should not count.
+   *
+   * Opt-in per theme rather than applied to all of them, because negation only reverses a theme whose
+   * patterns match a *request*. "If you do not verify your account it will be closed" is a demand with
+   * a negation in it, and `credential_verification` is right to report it; suppressing that would be
+   * worse than the false positive this exists to remove.
+   */
+  negationReverses?: boolean;
+}
+
+/**
+ * A negation reaching the end of the text it is tested against — that is, one governing whatever comes
+ * next.
+ *
+ * "Never share your verification code with anyone" is the advice attached to almost every genuine one-time
+ * code, written from the same vocabulary as the request this rule looks for, and it is the single sentence
+ * most likely to be mistaken for it. Reading the warning as the attack scored ordinary transactional mail
+ * at 50/100.
+ *
+ * Three bounds carry the precision, and each of them has a counter-example behind it:
+ *  - The lookbehinds drop the conditional forms. In "if you do not send us the code", "do not" belongs to
+ *    a demand rather than to advice against one, and that message should be reported. `should` needs its
+ *    own, requiring the inversion that makes it a conditional ("should you not reply…"), because the
+ *    plain form is the commonest advice there is: "you should never give your code to a caller".
+ *  - The gap allows no comma or semicolon, because a clause boundary ends the negation's reach: in
+ *    "never share your code, and send me a screenshot of it", "never" does not govern "send".
+ *  - It has to end where the matched verb begins, so the negation attaches to *that* verb and not to some
+ *    other one earlier in the sentence.
+ */
+const NEGATED_UP_TO_HERE =
+  /(?<!\b(?:if|unless|until|when|whenever)\s{1,4}(?:you\s{1,4})?)(?<!\bshould\s{1,4}you\s{1,4})\b(?:never|do not|don'?t|must not|mustn'?t|should not|shouldn'?t|will not|won'?t|cannot|can'?t|no ?one|nobody)\b[^.!?,;]{0,60}$/u;
+
+/**
+ * How far back to look for the start of the sentence containing a match.
+ *
+ * A bound rather than a scan to the beginning of the body, because the text is attacker-controlled: a
+ * message with no sentence punctuation in it would otherwise cost the length of the body per occurrence.
+ * Comfortably past the reach of the negation being looked for.
+ */
+const MAX_SENTENCE_LOOKBACK = 320;
+
+/** How many occurrences of one pattern to consider before giving up on finding an unnegated one. */
+const MAX_OCCURRENCES = 12;
+
+/**
+ * Finds the first occurrence of `regex` that a preceding negation does not reverse.
+ *
+ * Scanning *past* a negated occurrence matters as much as recognising one. "Never share your verification
+ * code with anyone. Reply to this email with the verification code." has to be reported, and it is the
+ * shape an attacker gets for free by quoting the warning the real provider sends. Suppression is therefore
+ * per occurrence and within one sentence; a theme suppressed by a negation appearing anywhere in the body
+ * would be an off switch that whoever wants the finding gone gets to write.
+ */
+function firstUnnegatedMatch(text: string, regex: RegExp): { match: string; index: number } | null {
+  const scan = new RegExp(regex.source, `${regex.flags.replace('g', '')}g`);
+  for (let seen = 0; seen < MAX_OCCURRENCES; seen += 1) {
+    const found = scan.exec(text);
+    if (found === null) return null;
+    if (!isNegated(text, found.index)) return { match: found[0], index: found.index };
+    // A zero-length match would otherwise loop on one position forever. No pattern here can produce one
+    // today; the guard costs nothing and what it prevents is a hung tab.
+    if (scan.lastIndex === found.index) scan.lastIndex += 1;
+  }
+  return null;
+}
+
+function isNegated(text: string, index: number): boolean {
+  const from = Math.max(0, index - MAX_SENTENCE_LOOKBACK);
+  const preceding = text.slice(from, index);
+  // No line breaks to look for: `matchText` is whitespace-collapsed. Bullets and semicolons end a
+  // sentence here because advice is as often listed or joined as it is punctuated.
+  const boundary = /[.!?;\u2022][^.!?;\u2022]*$/u.exec(preceding);
+  const start = boundary === null ? 0 : boundary.index + 1;
+  return NEGATED_UP_TO_HERE.test(preceding.slice(start));
 }
 
 const CONTENT_PATTERNS: readonly ContentPattern[] = [
@@ -121,14 +196,17 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
       'The message solicits a one-time passcode or multi-factor authentication code. No legitimate organisation ever asks a customer to share one.',
     severity: 'high',
     score: 30,
+    negationReverses: true,
     patterns: [
       /\b(share|send|provide|forward|enter|give|tell (me|us)|read (me|us))\b[^.!?]{0,40}\b(otp|one[- ]time (code|password|passcode|pin)|verification code|security code|authentication code|2fa code|mfa code|sms code|access code)\b/u,
       // "reply to this email with the verification code" — the verb and the preposition are separated.
       /\b(reply|respond|get back)\b[^.!?]{0,40}\bwith\b[^.!?]{0,40}\b(otp|one[- ]time (code|password|passcode|pin)|verification code|security code|authentication code|2fa code|mfa code|sms code|access code|code)\b/u,
       // Deliberately no pattern for "your verification code is 123456". A message *containing* a code is
       // delivering one, which is the most ordinary transactional mail there is, and every service that
-      // sends one says so in those words — usually right next to "never share this code with anyone",
-      // which is the opposite of the request this rule reports. Solicitation needs a verb asking the
+      // sends one says so in those words — usually right next to "never share your verification code with
+      // anyone", which is the opposite of the request this rule reports, and which the patterns above do
+      // match verbatim. That sentence is what `negationReverses` is for; without it the rule reads the
+      // warning as the attack. Solicitation needs a verb asking the
       // reader to hand it over, and the patterns above are those verbs. An attacker who includes a
       // plausible code to look authentic is not thereby ignored: whatever they want done with it is what
       // the rest of this table and the link rules are looking at.
@@ -429,7 +507,8 @@ function matchThemes(context: AnalysisContext): ThemeMatch[] {
     let matchCount = 0;
     let evidenceText = '';
     for (const regex of pattern.patterns) {
-      const hit = firstMatch(text, regex);
+      const hit =
+        pattern.negationReverses === true ? firstUnnegatedMatch(text, regex) : firstMatch(text, regex);
       if (hit === null) continue;
       matchCount += 1;
       if (evidenceText === '') evidenceText = excerpt(text, hit.index, hit.match.length);

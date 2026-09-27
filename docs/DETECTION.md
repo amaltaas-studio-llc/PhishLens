@@ -73,8 +73,17 @@ code is the attack, and supplying one is the most ordinary mail there is.** The 
 differs, so the rule keys on the verb — share, send, forward, reply with — and never on the presence of a
 code. Matching "your verification code is 123456" scored every OTP notification ever sent at 50/100, and
 because such mail usually comes from a domain no brand table contains, nothing downstream was going to
-rescue it. `legitimate-verification-code` in the fixture corpus is that message, including the sentence
-real ones carry and phishes do not: never share this code with anyone.
+rescue it.
+
+Keying on the verb is only half of it, because the advice beside every genuine code uses the same verb:
+"never share your verification code with anyone" is a warning against the request, written in the words of
+the request. So a match preceded by a negation does not count. Three bounds keep that from becoming an
+evasion. The negation has to reach the matched verb without crossing a comma, semicolon or sentence end, so
+"never share your code, and send me a screenshot" still reports; it cannot be a conditional, so "if you do
+not send us the code your account will be closed" still reports; and each occurrence is judged on its own,
+so quoting the provider's warning above a demand — one sentence an attacker gets for free — suppresses
+nothing. `legitimate-verification-code` in the fixture corpus is the honest message, carrying the advice in
+the phrasing that names the code.
 
 Two further tells are about a message manipulating its own reading rather than what it asks for. A body that
 vouches for itself — "this message was sent from a trusted sender" — is forging a verdict, because that
@@ -231,7 +240,7 @@ it is the marker that gets the feature switched off.
 
 ## Confidence in the numbers
 
-967 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
+994 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
 `test/fixtures/` holds 22 messages: a plain legitimate message, a legitimate password reset, a legitimate
 one-time code being delivered, a legitimate reply into an existing thread, a newsletter with many links, a
 newsletter whose links are all rewritten through its platform's click tracker, an institutional newsletter

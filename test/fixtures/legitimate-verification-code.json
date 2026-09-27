@@ -1,12 +1,12 @@
 {
   "name": "legitimate-verification-code",
-  "description": "False-positive resistance for the most ordinary transactional mail there is: a one-time code being delivered. It contains the exact phrase an OTP phish contains, and the sentence next to it — never share this code — is the opposite of the request the mfa_request rule reports. From a domain no brand table contains and with no dampening available, so nothing but the rule's own precision keeps it low.",
+  "description": "False-positive resistance for the most ordinary transactional mail there is: a one-time code being delivered. It contains the exact phrase an OTP phish contains, and the safety advice next to it names the code in the same words a request for one would — never share your verification code — which is what makes the negation load-bearing rather than incidental. From a domain no brand table contains and with no dampening available, so nothing but the rule's own precision keeps it low.",
   "email": {
     "senderName": "Northwind Tools",
     "senderEmail": "notifications@northwind-tools.com",
     "recipientEmail": "sam.okafor@northwind-logistics.com",
     "subject": "Your verification code",
-    "bodyText": "Your verification code is 482915.\n\nEnter it on the sign-in screen to finish signing in. The code expires in ten minutes.\n\nNever share this code with anyone. Northwind Tools staff will never ask you for it, by email, phone or chat.\n\nIf you did not try to sign in, you can ignore this message and your account stays as it is.\n\nNorthwind Tools",
+    "bodyText": "Your verification code is 482915.\n\nEnter it on the sign-in screen to finish signing in. The code expires in ten minutes.\n\nNever share your verification code with anyone. Northwind Tools staff will never ask you to send us your verification code, by email, phone or chat.\n\nIf you did not try to sign in, you can ignore this message and your account stays as it is.\n\nNorthwind Tools",
     "links": [],
     "attachments": [],
     "auth": {
