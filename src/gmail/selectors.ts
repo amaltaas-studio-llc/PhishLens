@@ -211,6 +211,37 @@ export const PAGE_SCOPED: ReadonlySet<string> = new Set([
   'listSubjectCell',
 ]);
 
+/**
+ * Every attribute name any selector above depends on, derived from the selectors themselves.
+ *
+ * The message observer needs this to watch attribute mutations without waking on all of them: Gmail
+ * rewrites `style`, `jsaction`, `tabindex` and `aria-hidden` constantly and none of them changes what a
+ * message says, while `class` decides whether a message is collapsed and `data-message-id` decides which
+ * message it is. A hand-written list would answer that today and be wrong the first time a selector gains
+ * an attribute, silently — the observer would stop noticing the state change and nothing would fail. So the
+ * list is read off the selectors, and adding a candidate here is enough.
+ *
+ * Coarse on purpose. A selector mentioning any class contributes `class` rather than the class named,
+ * because `attributeFilter` matches names, not values, and extra names cost an evaluation the observer's
+ * signature check then discards.
+ */
+export const OBSERVED_ATTRIBUTES: readonly string[] = deriveObservedAttributes();
+
+function deriveObservedAttributes(): readonly string[] {
+  const names = new Set<string>();
+  for (const candidates of Object.values(SELECTORS)) {
+    for (const selector of candidates) {
+      if (selector.includes('.')) names.add('class');
+      if (selector.includes('#')) names.add('id');
+      for (const match of selector.matchAll(/\[\s*([A-Za-z][\w-]{0,40})/gu)) {
+        const name = match[1];
+        if (name !== undefined) names.add(name.toLowerCase());
+      }
+    }
+  }
+  return [...names].sort();
+}
+
 /** Returns the first element matching any candidate selector, or `null`. */
 export function queryFirst(root: ParentNode, candidates: readonly string[]): Element | null {
   for (const selector of candidates) {

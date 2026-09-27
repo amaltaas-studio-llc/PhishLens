@@ -44,6 +44,7 @@
 import { logger } from '../shared/logger.js';
 import type { EmailMessage, MessagePart } from '../shared/types.js';
 import type { MailAdapter, MessageHandle } from './adapter.js';
+import { OBSERVED_ATTRIBUTES } from './selectors.js';
 
 export interface MessageOpenedEvent {
   kind: 'message';
@@ -184,14 +185,25 @@ export class GmailObserver {
       this.#ensureObserving();
       this.#scheduleEvaluation();
     });
+    /*
+     * Structure is not the only way a message changes. Gmail collapses a message by adding a class to the
+     * container it already rendered, and it rewrites text in place: an attachment chip's filename, a
+     * subject, a link's href. Watching `childList` alone meant the extension never re-evaluated any of
+     * that — the open message could become collapsed, and unreadable, with the badge still asserting a
+     * verdict about it, and `invoice.pdf` could become `invoice.exe` with no evaluation to notice. A
+     * signature covering every field of the message helps only where something asks for it to be recomputed.
+     *
+     * Attributes are filtered to the ones the selectors actually read (`OBSERVED_ATTRIBUTES`), because the
+     * unfiltered stream is mostly `style` and `jsaction` churn from hovering. Character data is not
+     * filterable, so relative timestamps ticking over arrive here too; both are absorbed by the debounce
+     * and then by the unchanged-signature guard, which is the cheap half of the evaluation.
+     */
     this.#mutationObserver.observe(root, {
       childList: true,
       subtree: true,
-      // Attribute and character-data mutations are the noisiest and least informative: Gmail
-      // constantly toggles classes and updates relative timestamps. Structural changes are what
-      // indicate a different message.
-      attributes: false,
-      characterData: false,
+      attributes: true,
+      attributeFilter: [...OBSERVED_ATTRIBUTES],
+      characterData: true,
     });
 
     /*

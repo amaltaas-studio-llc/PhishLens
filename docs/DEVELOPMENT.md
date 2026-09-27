@@ -73,7 +73,7 @@ why the whole detection engine runs under `vitest` in plain Node.
 | **esbuild**, not Vite | Three entry points with three different output contracts: the content script must be an IIFE, since MV3 declared content scripts are classic scripts, while the worker and options page are ESM. Vite's main advantage is a dev server, which is worth little when the primary UI only exists injected into Gmail's DOM. esbuild also keeps the dependency tree small, which matters for a security tool that asks to read your mail. Full build is ~50 ms. |
 | Vitest | ESM-native, no transform config, and fast enough that the fixture suite is usable as an inner-loop tool. |
 | ESLint + `typescript-eslint` (`strictTypeChecked`) | Flags `any`, unused vars and floating promises, plus `no-innerHTML` / `no-eval` house rules that make the XSS posture mechanical rather than aspirational. |
-| Zero runtime dependencies | `"dependencies": {}`. Everything shipped into the browser is in `src/` and can be read end to end. `jsdom` is a dev dependency and reaches one test file: the alternative was leaving the layer that reads Gmail's markup asserted only through helpers, which is where two production bugs came from. |
+| Zero runtime dependencies | `"dependencies": {}`. Everything shipped into the browser is in `src/` and can be read end to end. `jsdom` is a dev dependency and reaches four test files: the alternative was leaving the layer that reads Gmail's markup asserted only through helpers, which is where two production bugs came from. |
 
 ## The UI harness
 
@@ -124,7 +124,7 @@ UI change is one command away from being reflected in the README instead of sile
 
 ## Testing
 
-1009 tests, all in plain Node — no Chrome, no Gmail, no network. Three files ask for a DOM and get it from
+1016 tests, all in plain Node — no Chrome, no Gmail, no network. Four files ask for a DOM and get it from
 `jsdom`, which is why that is the only dev dependency here that is not a build or lint tool; see the note
 below the table.
 
@@ -145,6 +145,7 @@ below the table.
 | `test/triage.test.ts` | The sender-only verdicts, that none of them can read as an all-clear, that no low-scoring fixture is marked, and the allowlist guard that fails when a new identity rule is classified as neither safe nor unsafe for a list row. |
 | `test/popup.test.ts` | The popup's wording for every state — in particular that "nothing was found" and "nothing was checked" never share a phrasing — and the health line for each shape of extraction failure. |
 | `test/gmail-dom.test.ts` | The adapter against Gmail-shaped markup: sender, subject, body, links and attachment chips read out of a rendered page, authentication read from the details table, a warning banner distinguished from an unrelated live region, an unreadable sender reported as unread rather than empty, and which message is chosen when the candidate selectors disagree about which element is a message. Needs a DOM. |
+| `test/observer-dom.test.ts` | The same observer over a real page and a real `MutationObserver`, because the file above fakes both and a fake calls its callback whatever it was told to watch: that a message collapsed in place is retracted, and that an attachment filename or a link target rewritten in place is read again. Needs a DOM. |
 | `test/list-marks.test.ts` | The list marker against inbox-shaped rows: that ordinary mail is left alone, that a recycled row is re-evaluated rather than trusted, and that rows already on screen are re-triaged once Gmail exposes the signed-in address — which arrives after they do, and without which the check for a domain imitating the reader's own cannot run. Needs a DOM. |
 | `test/settings.test.ts` | What each setting asks of a view already on screen, with a guard that fails until a newly added setting is classified — "changes nothing" being the one answer that cannot be right for something offered as a choice. |
 | `test/controller.test.ts` | The orchestration's timing, with the model's answer held as a promise this file resolves by hand: that a settings change abandons the inference it supersedes, that the superseded answer reaches neither the screen nor the cache, and that a presentation-only change leaves the inference running. Needs a DOM. |

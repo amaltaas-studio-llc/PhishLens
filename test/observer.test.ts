@@ -120,14 +120,21 @@ class FakeMutationObserver {
   readonly callback: () => void;
   /** Recorded because *what* is watched is the whole mechanism for noticing a replaced root. */
   readonly targets: unknown[] = [];
+  /**
+   * And with what options, because a fake calls the callback whatever it was asked to watch. Every test
+   * here drives the callback directly, so the options are the only place the real browser's answer to
+   * "is this worth reporting" is visible at all.
+   */
+  readonly watches: { target: unknown; options: MutationObserverInit }[] = [];
 
   constructor(callback: () => void) {
     this.callback = callback;
     FakeMutationObserver.instances.push(this);
   }
 
-  observe(target: unknown): void {
+  observe(target: unknown, options: MutationObserverInit = {}): void {
     this.targets.push(target);
+    this.watches.push({ target, options });
   }
 
   disconnect(): void {
@@ -500,6 +507,52 @@ describe('lifecycle', () => {
    * stood, because the evaluation simply returned. Retracting it needs a delay rather than an immediate
    * teardown: a momentary absence is exactly what an ordinary Gmail re-render looks like from here.
    */
+  /**
+   * Gmail changes a message without changing the shape of the page: a class marks it collapsed, a text
+   * node carries an attachment's filename, an attribute carries a link's target. None of that is a
+   * child-list mutation, so none of it was ever looked at.
+   */
+  describe('what the browser is asked to report', () => {
+    beforeEach(() => {
+      adapter.route = THREAD_A_HASH;
+      adapter.view = thread('a', '1');
+      observer.start();
+    });
+
+    function rootWatch(): MutationObserverInit {
+      const watch = latestObserver().watches.find((entry) => entry.target === adapter.root);
+      if (watch === undefined) throw new Error('the root itself is not being watched');
+      return watch.options;
+    }
+
+    it('watches text and the attributes the selectors read', () => {
+      const options = rootWatch();
+
+      expect(options.subtree).toBe(true);
+      expect(options.characterData).toBe(true);
+      expect(options.attributes).toBe(true);
+      // `class` decides whether a message is collapsed; the id attributes decide which message it is.
+      expect(options.attributeFilter).toContain('class');
+      expect(options.attributeFilter).toContain('data-message-id');
+      expect(options.attributeFilter).toContain('href');
+    });
+
+    /** The hover churn the filter exists to drop. Watching it would re-extract on every mouse move. */
+    it('leaves the attributes nothing reads alone', () => {
+      expect(rootWatch().attributeFilter).not.toContain('style');
+    });
+
+    /** Ancestors are watched for one thing only: the root being swapped out from under them. */
+    it('watches ancestors for structure alone', () => {
+      const ancestors = latestObserver().watches.filter((entry) => entry.target !== adapter.root);
+
+      expect(ancestors.length).toBeGreaterThan(0);
+      for (const { options } of ancestors) {
+        expect(options).toEqual({ childList: true });
+      }
+    });
+  });
+
   describe('when a reported message stops being readable', () => {
     beforeEach(() => {
       adapter.route = THREAD_A_HASH;

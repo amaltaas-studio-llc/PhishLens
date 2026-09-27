@@ -232,6 +232,13 @@ every repaint into a re-analysis.
 
 - A debounced (200 ms) `MutationObserver` on the conversation container recomputes the signature.
   **Unchanged signature → no emit.** That kills redundant re-analysis.
+- It watches text and attributes, not only structure, because Gmail changes a message without changing the
+  shape of the page: collapsing one adds a class to a container that is already there, and an attachment's
+  filename, a subject and a link's target all arrive as edits in place. Structure alone meant a fingerprint
+  covering every field never got asked to recompute — the retraction above could not fire on a collapse, and
+  `invoice.pdf` becoming `invoice.exe` changed nothing. Attributes are filtered to the names the selectors
+  read, derived from `SELECTORS` rather than listed, so a new candidate is watched without anyone
+  remembering to add it; the `style` and `jsaction` churn that comes with hovering is left alone.
 - The same observer watches the child lists of the container's **ancestors**, because a `MutationObserver`
   holds the node it was given. Gmail replaces the conversation container on some in-place actions, and the
   observer is then attached to an element outside the document, reporting nothing again for the lifetime of
