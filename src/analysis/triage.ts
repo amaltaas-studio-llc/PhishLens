@@ -45,6 +45,13 @@ const SENDER_ONLY_RULES: ReadonlySet<string> = new Set([
   'identity.unsupported_org_claim',
   'identity.implausible_local_part',
   'identity.randomised_address_case',
+  /*
+   * Sender-only, and silent on a row for as long as it stays `medium`: what keeps it out of the list is
+   * `TRIAGE_MIN_SEVERITY`, not this set. Recorded because raising its severity would put "cannot confirm
+   * this domain belongs to PayPal" on unopened mail, which is a marker on a message that may be entirely
+   * ordinary — the thing that gets the feature switched off.
+   */
+  'identity.unverified_brand_domain',
 ]);
 
 /**

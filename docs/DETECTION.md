@@ -221,6 +221,22 @@ mechanisms exist purely to keep legitimate mail at zero.
   that could not be read, so the message is not scored at all. Substituting the removed text instead was the
   first attempt and is worse — Gmail renders a body hidden while it is still building the view, so every
   message caught mid-render would be accused of concealing every word it contains.
+- **A brand's own name under a suffix the table does not list.** The most expensive form of the same
+  problem, because the rule it tripped was `critical`. A multinational runs one name across every market it
+  sells in; the table lists a handful of those domains per brand, so `paypal.it`, `hsbc.fr` and
+  `netflix.com.br` were domains those brands do not own, and the lookalike rule — which deliberately treats
+  the same name under a different suffix as an imitation — reported them at 45 points with a severity floor.
+  Authentic mail, High Risk. Thirty-odd brands against two hundred country suffixes is not a list anyone
+  finishes, so the split is structural. A name that is only *confusably* the brand's (`pаypal.it` with a
+  Cyrillic а) is a homoglyph domain and stays an imitation. A suffix that is the brand's own with characters
+  dropped (`.co`, `.cm`, `.om` against `.com`) is a typo trap and stays an imitation — those are the reason
+  anyone registers them. What is left is a name that is literally the brand's under a suffix that misspells
+  nothing, which is either the brand's market or somebody who registered the brand's name in it, and no
+  string in the message tells those apart. That is reported as what it is — `identity.unverified_brand_domain`,
+  `medium`, no floor, naming the domain and telling the reader to compare it with the one the brand's mail
+  normally arrives from — and the links to that domain are left to it rather than each restating the
+  uncertainty as a certainty. `legitimate-brand-country-domain` is held to `caution`: never an all-clear,
+  never an accusation.
 - **Brands that run their own top-level domain.** Ownership is a question about a name's TLD as well as its
   second level. ICANN's Specification 13 restricts registrations in a brand TLD to the operator, its
   affiliates and its trademark licensees, so every name under `.apple` or `.microsoft` is the brand's by the

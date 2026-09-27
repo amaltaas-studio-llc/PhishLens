@@ -5,7 +5,7 @@
  * decidable from strings — no judgement required — which is exactly why it belongs in rules rather
  * than in the LLM.
  */
-import { BRANDS, brandOwningDomain, brandOwns } from '../../shared/brands.js';
+import { type Brand, BRANDS, brandOwningDomain, brandOwns } from '../../shared/brands.js';
 import { FREEMAIL_DOMAINS } from '../../shared/public-suffix.js';
 import type { SecuritySignal } from '../../shared/types.js';
 import {
@@ -47,6 +47,10 @@ function displayNameImpersonation(context: AnalysisContext): SecuritySignal[] {
   if (claim === undefined) return [];
   if (context.senderRegistrable === '') return [];
   if (brandOwns(claim.brand, context.senderRegistrable)) return [];
+  // The domain carries the brand's own name under a suffix the table does not list, which is a claim
+  // nothing here can settle either way. `unverifiedBrandDomain` says exactly that instead of calling a
+  // market the brand may well operate an impersonation of the one it does.
+  if (brandNamingDomain(context.senderRegistrable)?.id === claim.brand.id) return [];
 
   // A brand's own domain sending mail that mentions another brand is not impersonation
   // (e.g. LinkedIn mail referencing Microsoft).
@@ -68,6 +72,36 @@ function displayNameImpersonation(context: AnalysisContext): SecuritySignal[] {
         text: context.senderName !== '' ? context.senderName : context.senderEmail,
         value: context.senderRegistrable,
       },
+    }),
+  ];
+}
+
+/**
+ * The sending domain is the brand's own name under a suffix the brand is not known to use.
+ *
+ * Reported rather than judged, because the message cannot settle it: `hsbc.fr` is either HSBC France or
+ * somebody who registered HSBC's name in France, and no string in the mail distinguishes them. What is
+ * stated is the part that is true — the domain is named for the brand and is not one of the brand's known
+ * domains — at a severity that sets no floor, so a genuine country domain does not reach High Risk on this
+ * alone and a registration that is not the brand's still contributes to any other finding it earns.
+ *
+ * `medium` rather than `low` because the reader is the one who can check it: they know which domain their
+ * own statements come from, and this is the finding that tells them to look.
+ */
+function unverifiedBrandDomain(context: AnalysisContext): SecuritySignal[] {
+  if (context.senderRegistrable === '') return [];
+  const brand = brandNamingDomain(context.senderRegistrable);
+  if (brand === undefined) return [];
+
+  return [
+    signal({
+      id: 'identity.unverified_brand_domain',
+      category: 'identity',
+      severity: 'medium',
+      score: 18,
+      title: `Cannot confirm ${context.senderRegistrable} belongs to ${brand.label}`,
+      description: `The message was sent from ${context.senderRegistrable}, which carries ${brand.label}'s name under a domain ending PhishLens does not know ${brand.label} to use. Large organisations run the same name in every market they sell in, so this may be genuine — and a domain carrying a brand's name can equally have been registered by somebody else. Compare it against the address ${brand.label} mail normally arrives from before acting on anything in this message.`,
+      evidence: { value: context.senderRegistrable },
     }),
   ];
 }
@@ -103,6 +137,61 @@ export interface LookalikeMatch {
 }
 
 /**
+ * The brand a domain is *named after* while not being one the brand is known to own.
+ *
+ * The third answer to "does this brand own this domain", between the two the code used to have. A brand
+ * runs one name across the suffixes of every market it sells in — `paypal.it`, `hsbc.fr`,
+ * `netflix.com.br` — and the table lists a handful of them, so every other one was a domain the brand did
+ * not own, which the lookalike rule then reported as a `critical` imitation of the `.com`: 45 points and a
+ * floor, High Risk, on authentic mail. Thirty-odd brands against two hundred country suffixes is not a list
+ * anyone can finish, which is the argument for answering the question structurally instead.
+ *
+ * The name must be *literally* identical, not merely identical after confusable folding: `pаypal.it` spelled
+ * with a Cyrillic а is a homoglyph domain and stays with the lookalike rule, which is what that rule is for.
+ * And a suffix that is the brand's own with characters dropped — `.co`, `.cm`, `.om` against `.com` — is a
+ * typo trap rather than a market, so it stays there too. What is left is a name that is the brand's under a
+ * suffix that is not a misspelling of anything: either the brand's own country domain or somebody who
+ * registered the brand's name elsewhere, and nothing readable from the message can tell those apart.
+ */
+export function brandNamingDomain(registrable: string): Brand | undefined {
+  const domain = normalizeDomain(registrable);
+  if (domain === '') return undefined;
+
+  const core = domainCore(domain);
+  if (core.length < 4) return undefined;
+  const suffix = domain.slice(core.length + 1);
+  if (suffix === '') return undefined;
+
+  for (const brand of BRANDS) {
+    if (brandOwns(brand, domain)) continue;
+
+    // The suffixes this brand is known to use with *this* name, which is what a typo of it would imitate.
+    // Multi-label suffixes are excluded: `uk` read as `co.uk` with a label dropped would make a brand's
+    // direct `.uk` registration a typo trap.
+    const ownSuffixes = brand.domains
+      .filter((owned) => domainCore(owned) === core)
+      .map((owned) => owned.slice(core.length + 1))
+      .filter((owned) => !owned.includes('.'));
+    if (ownSuffixes.length === 0) continue;
+    if (ownSuffixes.some((own) => isDroppedCharacterVariant(suffix, own))) continue;
+
+    return brand;
+  }
+  return undefined;
+}
+
+/** Whether `candidate` is `original` with one or more characters removed: `co`, `cm` and `om` of `com`. */
+function isDroppedCharacterVariant(candidate: string, original: string): boolean {
+  if (candidate.length >= original.length || candidate.length < 2) return false;
+
+  let index = 0;
+  for (const character of original) {
+    if (character === candidate[index]) index += 1;
+  }
+  return index === candidate.length;
+}
+
+/**
  * Compares a registrable domain against every known brand domain.
  *
  * Exported because the link detectors need exactly the same comparison — one implementation means
@@ -114,6 +203,10 @@ export function findLookalike(candidate: string): LookalikeMatch | null {
 
   // An exact match against a real brand domain is the opposite of a lookalike.
   if (brandOwningDomain(domain) !== undefined) return null;
+
+  // A name that is literally the brand's under a suffix that misspells nothing. Not a typo trap and not a
+  // visual substitution, so calling it an imitation would be false; `brandNamingDomain` reports it instead.
+  if (brandNamingDomain(domain) !== undefined) return null;
 
   const rendered = decodeIdnHost(domain);
   const candidateSkeleton = skeleton(domainCore(rendered));
@@ -127,7 +220,7 @@ export function findLookalike(candidate: string): LookalikeMatch | null {
       if (targetSkeleton.length < 4) continue;
 
       // Identical after folding, which covers both a visual substitution (`pаypal`, `paypa1`,
-      // `rnicrosoft`) and the same core under a different TLD (`paypal.co`), since the TLD is stripped
+      // `rnicrosoft`) and a typo of the brand's own suffix (`paypal.co`), since the TLD is stripped
       // from both sides before comparison.
       if (candidateSkeleton === targetSkeleton) {
         return { target, brandLabel: brand.label, kind: 'confusable', distance: 0 };
@@ -740,6 +833,7 @@ const identityDetectors: Detect[] = [
   implausibleSenderLocalPart,
   randomisedAddressCase,
   lookalikeSenderDomain,
+  unverifiedBrandDomain,
   lookalikeOfRecipientDomain,
   replyToMismatch,
   senderDomainUnicodeSpoofing,

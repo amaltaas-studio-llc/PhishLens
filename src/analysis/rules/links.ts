@@ -15,7 +15,7 @@ import { describeUrl, registrableDomain } from '../../shared/url.js';
 import { decodeIdnHost, hasSuspiciousScriptMixing, scriptsUsed, skeleton } from '../../shared/unicode.js';
 import type { AnalysisContext } from '../context.js';
 import { DETECTION_TUNING } from '../scoring/config.js';
-import { findLookalike } from './identity.js';
+import { brandNamingDomain, findLookalike } from './identity.js';
 import { signal } from './types.js';
 import type { Detect } from './types.js';
 
@@ -444,6 +444,15 @@ function credentialTermsOnUnrelatedDomain(context: AnalysisContext): SecuritySig
     if (!loginish) continue;
 
     if (claim !== undefined && brandOwns(claim.brand, link.registrable)) continue;
+    /*
+     * A destination carrying the claimed brand's own name under a suffix the table does not list —
+     * `paypal.it` on mail presenting itself as PayPal. Saying credentials entered there "would go to
+     * whoever controls that domain" is true of every sign-in page and worthless unless the domain is
+     * plainly not the brand's, which is exactly what cannot be established here. The sender-side finding
+     * `identity.unverified_brand_domain` states the uncertainty once, rather than every link restating it
+     * as a certainty.
+     */
+    if (claim !== undefined && brandNamingDomain(link.registrable)?.id === claim.brand.id) continue;
 
     const openHosting = link.openHosting;
 

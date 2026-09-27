@@ -1,0 +1,23 @@
+{
+  "name": "legitimate-brand-country-domain",
+  "description": "False-positive resistance for a brand's own name under a country suffix the brand table does not list. A multinational runs one name across every market it sells in, and the table lists a handful of those domains per brand, so `paypal.it` was a domain PayPal does not own — which the lookalike rule reported as a `critical` imitation of `paypal.com` at 45 points and a severity floor, making authentic mail High Risk. Thirty-odd brands against two hundred country suffixes is not a list anyone can finish. The fixture asserts the honest replacement: the uncertainty is reported once, at a severity that sets no floor, and says what the reader can check.",
+  "email": {
+    "senderName": "PayPal",
+    "senderEmail": "service@paypal.it",
+    "recipientEmail": "sam.okafor@northwind-logistics.com",
+    "subject": "Your receipt for order 4471-22",
+    "bodyText": "You sent a payment of 48,00 EUR.\n\nThe amount will appear on your statement within a few days. You can see the full receipt, including the seller's details and the delivery address you chose, in your account.\n\nIf you did not authorise this payment, report it from the Resolution Centre in your account rather than by replying to this message.",
+    "links": [
+      { "text": "View your receipt", "href": "https://www.paypal.it/myaccount/transactions" },
+      { "text": "Resolution Centre", "href": "https://www.paypal.it/disputes" }
+    ],
+    "attachments": [],
+    "auth": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass",
+      "signedBy": "paypal.it",
+      "mailedBy": "paypal.it"
+    }
+  }
+}

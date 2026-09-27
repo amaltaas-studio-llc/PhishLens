@@ -12,7 +12,12 @@ import { CATEGORY_WEIGHTS } from '../src/analysis/scoring/config.js';
 import { findParticipantLookalike } from '../src/analysis/rules/thread.js';
 import { __testables as contentTestables } from '../src/analysis/rules/content.js';
 import { __testables as adapterTestables } from '../src/gmail/dom-adapter.js';
-import { isCaseScrambled, repeatedUnitCount } from '../src/analysis/rules/identity.js';
+import {
+  brandNamingDomain,
+  findLookalike,
+  isCaseScrambled,
+  repeatedUnitCount,
+} from '../src/analysis/rules/identity.js';
 import { severityFloor } from '../src/analysis/scoring/aggregate.js';
 import { triageSender } from '../src/analysis/triage.js';
 import { BRANDS, brandOwningDomain } from '../src/shared/brands.js';
@@ -38,6 +43,22 @@ const LEGITIMATE_FIXTURES = [
   'legitimate-brand-product-name',
   'legitimate-brand-tld',
 ];
+
+/**
+ * Genuine mail whose sender cannot be *proved* genuine from the message, which is a third outcome the
+ * corpus needs a name for.
+ *
+ * `paypal.it` is either PayPal Italy or somebody who registered PayPal's name in Italy, and nothing in the
+ * mail distinguishes them. Demanding `low` here would mean pretending the ambiguity is resolved, and
+ * demanding `high` — which is what the lookalike rule did — means calling authentic mail an imitation. So
+ * these are held to a different standard: no `high` or `critical` deterministic signal and no severity
+ * floor, as with any legitimate fixture, but `caution` rather than `low`, carrying the finding that says
+ * which part could not be confirmed.
+ */
+const UNVERIFIABLE_FIXTURES = ['legitimate-brand-country-domain'];
+
+/** Everything that must never produce a `high` deterministic signal, which is what makes floors safe. */
+const HONEST_FIXTURES = [...LEGITIMATE_FIXTURES, ...UNVERIFIABLE_FIXTURES];
 
 const MALICIOUS_FIXTURES = [
   'paypal-phish',
@@ -1263,7 +1284,13 @@ describe("a sender on a brand's own top-level domain", () => {
     const result = analyzeDeterministic(
       {
         ...genuine,
-        links: [{ text: 'Verify your account', href: 'https://notices.apple/account/verify' }],
+        links: [
+          {
+            text: 'Verify your account',
+            href: 'https://notices.apple/account/verify',
+            normalizedDomain: 'notices.apple',
+          },
+        ],
       },
       { now: FIXED_NOW },
     );
@@ -1301,6 +1328,68 @@ describe("a sender on a brand's own top-level domain", () => {
         expect(tld.includes('.'), `${brand.id}: ${tld}`).toBe(false);
       }
     }
+  });
+});
+
+/**
+ * The same open-world problem as the brand TLD, in its most expensive form. A brand runs one name across
+ * every market it sells in, the table lists a few of those domains, and the lookalike rule read every other
+ * one as a `critical` imitation of the `.com` — 45 points and a severity floor, so authentic mail from
+ * `hsbc.fr` was High Risk. Thirty-odd brands against two hundred country suffixes is not a list anyone
+ * finishes, so the question is answered structurally: a name that is literally the brand's, under a suffix
+ * that misspells none of the brand's own, is reported as unverifiable rather than judged as imitation.
+ */
+describe("a brand's own name under a suffix the table does not list", () => {
+  const genuine = loadFixture('legitimate-brand-country-domain').email;
+
+  it('is not called an imitation of the domain it shares a name with', () => {
+    const result = analyzeDeterministic(genuine, { now: FIXED_NOW });
+    expect(hasSignal(result, 'identity.lookalike_sender_domain')).toBe(false);
+    expect(hasSignal(result, 'identity.display_name_impersonation')).toBe(false);
+  });
+
+  it('says what cannot be confirmed, without a severity floor', () => {
+    const result = analyzeDeterministic(genuine, { now: FIXED_NOW });
+    const finding = signalFor(result, 'identity.unverified_brand_domain');
+
+    expect(finding?.severity).toBe('medium');
+    expect(finding?.title).toContain('paypal.it');
+    expect(finding?.description).toContain('every market');
+    expect(result.classification).not.toBe('high');
+  });
+
+  /** The reader has to be told which links were left unjudged for the same reason, and not told twice. */
+  it('does not also report every link to that domain as credential harvesting', () => {
+    const result = analyzeDeterministic(genuine, { now: FIXED_NOW });
+    expect(hasSignal(result, 'link.credential_link_unrelated_domain.0')).toBe(false);
+    expect(result.categoryScores.link).toBe(0);
+  });
+
+  /**
+   * What must not be softened with it. A suffix that is the brand's own with characters dropped is a typo
+   * trap, not a market — `.co`, `.cm` and `.om` are the reason anyone registers them — and a name that is
+   * only *confusably* the brand's is a homoglyph domain, which is the lookalike rule's entire purpose.
+   */
+  it.each([
+    ['paypal.co', 'PayPal'],
+    ['microsoft.cm', 'Microsoft'],
+    ['раypal.com', 'PayPal'],
+    ['paypa1.com', 'PayPal'],
+  ])('still reports %s as an imitation', (domain, label) => {
+    expect(brandNamingDomain(domain)).toBeUndefined();
+    expect(findLookalike(domain)?.brandLabel).toBe(label);
+  });
+
+  it('claims nothing for a name that merely contains a brand', () => {
+    for (const domain of ['paypal-security.com', 'secure-hsbc.net', 'appleid-verify.co']) {
+      expect(brandNamingDomain(domain), domain).toBeUndefined();
+    }
+  });
+
+  /** A short core collides with ordinary words, so the rule stays out of names it cannot be sure about. */
+  it('claims nothing for a core too short to be distinctive', () => {
+    expect(brandNamingDomain('me.tv')).toBeUndefined();
+    expect(brandNamingDomain('ups.io')).toBeUndefined();
   });
 });
 
@@ -2137,7 +2226,7 @@ describe('ranking sanity: phishing must outscore legitimate mail', () => {
   const score = (name: string): number => analyzeFixture(name).score;
 
   it('every malicious fixture outscores every legitimate fixture', () => {
-    const legitimate = LEGITIMATE_FIXTURES.map(score);
+    const legitimate = HONEST_FIXTURES.map(score);
     const malicious = MALICIOUS_FIXTURES.map(score);
     expect(Math.max(...legitimate)).toBeLessThan(Math.min(...malicious));
   });
@@ -2145,6 +2234,18 @@ describe('ranking sanity: phishing must outscore legitimate mail', () => {
   it('every legitimate fixture classifies as low', () => {
     for (const name of LEGITIMATE_FIXTURES) {
       expect(analyzeFixture(name).classification, name).toBe('low');
+    }
+  });
+
+  /** The ambiguity is reported, and reported as ambiguity: never an all-clear, never an accusation. */
+  it('every unverifiable fixture stops at caution and says what it could not verify', () => {
+    for (const name of UNVERIFIABLE_FIXTURES) {
+      const result = analyzeFixture(name);
+      expect(result.classification, name).toBe('caution');
+      expect(
+        result.signals.some((s) => s.id === 'identity.unverified_brand_domain'),
+        name,
+      ).toBe(true);
     }
   });
 
@@ -2163,7 +2264,7 @@ describe('ranking sanity: phishing must outscore legitimate mail', () => {
  * here rather than silently marking every newsletter as suspicious in production.
  */
 describe('severity floor safety', () => {
-  for (const name of LEGITIMATE_FIXTURES) {
+  for (const name of HONEST_FIXTURES) {
     it(`${name} produces no high or critical deterministic signal`, () => {
       const result = analyzeFixture(name);
       const offenders = result.signals.filter(
