@@ -78,12 +78,13 @@ rescue it.
 Keying on the verb is only half of it, because the advice beside every genuine code uses the same verb:
 "never share your verification code with anyone" is a warning against the request, written in the words of
 the request. So a match preceded by a negation does not count. Three bounds keep that from becoming an
-evasion. The negation has to reach the matched verb without crossing a comma, semicolon or sentence end, so
-"never share your code, and send me a screenshot" still reports; it cannot be a conditional, so "if you do
-not send us the code your account will be closed" still reports; and each occurrence is judged on its own,
-so quoting the provider's warning above a demand — one sentence an attacker gets for free — suppresses
-nothing. `legitimate-verification-code` in the fixture corpus is the honest message, carrying the advice in
-the phrasing that names the code.
+evasion. The negation must attach to the matched verb itself — either directly, or through the one
+construction that reaches across a verb, "will never *ask you to* share" — so "do not hesitate to send me
+your verification code" and "never share your code, and send me a screenshot" both still report. It cannot
+be a conditional, so "if you do not send us the code your account will be closed" still reports. And each
+occurrence is judged on its own, so quoting the provider's warning above a demand — one sentence an
+attacker gets for free — suppresses nothing. `legitimate-verification-code` in the fixture corpus is the
+honest message, carrying the advice in the phrasing that names the code.
 
 Two further tells are about a message manipulating its own reading rather than what it asks for. A body that
 vouches for itself — "this message was sent from a trusted sender" — is forging a verdict, because that
@@ -240,7 +241,7 @@ it is the marker that gets the feature switched off.
 
 ## Confidence in the numbers
 
-1005 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
+1009 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
 `test/fixtures/` holds 22 messages: a plain legitimate message, a legitimate password reset, a legitimate
 one-time code being delivered, a legitimate reply into an existing thread, a newsletter with many links, a
 newsletter whose links are all rewritten through its platform's click tracker, an institutional newsletter

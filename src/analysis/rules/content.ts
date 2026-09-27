@@ -59,13 +59,16 @@ interface ContentPattern {
  *    a demand rather than to advice against one, and that message should be reported. `should` needs its
  *    own, requiring the inversion that makes it a conditional ("should you not reply…"), because the
  *    plain form is the commonest advice there is: "you should never give your code to a caller".
- *  - The gap allows no comma or semicolon, because a clause boundary ends the negation's reach: in
- *    "never share your code, and send me a screenshot of it", "never" does not govern "send".
- *  - It has to end where the matched verb begins, so the negation attaches to *that* verb and not to some
- *    other one earlier in the sentence.
+ *  - It has to end where the matched verb begins, so the negation attaches to *that* verb.
+ *  - What may stand between them is enumerated rather than bounded, which is the difference between
+ *    negating the solicitation and merely preceding it. Any span of up to sixty characters allowed "do
+ *    not hesitate to send me your verification code" to suppress itself: "do not" governs "hesitate"
+ *    there, and the request it introduces is as plain as any. So the gap is either nothing at all, or the
+ *    one construction in which a negation does reach across a verb — "will never *ask you to* share" —
+ *    which needs an asking verb followed by an infinitive to be that construction at all.
  */
 const NEGATED_UP_TO_HERE =
-  /(?<!\b(?:if|unless|until|when|whenever)\s{1,4}(?:you\s{1,4})?)(?<!\bshould\s{1,4}you\s{1,4})\b(?:never|do not|don'?t|must not|mustn'?t|should not|shouldn'?t|will not|won'?t|cannot|can'?t|no ?one|nobody)\b[^.!?,;]{0,60}$/u;
+  /(?<!\b(?:if|unless|until|when|whenever)\s{1,4}(?:you\s{1,4})?)(?<!\bshould\s{1,4}you\s{1,4})\b(?:never|do not|don'?t|must not|mustn'?t|should not|shouldn'?t|will not|won'?t|cannot|can'?t|no ?one|nobody)\b(?:[^.!?,;]{0,40}\b(?:ask|asks|asked|asking|request|requests|requested|requesting|require|requires|need|needs)\b[^.!?,;]{0,20}\bto)?(?:\s{1,3}(?:ever|voluntarily|willingly|knowingly))?\s{1,3}$/u;
 
 /**
  * How far back to look for the start of the sentence containing a match.

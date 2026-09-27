@@ -684,6 +684,7 @@ describe('a warning not to share a code, and the request that quotes it', () => 
     "Don't forward your verification code to anyone who asks you for it.",
     'You should never give your verification code to a caller.',
     'We cannot ask you to provide your verification code, and we never will.',
+    'Never ever share your verification code, even with us.',
   ])('reads each ordinary phrasing of that advice the same way: %s', (advice) => {
     const result = withBody(`Your verification code is 482915. ${advice}`);
 
@@ -721,6 +722,22 @@ describe('a warning not to share a code, and the request that quotes it', () => 
     const result = withBody(demand);
 
     expect(hasSignal(result, 'content.mfa_request')).toBe(true);
+  });
+
+  /**
+   * A negation that governs some other verb entirely. "Do not" belongs to "hesitate" here, and what
+   * follows is as plain a request as the rule ever sees — which is why what may stand between a negation
+   * and the verb it suppresses is enumerated rather than merely bounded in length.
+   */
+  it.each([
+    'Do not hesitate to send me your verification code.',
+    'Do not wait to send us the verification code from your phone.',
+    'Please do not forget to read me the security code when we speak.',
+  ])('still reports a request the negation does not reach: %s', (request) => {
+    const result = withBody(request);
+
+    expect(hasSignal(result, 'content.mfa_request')).toBe(true);
+    expect(signalFor(result, 'content.mfa_request')?.severity).toBe('high');
   });
 });
 
