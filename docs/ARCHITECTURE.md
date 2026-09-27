@@ -182,6 +182,16 @@ not mark a message permanently unassessable, and a message read while Chrome was
 model is re-assessed once the model is there. The cost is a re-run of the rule engine (single-digit
 milliseconds) and one more inference attempt per visit.
 
+**A cache write is fenced by the generation it belongs to**, for the same reason and one step further out.
+Changing which model is asked, or the trust list, invalidates every cached verdict — and an inference
+already in flight belongs to the settings that have just been replaced. Clearing the cache does not reach
+it: the answer arrives a moment later, writes itself into the cache that was just emptied, and the
+re-evaluation the settings change asked for reads it straight back as a hit, so the reader who changed the
+setting watches the previous model's verdict reappear with nothing short of a reload able to shift it. The
+work is therefore abandoned and its generation invalidated before the clear, and the token is checked where
+a result is *cached* as well as where it is shown — an entry outlives the moment it was written, which is
+exactly what makes it worth more care than a repaint.
+
 ---
 
 ## 3. Gmail integration: two signals, cross-checked

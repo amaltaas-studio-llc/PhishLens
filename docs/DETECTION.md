@@ -240,7 +240,7 @@ it is the marker that gets the feature switched off.
 
 ## Confidence in the numbers
 
-999 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
+1005 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
 `test/fixtures/` holds 22 messages: a plain legitimate message, a legitimate password reset, a legitimate
 one-time code being delivered, a legitimate reply into an existing thread, a newsletter with many links, a
 newsletter whose links are all rewritten through its platform's click tracker, an institutional newsletter

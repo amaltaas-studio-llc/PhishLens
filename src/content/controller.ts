@@ -227,14 +227,14 @@ export class Controller {
         signal: refinement.signal,
         trustedSenders: this.#settings.trustedSenders,
       });
-      this.#remember(event.signature, refined);
+      this.#remember(event.signature, refined, token);
       this.#applyResult(refined, token, refined.meta.semanticStatus ?? 'no-output');
     } catch (error) {
       // The deterministic result is already on screen; a semantic failure is not a user-facing error.
       // It is still reported *as* a failure rather than left pending, or the card spins forever.
       logger.debug('semantic refinement failed', error);
       const failed = withSemanticStatus(deterministic, 'error');
-      this.#remember(event.signature, failed);
+      this.#remember(event.signature, failed, token);
       this.#applyResult(failed, token, 'error');
     } finally {
       if (this.#refinement === refinement) this.#refinement = null;
@@ -290,8 +290,21 @@ export class Controller {
     // analysis. Doing it here as well would analyse the same message twice.
   }
 
-  #teardownView(): void {
+  /**
+   * Abandons analysis in flight and everything it would have produced.
+   *
+   * Stopping the work and invalidating its results are one action, never two: the abort is advisory — a
+   * round trip already made cannot be recalled, and the adapters can only decline to use what comes back —
+   * so the token is what actually keeps a superseded answer off the screen and out of the cache.
+   */
+  #supersedeAnalysis(): void {
+    this.#refinement?.abort();
+    this.#refinement = null;
     this.#analysisToken += 1;
+  }
+
+  #teardownView(): void {
+    this.#supersedeAnalysis();
     this.#panel.close();
     this.#highlighter.clear();
     this.#badge.remove();
@@ -299,13 +312,24 @@ export class Controller {
   }
 
   /**
-   * Caches a result, but only if the semantic stage concluded something (see `isSemanticSettled`).
+   * Caches a result, but only if it is still wanted and the semantic stage concluded something (see
+   * `isSemanticSettled`).
+   *
+   * The token is checked here and not only where the result is displayed, because a cache entry outlives
+   * the moment it was written: an answer arriving after its generation was superseded would be served to
+   * every later visit to that message, and the clear that superseded it has already happened. A settings
+   * change is the case that made this reachable — the settings that produced the answer are gone, and the
+   * work was started under them.
    *
    * Caching an unsettled result makes a passing condition permanent for the life of the tab: a
    * cancelled or timed-out attempt would be replayed from the cache on every later visit, and only a
    * reload would clear it. Not keeping it costs one more inference attempt next time.
    */
-  #remember(signature: string, result: AnalysisResult): void {
+  #remember(signature: string, result: AnalysisResult, token: number): void {
+    if (token !== this.#analysisToken) {
+      logger.debug('not caching a result from superseded work');
+      return;
+    }
     if (!isSemanticSettled(result.meta.semanticStatus)) {
       logger.debug('not caching an unsettled result', {
         status: result.meta.semanticStatus ?? 'none',
@@ -455,6 +479,15 @@ export class Controller {
     const impact = settingsImpact(previous, this.#settings);
 
     if (impact.rescore) {
+      /*
+       * Work in flight is abandoned before the cache is cleared, because it was started under settings
+       * that no longer exist — a different model, or a trust list that changes what the engine does. The
+       * clear alone left a window: an inference that finished a moment later wrote its answer into the
+       * cache that had just been emptied and painted it on screen, and the re-evaluation below then read
+       * that answer back as a cache hit. The reader watched the score they had just changed a setting to
+       * affect stay exactly as it was, with no way to reach it again short of reloading the tab.
+       */
+      this.#supersedeAnalysis();
       this.#cache.clear();
       if (impact.remodel) this.#warmModel();
       this.#observer.refresh();

@@ -124,7 +124,7 @@ UI change is one command away from being reflected in the README instead of sile
 
 ## Testing
 
-999 tests, all in plain Node — no Chrome, no Gmail, no network. Two files ask for a DOM and get it from
+1005 tests, all in plain Node — no Chrome, no Gmail, no network. Three files ask for a DOM and get it from
 `jsdom`, which is why that is the only dev dependency here that is not a build or lint tool; see the note
 below the table.
 
@@ -147,6 +147,7 @@ below the table.
 | `test/gmail-dom.test.ts` | The adapter against Gmail-shaped markup: sender, subject, body, links and attachment chips read out of a rendered page, authentication read from the details table, a warning banner distinguished from an unrelated live region, an unreadable sender reported as unread rather than empty, and which message is chosen when the candidate selectors disagree about which element is a message. Needs a DOM. |
 | `test/list-marks.test.ts` | The list marker against inbox-shaped rows: that ordinary mail is left alone, that a recycled row is re-evaluated rather than trusted, and that rows already on screen are re-triaged once Gmail exposes the signed-in address — which arrives after they do, and without which the check for a domain imitating the reader's own cannot run. Needs a DOM. |
 | `test/settings.test.ts` | What each setting asks of a view already on screen, with a guard that fails until a newly added setting is classified — "changes nothing" being the one answer that cannot be right for something offered as a choice. |
+| `test/controller.test.ts` | The orchestration's timing, with the model's answer held as a promise this file resolves by hand: that a settings change abandons the inference it supersedes, that the superseded answer reaches neither the screen nor the cache, and that a presentation-only change leaves the inference running. Needs a DOM. |
 
 **What the DOM tests prove, and what they cannot.** They prove the adapter's logic — that a details table
 becomes an `EmailAuthInfo`, that an unread part is reported rather than dropped. They do not prove the
