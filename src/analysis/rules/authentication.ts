@@ -10,7 +10,7 @@
  * So these detectors are written to be **silent when uncertain**. An absent SPF result produces no
  * signal, because "Gmail did not render a details table" is not evidence of anything.
  */
-import { brandOwningDomain } from '../../shared/brands.js';
+import { brandOwningDomain, brandOwns } from '../../shared/brands.js';
 import type { AuthVerdict, SecuritySignal } from '../../shared/types.js';
 import {
   isKnownTrackingRedirector,
@@ -121,9 +121,9 @@ function sentViaUnrelatedHost(context: AnalysisContext): SecuritySignal[] {
   if (sameRegistrableDomain(via, context.senderDomain)) return [];
 
   const viaRegistrable = registrableDomain(via);
-  const claimsBrand = context.primaryClaim !== undefined;
+  const claim = context.primaryClaim;
   const brandClaimedButSentElsewhere =
-    claimsBrand && !(context.primaryClaim?.brand.domains.includes(viaRegistrable) ?? false);
+    claim !== undefined && !brandOwns(claim.brand, viaRegistrable);
 
   if (!brandClaimedButSentElsewhere && isKnownTrackingRedirector(via)) return [];
 
@@ -137,7 +137,7 @@ function sentViaUnrelatedHost(context: AnalysisContext): SecuritySignal[] {
         ? 'Message was relayed through a service the sender does not use'
         : 'Message was relayed through another service',
       description: brandClaimedButSentElsewhere
-        ? `Gmail shows this message as sent via ${viaRegistrable} rather than directly from ${context.senderRegistrable}. The message presents itself as ${context.primaryClaim?.brand.label ?? ''}, which does not send mail through ${viaRegistrable}.`
+        ? `Gmail shows this message as sent via ${viaRegistrable} rather than directly from ${context.senderRegistrable}. The message presents itself as ${claim.brand.label}, which does not send mail through ${viaRegistrable}.`
         : `Gmail shows this message as sent via ${viaRegistrable} rather than directly from ${context.senderRegistrable}. This is how mail sent through a third-party service normally appears — a notification platform, a helpdesk, a mailing list — so it is shown for context and does not affect the score.`,
       evidence: { value: viaRegistrable },
     }),

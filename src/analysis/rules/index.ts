@@ -5,6 +5,7 @@
  * rather than logic inside detectors because dampening needs to see *all* the signals to decide —
  * a content heuristic can only be safely softened once we know no link or identity rule fired.
  */
+import { brandOwns } from '../../shared/brands.js';
 import type { SecuritySignal } from '../../shared/types.js';
 import type { AnalysisContext } from '../context.js';
 import { DAMPENING } from '../scoring/config.js';
@@ -85,12 +86,13 @@ function refine(signals: SecuritySignal[], context: AnalysisContext): SecuritySi
       (context.senderOwnedByBrand !== undefined && context.primaryClaim === undefined));
 
   // Links that all resolve to the sender's own organisation or to the brand it legitimately is.
+  const owner = context.senderOwnedByBrand;
   const allLinksAligned =
     context.webLinks.length > 0 &&
     context.webLinks.every((link) => {
       if (link.registrable === '') return false;
       if (link.registrable === context.senderRegistrable) return true;
-      if (context.senderOwnedByBrand?.domains.includes(link.registrable) === true) return true;
+      if (owner !== undefined && brandOwns(owner, link.registrable)) return true;
       return link.wrappedByKnownTracker;
     });
 

@@ -1248,6 +1248,29 @@ describe("a sender on a brand's own top-level domain", () => {
     ).toBeNull();
   });
 
+  /**
+   * Ownership asked once. Five rules compared a claim against `brand.domains` directly instead of asking
+   * the function that knows about brand TLDs, so they disagreed with it about who owns a name under
+   * `.apple`: the message was excluded from the alignment that dampens content heuristics, its own links
+   * read as pointing outside the organisation, and a relay on its own TLD read as a service the brand does
+   * not use. One question answered in five places produces unrelated symptoms in unrelated files.
+   */
+  it('counts the brand TLD as alignment, so the dampening a verified brand earns applies', () => {
+    expect(buildContext(genuine).senderAlignedWithClaim).toBe(true);
+  });
+
+  it('reads a sign-in link on the brand TLD as the brand own', () => {
+    const result = analyzeDeterministic(
+      {
+        ...genuine,
+        links: [{ text: 'Verify your account', href: 'https://notices.apple/account/verify' }],
+      },
+      { now: FIXED_NOW },
+    );
+
+    expect(result.categoryScores.link).toBe(0);
+  });
+
   it('still flags the same claim from a domain outside that TLD', () => {
     const result = analyzeDeterministic(
       { ...genuine, senderEmail: 'no-reply@apple-savings-notice.com', auth: undefined },

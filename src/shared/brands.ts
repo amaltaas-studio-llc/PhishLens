@@ -327,6 +327,22 @@ export function brandOwningDomain(registrable: string): Brand | undefined {
 }
 
 /**
+ * Whether this particular brand owns the domain.
+ *
+ * The brand-scoped half of the same question, and the only form callers should use. Asking
+ * `brand.domains.includes(registrable)` instead looks equivalent and is not: it cannot see a brand's own
+ * top-level domain, so four rules disagreed with `brandOwningDomain` about who owned a name under `.apple`.
+ * A brand's genuine mail was then excluded from the alignment that dampens content heuristics, and its own
+ * links were read as pointing somewhere else — a disagreement that showed up as unrelated symptoms in
+ * unrelated files, which is what having one question answered in five places buys.
+ */
+export function brandOwns(brand: Brand, registrable: string): boolean {
+  if (registrable === '') return false;
+  if (brand.domains.includes(registrable)) return true;
+  return (brand.tlds ?? []).includes(lastLabel(registrable));
+}
+
+/**
  * The TLD of a registrable domain, computed here rather than imported.
  *
  * This file is data and has no imports, which is what lets the brand table be read by anything without

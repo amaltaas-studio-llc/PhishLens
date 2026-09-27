@@ -5,7 +5,7 @@
  * decidable from strings — no judgement required — which is exactly why it belongs in rules rather
  * than in the LLM.
  */
-import { BRANDS, brandOwningDomain } from '../../shared/brands.js';
+import { BRANDS, brandOwningDomain, brandOwns } from '../../shared/brands.js';
 import { FREEMAIL_DOMAINS } from '../../shared/public-suffix.js';
 import type { SecuritySignal } from '../../shared/types.js';
 import {
@@ -46,7 +46,7 @@ function displayNameImpersonation(context: AnalysisContext): SecuritySignal[] {
   );
   if (claim === undefined) return [];
   if (context.senderRegistrable === '') return [];
-  if (claim.brand.domains.includes(context.senderRegistrable)) return [];
+  if (brandOwns(claim.brand, context.senderRegistrable)) return [];
 
   // A brand's own domain sending mail that mentions another brand is not impersonation
   // (e.g. LinkedIn mail referencing Microsoft).

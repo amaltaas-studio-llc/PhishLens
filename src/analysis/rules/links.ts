@@ -9,7 +9,7 @@
  * No detector in this file resolves DNS, issues a request, or follows a redirect over the network.
  * All redirect analysis is textual.
  */
-import { brandOwningDomain, BRANDS } from '../../shared/brands.js';
+import { brandOwningDomain, brandOwns, BRANDS } from '../../shared/brands.js';
 import type { SecuritySignal } from '../../shared/types.js';
 import { describeUrl, registrableDomain } from '../../shared/url.js';
 import { decodeIdnHost, hasSuspiciousScriptMixing, scriptsUsed, skeleton } from '../../shared/unicode.js';
@@ -104,7 +104,8 @@ function anchorTextBrandMismatch(context: AnalysisContext): SecuritySignal[] {
         return f.length >= 5 && folded.includes(f);
       });
       if (hit === undefined) continue;
-      if (brand.domains.includes(link.registrable)) break;
+      // Brand-scoped, because a domain two brands both list resolves to whichever the table names first.
+      if (brandOwns(brand, link.registrable)) break;
       // The destination is a lookalike of this brand — reported by the lookalike rule instead.
       if (brandOwningDomain(link.registrable)?.id === brand.id) break;
       // Bulk senders rewrite every href through their own click-tracking host, so a footer that links
@@ -442,7 +443,7 @@ function credentialTermsOnUnrelatedDomain(context: AnalysisContext): SecuritySig
       CREDENTIAL_LINK_TERMS.test(link.anchorText) || CREDENTIAL_LINK_TERMS.test(pathAndQuery);
     if (!loginish) continue;
 
-    if (claim?.brand.domains.includes(link.registrable) === true) continue;
+    if (claim !== undefined && brandOwns(claim.brand, link.registrable)) continue;
 
     const openHosting = link.openHosting;
 

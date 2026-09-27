@@ -10,7 +10,7 @@
  *
  * Detectors become pure functions of this structure, which is what makes them trivially testable.
  */
-import { BRANDS, brandOwningDomain, type Brand } from '../shared/brands.js';
+import { BRANDS, brandOwningDomain, brandOwns, type Brand } from '../shared/brands.js';
 import { DISPOSABLE_DOMAINS, FREEMAIL_DOMAINS } from '../shared/public-suffix.js';
 import { isSenderProven, matchingTrustEntry } from '../shared/trust.js';
 import {
@@ -288,9 +288,7 @@ export function buildContext(email: EmailMessage, options: ContextOptions = {}):
   const senderOwnedByBrand = brandOwningDomain(senderRegistrable);
 
   const senderAlignedWithClaim =
-    primaryClaim !== undefined &&
-    senderRegistrable !== '' &&
-    primaryClaim.brand.domains.includes(senderRegistrable);
+    primaryClaim !== undefined && brandOwns(primaryClaim.brand, senderRegistrable);
 
   const priorParties = normalizeThreadParties(email.thread?.priorSenders ?? [], senderEmail);
 
@@ -497,8 +495,7 @@ function detectBrandClaims(
  * should say Amazon rather than Apple.
  */
 function orderClaims(claims: BrandClaim[], senderRegistrable: string): BrandClaim[] {
-  const ownsSender = (claim: BrandClaim): number =>
-    senderRegistrable !== '' && claim.brand.domains.includes(senderRegistrable) ? 1 : 0;
+  const ownsSender = (claim: BrandClaim): number => (brandOwns(claim.brand, senderRegistrable) ? 1 : 0);
 
   return [...claims].sort((a, b) => {
     const bySource = CLAIM_SOURCE_PRIORITY[b.source] - CLAIM_SOURCE_PRIORITY[a.source];
