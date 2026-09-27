@@ -462,4 +462,58 @@ describe('signatures', () => {
 
     expect(after).not.toBe(before);
   });
+
+  /**
+   * Gmail reveals a message in stages, and the stages that arrive late are the ones detection leans on
+   * hardest. Expanding the details panel adds Reply-To and the `mailed-by` / `signed-by` rows; attachment
+   * chips render after the body. A signature made only of subject, body length and link count was
+   * identical before and after each of those, so the observer read new evidence as "nothing has changed"
+   * and discarded it, leaving the badge standing on an analysis that could no longer be reproduced from
+   * what was on screen.
+   */
+  describe('evidence revealed after the first render', () => {
+    const base = handle('m1', 't1');
+    const initial = domSignature(base, email());
+
+    it('changes when a Reply-To appears', () => {
+      expect(domSignature(base, email({ replyTo: 'billing@unrelated.example' }))).not.toBe(initial);
+    });
+
+    it('changes when Gmail exposes its authentication summary', () => {
+      expect(
+        domSignature(base, email({ auth: { spf: 'pass', dkim: 'pass', signedBy: 'example.com' } })),
+      ).not.toBe(initial);
+    });
+
+    it('changes when an authentication verdict changes, not merely appears', () => {
+      const passing = domSignature(base, email({ auth: { dmarc: 'pass' } }));
+      const failing = domSignature(base, email({ auth: { dmarc: 'fail' } }));
+
+      expect(failing).not.toBe(passing);
+    });
+
+    it('changes when Gmail raises its own warning banner', () => {
+      expect(
+        domSignature(base, email({ auth: { gmailWarning: 'This message seems dangerous.' } })),
+      ).not.toBe(initial);
+    });
+
+    it('changes when an attachment chip arrives', () => {
+      expect(
+        domSignature(base, email({ attachments: [{ filename: 'invoice.pdf', extension: 'pdf' }] })),
+      ).not.toBe(initial);
+    });
+
+    it('changes when hidden text is found on a later pass', () => {
+      expect(
+        domSignature(base, email({ hiddenText: { chars: 800, techniques: ['font-size:0'] } })),
+      ).not.toBe(initial);
+    });
+
+    /** Still stable across a re-render that revealed nothing, or the badge would rebuild on every mutation. */
+    it('does not change when the same evidence is read again', () => {
+      const withAuth = email({ auth: { spf: 'pass', signedBy: 'example.com' }, replyTo: 'a@example.com' });
+      expect(domSignature(base, withAuth)).toBe(domSignature(base, withAuth));
+    });
+  });
 });

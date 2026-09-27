@@ -308,14 +308,47 @@ export function viewSignature(
  *
  * Deliberately excludes the route, so it can answer "is Gmail still showing what it showed before?"
  * independently of what the URL now claims.
+ *
+ * It covers the *evidence*, not merely the message, and the difference is the whole point. Gmail reveals
+ * parts of a message after it has drawn the rest: expanding the details panel adds the Reply-To line and
+ * the `mailed-by` / `signed-by` rows, and attachment chips arrive late. A signature made of subject, body
+ * length and link count is identical before and after, so the observer read the enrichment as "nothing has
+ * changed" and dropped it, leaving the score standing on evidence that had since been superseded — and the
+ * fields most often revealed that way are the authentication and Reply-To checks, which is to say the ones
+ * hardest to argue with.
+ *
+ * Summaries rather than values: what matters is whether the evidence available has changed, and a count or
+ * a verdict letter answers that in a bounded string. This is compared for equality and never parsed.
  */
 export function domSignature(handle: MessageHandle, email: EmailMessage): string {
-  return [
-    handle.messageId,
-    handle.threadId,
-    email.senderEmail ?? '',
-    fingerprint(`${email.subject ?? ''}|${String(email.bodyText.length)}|${String(email.links.length)}`),
+  const auth = email.auth;
+  const evidence = [
+    email.subject ?? '',
+    String(email.bodyText.length),
+    String(email.links.length),
+    String(email.attachments.length),
+    email.replyTo ?? '',
+    email.recipientEmail ?? '',
+    auth === undefined ? '' : authShape(auth),
+    email.hiddenText === undefined ? '' : String(email.hiddenText.chars),
   ].join('|');
+
+  return [handle.messageId, handle.threadId, email.senderEmail ?? '', fingerprint(evidence)].join('|');
+}
+
+/** Gmail's authentication summary reduced to the parts whose arrival changes an analysis. */
+function authShape(auth: NonNullable<EmailMessage['auth']>): string {
+  return [
+    auth.spf ?? '',
+    auth.dkim ?? '',
+    auth.dmarc ?? '',
+    auth.signedBy ?? '',
+    auth.mailedBy ?? '',
+    auth.via ?? '',
+    auth.unauthenticatedIndicator === true ? 'unverified' : '',
+    // The banner's presence is what matters; its text is Gmail's own wording and can be long.
+    auth.gmailWarning === undefined ? '' : 'warned',
+  ].join(',');
 }
 
 /**

@@ -197,9 +197,20 @@ Gmail is a hash-routed SPA. Relying on either signal alone is broken:
 `src/gmail/observer.ts` combines them around a single concept, the **view signature**:
 
 ```ts
-domSignature  = `${domMessageId}|${domThreadId}|${sender}|${cheapFingerprint(subject, bodyLen, linkCount)}`
+domSignature  = `${domMessageId}|${domThreadId}|${sender}|${cheapFingerprint(evidence)}`
 viewSignature = `${routeThreadIdFromHash}|${domSignature}`
 ```
+
+`evidence` is every extracted field an analysis depends on — subject, body length, link and attachment
+counts, Reply-To, delivered-to, the authentication summary, the size of any concealed text — and not just
+the shape of the message. That distinction is load-bearing, because Gmail reveals a message in stages and
+the late stages are the ones detection leans on hardest: **expanding the details panel adds the Reply-To
+line and the `mailed-by` / `signed-by` rows**, and attachment chips render after the body. A signature made
+of subject, body length and link count is identical before and after each of those, so the observer read
+new evidence as "nothing has changed", dropped the fresh extraction, and left the badge standing on an
+analysis that could no longer be reproduced from what was on screen. Anything injected by this extension is
+invisible to that fingerprint, because the badge and card live behind shadow roots and `querySelector` does
+not cross them — otherwise widening the signature would have turned every repaint into a re-analysis.
 
 - A debounced (200 ms) `MutationObserver` on the conversation container recomputes the signature.
   **Unchanged signature → no emit.** That kills redundant re-analysis.
