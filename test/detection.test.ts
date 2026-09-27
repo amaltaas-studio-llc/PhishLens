@@ -14,6 +14,9 @@ import { __testables as contentTestables } from '../src/analysis/rules/content.j
 import { __testables as adapterTestables } from '../src/gmail/dom-adapter.js';
 import { isCaseScrambled, repeatedUnitCount } from '../src/analysis/rules/identity.js';
 import { severityFloor } from '../src/analysis/scoring/aggregate.js';
+import { triageSender } from '../src/analysis/triage.js';
+import { BRANDS, brandOwningDomain } from '../src/shared/brands.js';
+import { hasUnknownTld } from '../src/shared/url.js';
 import type {
   AnalysisResult,
   EmailMessage,
@@ -33,6 +36,7 @@ const LEGITIMATE_FIXTURES = [
   'legitimate-thread-reply',
   'legitimate-verification-code',
   'legitimate-brand-product-name',
+  'legitimate-brand-tld',
 ];
 
 const MALICIOUS_FIXTURES = [
@@ -1207,6 +1211,73 @@ describe('a display name that names two brands', () => {
     );
 
     expect(signalFor(result, 'identity.display_name_impersonation')?.title).toContain('Microsoft');
+  });
+});
+
+/**
+ * A brand that operates its own top-level domain, where the brand table's question — is this one of the
+ * domains we list? — has the wrong shape. ICANN's Specification 13 restricts registrations in a brand TLD
+ * to the operator, its affiliates and its trademark licensees, so a name under `.apple` is Apple's by the
+ * registry agreement rather than by appearing in a list, and no list of second-level names can keep up
+ * with one. Until the TLD itself counted as ownership, an authenticated notice from Apple's own TLD with a
+ * display name saying Apple was Apple impersonation at `high`: 50/100, Suspicious, and a marker on the
+ * inbox row for good measure.
+ */
+describe("a sender on a brand's own top-level domain", () => {
+  const genuine = loadFixture('legitimate-brand-tld').email;
+
+  it('still reads the display name as claiming the brand', () => {
+    expect(buildContext(genuine).primaryClaim?.brand.label).toBe('Apple');
+  });
+
+  it("treats every name under the brand TLD as the brand's own", () => {
+    expect(brandOwningDomain('notices.apple')?.label).toBe('Apple');
+    expect(brandOwningDomain('anything-at-all.apple')?.label).toBe('Apple');
+  });
+
+  it('raises no impersonation finding and scores nothing', () => {
+    const result = analyzeDeterministic(genuine, { now: FIXED_NOW });
+    expect(hasSignal(result, 'identity.display_name_impersonation')).toBe(false);
+    expect(result.categoryScores.identity).toBe(0);
+    expect(result.classification).toBe('low');
+  });
+
+  it('puts no marker on the inbox row', () => {
+    expect(
+      triageSender({ senderName: 'Apple Savings Support', senderEmail: 'no_reply@post.notices.apple' }),
+    ).toBeNull();
+  });
+
+  it('still flags the same claim from a domain outside that TLD', () => {
+    const result = analyzeDeterministic(
+      { ...genuine, senderEmail: 'no-reply@apple-savings-notice.com', auth: undefined },
+      { now: FIXED_NOW },
+    );
+    expect(signalFor(result, 'identity.display_name_impersonation')?.title).toContain('Apple');
+  });
+
+  /**
+   * The mistake this must never become. A brand TLD carries its guarantee because nobody else can register
+   * under it; a TLD that anyone can buy a name in carries none, and treating one as a brand's would hand
+   * the brand's identity to every registrant. Both of these are in Apple's and Microsoft's `domains` as
+   * second-level names — `me.com`, `live.com` — which is exactly as far as it goes.
+   */
+  it.each(['phish-support.me', 'account-verify.live', 'secure-login.app', 'apple-id.dev'])(
+    'claims no ownership of %s, whose TLD is open to anyone',
+    (domain) => {
+      expect(brandOwningDomain(domain)).toBeUndefined();
+    },
+  );
+
+  /** A typo in the list is silent otherwise: a TLD that does not exist can never match a real sender. */
+  it('lists only top-level domains IANA has delegated', () => {
+    for (const brand of BRANDS) {
+      for (const tld of brand.tlds ?? []) {
+        expect(hasUnknownTld(`example.${tld}`), `${brand.id}: ${tld}`).toBe(false);
+        expect(tld, `${brand.id}: ${tld}`).toBe(tld.toLowerCase());
+        expect(tld.includes('.'), `${brand.id}: ${tld}`).toBe(false);
+      }
+    }
   });
 });
 

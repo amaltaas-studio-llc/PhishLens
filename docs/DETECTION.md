@@ -207,6 +207,16 @@ mechanisms exist purely to keep legitimate mail at zero.
   decides the question with a fact about the table rather than one about the message: Apple is written
   before Amazon, so authenticated mail from a domain Amazon owns was read as Apple impersonation and
   correlated with its own verification wording into High Risk.
+- **Brands that run their own top-level domain.** Ownership is a question about a name's TLD as well as its
+  second level. ICANN's Specification 13 restricts registrations in a brand TLD to the operator, its
+  affiliates and its trademark licensees, so every name under `.apple` or `.microsoft` is the brand's by the
+  registry agreement — a stronger guarantee than a curated list of `.com` names, and one no such list can
+  keep up with, since the brand may create names under it at will. Only strings ICANN records as granted a
+  Specification 13 exemption belong in a brand's `tlds`, and a TLD anyone can register under must never:
+  `.me` and `.live` appear in brand `domains` as `me.com` and `live.com`, and treating the TLDs as owned
+  would hand those identities to every registrant. Without this, an authenticated notice from a brand's own
+  TLD whose display name named the brand was brand impersonation at `high` — half the score, and a marker on
+  the inbox row, for mail whose provenance is better established than most.
 - **The AI dead zone.** Verdicts below 45/100, and any verdict no deterministic check corroborates, score
   zero. See [LOCAL-AI.md](LOCAL-AI.md).
 - **Trusted senders.** The user's own answer to a false positive, and the only one on this list that is

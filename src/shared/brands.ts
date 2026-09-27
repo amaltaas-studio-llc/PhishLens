@@ -18,6 +18,23 @@ export interface Brand {
   keywords: readonly string[];
   /** Registrable domains this brand legitimately sends from or links to. */
   domains: readonly string[];
+  /**
+   * Top-level domains the brand itself operates, under which *every* name is its own.
+   *
+   * ICANN's Specification 13 is what makes this a rule rather than a list of guesses: a brand TLD's string
+   * must match the operator's registered trademark, and registrations are restricted to the operator, its
+   * affiliates, and its trademark licensees. So any name under `.apple` is Apple's without an entry in
+   * `domains` — nobody else can hold one at all. Without this, a genuine notice about a bank product the
+   * brand operates jointly, sent from the brand's own TLD and authenticated, was reported as brand
+   * impersonation because the domain was not one of the handful this file happens to list.
+   *
+   * Only strings whose Specification 13 request ICANN records as granted belong here. `.office` is the
+   * instructive omission: Microsoft's request for it was withdrawn, so it carries no such guarantee even
+   * though Microsoft operates it. A TLD that is open to third parties must never appear — `.live` and
+   * `.me` are Microsoft's and Apple's in `domains` only as `live.com` and `me.com`, and treating either as
+   * a brand TLD would hand every registrant of a cheap name the brand's identity.
+   */
+  tlds?: readonly string[];
   /** Strings that a lookalike domain would be imitating (registrable-domain form). */
   lookalikeTargets: readonly string[];
 }
@@ -33,6 +50,7 @@ export const BRANDS: readonly Brand[] = [
       'msn.com', 'microsoft365.com', 'skype.com', 'xbox.com', 'msftauth.net',
       'microsoftstream.com', 'office.net', 'msidentity.com', 'linkedin.com', 'github.com',
     ],
+    tlds: ['microsoft', 'azure', 'bing', 'hotmail', 'skype', 'windows', 'xbox'],
     lookalikeTargets: ['microsoft.com', 'microsoftonline.com', 'office365.com', 'sharepoint.com', 'onedrive.com'],
   },
   {
@@ -44,6 +62,7 @@ export const BRANDS: readonly Brand[] = [
       'withgoogle.com', 'google.co.uk', 'googleusercontent.com', 'goo.gl', 'firebase.google.com',
       'accounts.google.com', 'gstatic.com', 'chromium.org', 'android.com',
     ],
+    tlds: ['google', 'gmail', 'youtube'],
     lookalikeTargets: ['google.com', 'gmail.com', 'youtube.com', 'googlemail.com'],
   },
   {
@@ -58,6 +77,7 @@ export const BRANDS: readonly Brand[] = [
     label: 'Apple',
     keywords: ['apple', 'appleid', 'icloud', 'itunes', 'appstore', 'applepay'],
     domains: ['apple.com', 'icloud.com', 'itunes.com', 'me.com', 'mac.com', 'apple.co', 'apple.news'],
+    tlds: ['apple'],
     lookalikeTargets: ['apple.com', 'icloud.com', 'appleid.apple.com'],
   },
   {
@@ -69,6 +89,7 @@ export const BRANDS: readonly Brand[] = [
       'amazon.co.jp', 'amazon.com.au', 'amazonaws.com', 'aws.amazon.com', 'audible.com',
       'primevideo.com', 'amazonses.com', 'kindle.com', 'amazon.jobs',
     ],
+    tlds: ['amazon', 'aws', 'audible', 'kindle', 'prime'],
     lookalikeTargets: ['amazon.com', 'amazon.co.uk', 'amazonaws.com'],
   },
   {
@@ -76,6 +97,7 @@ export const BRANDS: readonly Brand[] = [
     label: 'Netflix',
     keywords: ['netflix'],
     domains: ['netflix.com', 'nflxext.com', 'netflix.net'],
+    tlds: ['netflix'],
     lookalikeTargets: ['netflix.com'],
   },
   {
@@ -118,6 +140,7 @@ export const BRANDS: readonly Brand[] = [
     label: 'DHL',
     keywords: ['dhl'],
     domains: ['dhl.com', 'dhl.de', 'dhlparcel.com', 'dhlexpress.com', 'dhl.co.uk'],
+    tlds: ['dhl'],
     lookalikeTargets: ['dhl.com'],
   },
   {
@@ -125,6 +148,7 @@ export const BRANDS: readonly Brand[] = [
     label: 'FedEx',
     keywords: ['fedex'],
     domains: ['fedex.com', 'fedex.co.uk', 'fedexoffice.com'],
+    tlds: ['fedex'],
     lookalikeTargets: ['fedex.com'],
   },
   {
@@ -132,6 +156,7 @@ export const BRANDS: readonly Brand[] = [
     label: 'UPS',
     keywords: ['ups package', 'united parcel'],
     domains: ['ups.com', 'ups.co.uk'],
+    tlds: ['ups'],
     lookalikeTargets: ['ups.com'],
   },
   {
@@ -146,6 +171,7 @@ export const BRANDS: readonly Brand[] = [
     label: 'Chase',
     keywords: ['chase bank', 'jpmorgan', 'chase online'],
     domains: ['chase.com', 'jpmorgan.com', 'jpmorganchase.com', 'chasepaymentech.com'],
+    tlds: ['chase', 'jpmorgan'],
     lookalikeTargets: ['chase.com'],
   },
   {
@@ -153,6 +179,7 @@ export const BRANDS: readonly Brand[] = [
     label: 'Bank of America',
     keywords: ['bank of america', 'bankofamerica', 'bofa'],
     domains: ['bankofamerica.com', 'bofa.com', 'merrilledge.com', 'ml.com'],
+    tlds: ['bofa'],
     lookalikeTargets: ['bankofamerica.com'],
   },
   {
@@ -167,6 +194,7 @@ export const BRANDS: readonly Brand[] = [
     label: 'HSBC',
     keywords: ['hsbc'],
     domains: ['hsbc.com', 'hsbc.co.uk', 'hsbc.ca', 'hsbcnet.com'],
+    tlds: ['hsbc'],
     lookalikeTargets: ['hsbc.com', 'hsbc.co.uk'],
   },
   {
@@ -174,6 +202,7 @@ export const BRANDS: readonly Brand[] = [
     label: 'American Express',
     keywords: ['american express', 'americanexpress', 'amex'],
     domains: ['americanexpress.com', 'aexp.com', 'amex.com', 'americanexpress.co.uk'],
+    tlds: ['amex', 'americanexpress'],
     lookalikeTargets: ['americanexpress.com'],
   },
   {
@@ -181,6 +210,7 @@ export const BRANDS: readonly Brand[] = [
     label: 'Intuit / QuickBooks',
     keywords: ['intuit', 'quickbooks', 'turbotax'],
     domains: ['intuit.com', 'quickbooks.com', 'turbotax.com', 'intuit.ca', 'mint.com'],
+    tlds: ['intuit'],
     lookalikeTargets: ['intuit.com', 'quickbooks.com'],
   },
   {
@@ -283,6 +313,27 @@ for (const brand of BRANDS) {
   }
 }
 
+const BRAND_BY_TLD = new Map<string, Brand>();
+for (const brand of BRANDS) {
+  for (const tld of brand.tlds ?? []) {
+    if (!BRAND_BY_TLD.has(tld)) BRAND_BY_TLD.set(tld, brand);
+  }
+}
+
 export function brandOwningDomain(registrable: string): Brand | undefined {
-  return BRAND_BY_DOMAIN.get(registrable);
+  const named = BRAND_BY_DOMAIN.get(registrable);
+  if (named !== undefined) return named;
+  return BRAND_BY_TLD.get(lastLabel(registrable));
+}
+
+/**
+ * The TLD of a registrable domain, computed here rather than imported.
+ *
+ * This file is data and has no imports, which is what lets the brand table be read by anything without
+ * dragging the URL helpers behind it. The input is already a registrable domain, so its last label is its
+ * TLD whether or not the suffix has several labels: `hsbc.co.uk` gives `uk`, which no brand claims.
+ */
+function lastLabel(registrable: string): string {
+  const trimmed = registrable.toLowerCase().replace(/\.+$/u, '');
+  return trimmed.slice(trimmed.lastIndexOf('.') + 1);
 }
