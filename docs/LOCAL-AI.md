@@ -158,6 +158,14 @@ message read while Chrome was still downloading the model are all re-assessed on
   while the reader is still looking at their inbox. Warming never downloads a model.
 - The session is cached in the **content script**, never the service worker, which MV3 may terminate at
   any moment.
+- **One conversation per message.** A Prompt API session is a conversation: every prompt and every reply
+  stays in its context. The cached session is therefore a template, kept pristine and never prompted, and
+  each message is analysed in a `clone()` of it that is destroyed afterwards. Reusing one session would
+  fill its context with mail the reader has finished with until an inference failed for length, anchor each
+  verdict on its predecessor so the same message scored differently depending on what was read before it,
+  and let the wording of one message reach the judgement of every message after it — a steering channel
+  available to any sender. On a build with no `clone`, each message gets a whole new session and its
+  replacement is built behind the queue; that is slower, and the alternative is a contaminated judgement.
 
 ## Your own model server
 

@@ -63,7 +63,11 @@ function modernFactory(options: { availability?: string; promptResult?: unknown 
     Promise.resolve(options.promptResult ?? VALID_JSON),
   );
   const destroy = vi.fn();
-  const create = vi.fn((_createOptions?: unknown) => Promise.resolve({ prompt, destroy }));
+  const releaseClone = vi.fn();
+  // Browsers expose `clone`, and the adapter branches a session per message with it. A fake without one
+  // would exercise only the fallback path, which is not the path anybody runs.
+  const clone = vi.fn(() => Promise.resolve({ prompt, destroy: releaseClone }));
+  const create = vi.fn((_createOptions?: unknown) => Promise.resolve({ prompt, destroy, clone }));
   const availability = vi.fn(() => Promise.resolve(options.availability ?? 'available'));
 
   // A class is a function carrying static properties, which is what this builds. The adapter must
@@ -73,7 +77,7 @@ function modernFactory(options: { availability?: string; promptResult?: unknown 
   }
 
   const factory = Object.assign(LanguageModelFake, { availability, create });
-  return { factory, prompt, destroy, create, availability };
+  return { factory, prompt, destroy, create, availability, clone, releaseClone };
 }
 
 /** The same contract as `modernFactory`, but as a plain namespace object (pre-class builds). */
@@ -332,19 +336,38 @@ describe('on-device adapter: inference', () => {
     }
   });
 
-  it('reuses one session across messages, then releases it on dispose', async () => {
-    const { factory, create, destroy } = modernFactory();
+  it('loads the model once and branches from it per message, releasing it on dispose', async () => {
+    const { factory, create, clone, destroy, releaseClone } = modernFactory();
     install({ LanguageModel: factory });
 
     const analyzer = new ChromePromptAnalyzer();
     await analyzer.analyze(EMAIL);
     await analyzer.analyze(EMAIL);
-    // Session caching is why this adapter lives in the content script and not the service worker,
-    // which MV3 would terminate between messages.
+    // Caching the loaded model is why this adapter lives in the content script and not the service
+    // worker, which MV3 would terminate between messages. Branching from it is what keeps one message's
+    // conversation out of the next one's.
     expect(create).toHaveBeenCalledTimes(1);
+    expect(clone).toHaveBeenCalledTimes(2);
+    expect(releaseClone).toHaveBeenCalledTimes(2);
 
     analyzer.dispose();
     expect(destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('survives a clone that the build accepts and then refuses', async () => {
+    const prompt = vi.fn(() => Promise.resolve(VALID_JSON));
+    install({
+      LanguageModel: {
+        availability: () => Promise.resolve('available'),
+        create: () => Promise.resolve({
+          prompt,
+          clone: () => Promise.reject(new Error('cloning is not supported here after all')),
+        }),
+      },
+    });
+
+    // A build that advertises `clone` and then fails must fall back, not lose the analysis.
+    await expect(new ChromePromptAnalyzer().analyze(EMAIL)).resolves.not.toBeNull();
   });
 
   it('survives a session that refuses to be destroyed', async () => {
@@ -374,6 +397,118 @@ describe('on-device adapter: inference', () => {
     const sent = prompt.mock.calls[0]?.[0] ?? '';
     expect(sent).not.toContain('victim@northwind.example');
     expect(sent).toContain('Unusual sign-in activity');
+  });
+});
+
+/**
+ * A session that behaves like a conversation, because that is what the Prompt API gives you: everything
+ * prompted stays in a session's history, and `clone()` branches from whatever the history holds at the
+ * time. Only a fake that keeps a history can show one message's text reaching the next one's judgement.
+ */
+function conversationalFactory(options: { clonable?: boolean } = {}) {
+  const clonable = options.clonable !== false;
+  const sessions: { history: string[]; alive: boolean }[] = [];
+
+  function open(inherited: readonly string[]): Record<string, unknown> {
+    const session = { history: [...inherited], alive: true };
+    sessions.push(session);
+    const handle: Record<string, unknown> = {
+      prompt: (input: string) => {
+        session.history.push(input);
+        return Promise.resolve(VALID_JSON);
+      },
+      destroy: () => {
+        session.alive = false;
+      },
+    };
+    if (clonable) handle['clone'] = () => Promise.resolve(open(session.history));
+    return handle;
+  }
+
+  return {
+    factory: {
+      availability: () => Promise.resolve('available'),
+      create: (createOptions?: unknown) => {
+        const record = (createOptions ?? {}) as Record<string, unknown>;
+        const prompts = record['initialPrompts'];
+        const system = Array.isArray(prompts) ? [SYSTEM_PROMPT] : [];
+        return Promise.resolve(open(system));
+      },
+    },
+    sessions,
+    /** The prompts each session saw that were messages rather than the system instructions. */
+    messagesPerSession: (): number[] =>
+      sessions.map((s) => s.history.filter((entry) => entry !== SYSTEM_PROMPT).length),
+  };
+}
+
+const SECOND_EMAIL: EmailMessage = {
+  senderName: 'Northwind Logistics',
+  senderEmail: 'notifications@northwind-logistics.com',
+  subject: 'Your delivery is scheduled',
+  bodyText: 'Your consignment leaves the depot on Tuesday morning.',
+  links: [],
+  attachments: [],
+};
+
+/**
+ * One message must not be judged by a model that has just judged another.
+ *
+ * A session is a conversation, so reusing one across messages fills its context with mail the reader has
+ * finished with until an inference fails for length; anchors each verdict on its predecessor, so the same
+ * message scores differently depending on what was read before it; and lets the wording of one message
+ * reach the judgement of every message after it, which is a steering channel any sender can use.
+ */
+describe('on-device adapter: one conversation per message', () => {
+  it('never shows a session two messages', async () => {
+    const { factory, messagesPerSession } = conversationalFactory();
+    install({ LanguageModel: factory });
+
+    const analyzer = new ChromePromptAnalyzer();
+    await analyzer.analyze(EMAIL);
+    await analyzer.analyze(SECOND_EMAIL);
+
+    expect(Math.max(...messagesPerSession())).toBe(1);
+  });
+
+  it('branches from a session that still holds the system prompt', async () => {
+    const { factory, sessions } = conversationalFactory();
+    install({ LanguageModel: factory });
+
+    await new ChromePromptAnalyzer().analyze(EMAIL);
+
+    // The clone inherits the instructions and adds the message: isolation must not cost the calibration.
+    const used = sessions.find((s) => s.history.length > 1);
+    expect(used?.history[0]).toBe(SYSTEM_PROMPT);
+    expect(used?.history[1]).toContain('Unusual sign-in activity');
+  });
+
+  it('opens a fresh session per message on a build that cannot clone', async () => {
+    const { factory, messagesPerSession } = conversationalFactory({ clonable: false });
+    install({ LanguageModel: factory });
+
+    const analyzer = new ChromePromptAnalyzer();
+    await analyzer.analyze(EMAIL);
+    await analyzer.analyze(SECOND_EMAIL);
+
+    // Slower, since each message pays for a session, and still isolated. The alternative on such a build
+    // is a judgement contaminated by the previous message, which is not a trade worth making.
+    expect(Math.max(...messagesPerSession())).toBe(1);
+    expect(messagesPerSession().filter((count) => count === 1)).toHaveLength(2);
+  });
+
+  it('does not open a session behind a teardown', async () => {
+    const { factory, sessions } = conversationalFactory({ clonable: false });
+    install({ LanguageModel: factory });
+
+    const analyzer = new ChromePromptAnalyzer();
+    await analyzer.analyze(EMAIL);
+    analyzer.dispose();
+    // The replacement session is built behind the queue, and must not outlive the content script.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(sessions.filter((s) => s.alive)).toEqual([]);
   });
 });
 

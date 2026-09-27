@@ -123,6 +123,8 @@ async function probeAvailability(host: UnknownRecord): Promise<'ready' | 'needs-
 
 interface Session {
   prompt(input: string, options?: UnknownRecord): Promise<unknown>;
+  /** Branches a session from its current state. Present since early builds, but not guaranteed. */
+  clone?: () => Promise<Session | null>;
   destroy?: () => void;
 }
 
@@ -130,7 +132,13 @@ function asSession(value: unknown): Session | null {
   if (!isRecord(value)) return null;
   const prompt = fn(value, 'prompt');
   if (prompt === null) return null;
+  const clone = fn(value, 'clone');
   return {
+    ...(clone !== null
+      ? {
+          clone: async (): Promise<Session | null> => asSession(await clone.call(value)),
+        }
+      : {}),
     prompt: async (input: string, options?: UnknownRecord) => {
       const result: unknown = options === undefined
         ? await prompt.call(value, input)
@@ -151,6 +159,22 @@ function asSession(value: unknown): Session | null {
   };
 }
 
+/**
+ * A session branched from `template`, or `null` when this build cannot branch one.
+ *
+ * `clone()` exists in the Prompt API for exactly this: it copies the session's state — including the
+ * system prompt, which is the part that must not be lost — without re-loading the model, so per-message
+ * isolation costs almost nothing where it is supported.
+ */
+async function branch(template: Session): Promise<Session | null> {
+  if (template.clone === undefined) return null;
+  try {
+    return await template.clone();
+  } catch {
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Adapter
 // ---------------------------------------------------------------------------
@@ -158,8 +182,12 @@ function asSession(value: unknown): Session | null {
 export class ChromePromptAnalyzer implements SemanticAnalyzer {
   readonly id = 'chrome-on-device';
 
-  /** Cached session. Valid only in a long-lived context (the content script). */
+  /**
+   * Cached *template* session, kept pristine and cloned per message. Valid only in a long-lived context
+   * (the content script), which is why this adapter is not in the service worker.
+   */
   #session: Session | null = null;
+  #disposed = false;
   /**
    * Whether the cached session was created with the system prompt attached.
    *
@@ -245,15 +273,39 @@ export class ChromePromptAnalyzer implements SemanticAnalyzer {
     // is not this message, so the cheapest correct thing is to not run at all.
     if (isAborted(options.signal)) return null;
 
+    /*
+     * Every message is analysed in a session of its own.
+     *
+     * A Prompt API session is a conversation: each prompt and each reply stay in its context. Reusing
+     * one across messages therefore asks the model to judge this message *having just judged the last
+     * one*, which is wrong in three ways of increasing seriousness. The context fills up with mail the
+     * reader has finished with, until an inference fails for length on a busy morning and the failure
+     * looks like an unavailable model. A verdict anchors on its predecessor, so the same message scores
+     * differently depending on what was read before it — the opposite of a check you can reproduce. And
+     * the wording of one message reaches the judgement of the next, which hands any message in the
+     * mailbox a channel for steering the assessment of every message after it.
+     */
+    let working: Session | null = null;
+    let spentTemplate = false;
     try {
-      const session = await this.#ensureSession();
-      if (session === null) return null;
+      const template = await this.#ensureSession();
+      if (template === null) return null;
+
+      working = await branch(template);
+      if (working === null) {
+        // No `clone` on this build. Prompting the cached session spends it, so it is retired below.
+        working = template;
+        spentTemplate = true;
+      }
 
       const user = buildUserPrompt(email);
       const prompt = this.#sessionHasSystemPrompt ? user : `${SYSTEM_PROMPT}\n\n${user}`;
-      logger.debug('on-device inference starting', { shape: describePromptShape(email) });
+      logger.debug('on-device inference starting', {
+        shape: describePromptShape(email),
+        cloned: !spentTemplate,
+      });
 
-      const raw = await this.#promptWithTimeout(session, prompt, options.signal);
+      const raw = await this.#promptWithTimeout(working, prompt, options.signal);
       if (raw === null) return null;
 
       const analysis = parseSemanticAnalysis(raw, 'local', this.#factoryLabel);
@@ -266,7 +318,22 @@ export class ChromePromptAnalyzer implements SemanticAnalyzer {
       this.#discardSession();
       logger.debug('on-device inference failed', error);
       return null;
+    } finally {
+      if (spentTemplate) this.#retireSession();
+      else working?.destroy?.();
     }
+  }
+
+  /**
+   * Releases a session that has now seen a message, and builds its replacement behind the queue.
+   *
+   * Only reached on a build without `clone`, where isolation costs a session creation per message. The
+   * rebuild is queued rather than awaited so that cost is paid while the reader is still reading, which
+   * is the same reason `warmUp()` exists.
+   */
+  #retireSession(): void {
+    this.#discardSession();
+    void this.#enqueue(() => this.#ensureSession()).catch(() => undefined);
   }
 
   /**
@@ -288,6 +355,8 @@ export class ChromePromptAnalyzer implements SemanticAnalyzer {
    * then a bare create — each historically valid, none guaranteed.
    */
   async #ensureSession(): Promise<Session | null> {
+    // A queued rebuild can outlive teardown, and a session created after it would never be released.
+    if (this.#isDisposed()) return null;
     if (this.#session !== null) return this.#session;
 
     const factory = findFactory();
@@ -312,6 +381,12 @@ export class ChromePromptAnalyzer implements SemanticAnalyzer {
       try {
         const session = asSession(await create.call(factory.host, attempt.options));
         if (session !== null) {
+          // Teardown can land during the seconds a creation takes, and a session stored afterwards is
+          // one nothing will ever release.
+          if (this.#isDisposed()) {
+            session.destroy?.();
+            return null;
+          }
           this.#session = session;
           this.#sessionHasSystemPrompt = attempt.system;
           return session;
@@ -364,6 +439,14 @@ export class ChromePromptAnalyzer implements SemanticAnalyzer {
     return null;
   }
 
+  /**
+   * Read through a method because the flag is checked either side of an `await`, and narrowing does not
+   * survive one: read directly, the second check is dead code as far as the compiler is concerned.
+   */
+  #isDisposed(): boolean {
+    return this.#disposed;
+  }
+
   #discardSession(): void {
     this.#session?.destroy?.();
     this.#session = null;
@@ -372,6 +455,7 @@ export class ChromePromptAnalyzer implements SemanticAnalyzer {
 
   /** Releases the on-device session. Called when the content script tears down. */
   dispose(): void {
+    this.#disposed = true;
     this.#discardSession();
   }
 }
