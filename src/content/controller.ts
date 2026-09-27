@@ -19,7 +19,12 @@ import {
 } from '../analysis/engine.js';
 import { localAnalyzer, resolveAnalyzer } from '../analysis/llm/index.js';
 import { isScorable, type MailAdapter, type MessageHandle } from '../gmail/adapter.js';
-import { buildDiagnostic, probeSelectors } from '../gmail/diagnostics.js';
+import {
+  buildDiagnostic,
+  probeSelectors,
+  summarizeScoring,
+  type ScoringSummary,
+} from '../gmail/diagnostics.js';
 import { GmailObserver, type ObserverEvent } from '../gmail/observer.js';
 import { logger } from '../shared/logger.js';
 import { isTabRequest, sendMessage, type TabResponse, type TabStatus } from '../shared/messaging.js';
@@ -378,13 +383,39 @@ export class Controller {
     }
 
     if (message.type === 'GET_HEALTH_REPORT') {
-      respond({ ok: true, type: 'HEALTH_REPORT', report: this.#health.report(this.#adapter.id) });
+      respond({ ok: true, type: 'HEALTH_REPORT', report: this.#report() });
       return false;
     }
 
     respond({ ok: true, type: 'TAB_STATUS', status: this.#status(), health: this.#health.summary() });
     return false;
   };
+
+  /**
+   * The pasteable report: how extraction has been going, what the last list pass saw, and how the
+   * message on screen scored.
+   *
+   * The third part is the one that makes a score arguable from a released build. The card already
+   * explains the score to the person reading it, but every sentence in it is built around their own
+   * mail, so the only way to report "this check should not have fired" used to be a development build.
+   */
+  #report(): string {
+    return this.#health.report(
+      this.#adapter.id,
+      this.#scoringSummary(),
+      this.#listMarks.lastPass(),
+    );
+  }
+
+  /** The scoring half of the report, or `null` when nothing on screen has a score to explain. */
+  #scoringSummary(): ScoringSummary | null {
+    const active = this.#active;
+    if (active?.result == null) return null;
+    // A message that could not be read has no score to account for, and the parts it was missing are
+    // already in the session tally above it.
+    if (!isScorable(active.missing)) return null;
+    return summarizeScoring(active.result, active.email, active.semantic);
+  }
 
   #status(): TabStatus {
     const active = this.#active;

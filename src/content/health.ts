@@ -12,11 +12,19 @@
  * text as the unreadable card's (`gmail/diagnostics.ts`), so a user can tell us which selector list needs
  * an entry. Nothing is persisted: a tally that survived a restart would report yesterday's Gmail.
  *
- * Holds no message content. Only counts, part names, and selector strings we wrote.
+ * Holds no message content. Only counts, part names, and selector strings we wrote — and the report it
+ * builds adds nothing of a different kind, since the message on screen reaches it as a `ScoringSummary`
+ * of rule names and counts rather than as a message.
  */
 import type { MessagePart } from '../shared/types.js';
 import type { TabHealth } from '../shared/messaging.js';
-import { buildHealthReport, hasDrifted, type SelectorProbe } from '../gmail/diagnostics.js';
+import {
+  buildHealthReport,
+  hasDrifted,
+  type ListPassCounts,
+  type ScoringSummary,
+  type SelectorProbe,
+} from '../gmail/diagnostics.js';
 
 export class HealthLog {
   #seen = 0;
@@ -64,8 +72,25 @@ export class HealthLog {
     };
   }
 
-  /** The pasteable report. Built on request, since nothing needs it until a button is pressed. */
-  report(adapter: string): string {
-    return buildHealthReport(this.summary(), this.#probes, adapter);
+  /**
+   * The pasteable report. Built on request, since nothing needs it until a button is pressed.
+   *
+   * The message on screen and the list pass arrive as arguments rather than being accumulated here: this
+   * class counts what extraction did over a session, and both of those are state owned elsewhere. Giving
+   * it a reference to the controller to fetch them would be the moment "holds no message content" became
+   * a claim about discipline instead of about shape.
+   */
+  report(
+    adapter: string,
+    scoring: ScoringSummary | null,
+    listPass: ListPassCounts | null,
+  ): string {
+    return buildHealthReport({
+      adapter,
+      health: this.summary(),
+      probes: this.#probes,
+      scoring,
+      listPass,
+    });
   }
 }

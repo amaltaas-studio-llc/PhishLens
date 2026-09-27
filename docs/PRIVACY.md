@@ -57,6 +57,14 @@ which selector groups fell through to a fallback — is counted in the tab and s
 Gmail layout change is visible rather than silent. It is counts and selector names only; the diagnostic
 you can copy from the popup is asserted by a test to contain nothing from any message.
 
+That report also accounts for the score of the message on screen, so you can dispute one without
+installing a development build. It names the checks that ran — the identifiers used in this repository —
+with what each added to the score, and describes what was read as numbers: how many characters the body
+held, how many links and attachments, how many characters were concealed and by which CSS. No subject, no
+address, no filename, no excerpt, and no finding wording, since every one of those is built around
+something you were sent. The report is shown in full in the popup before you copy it, for the same reason
+the other one is: a report you cannot read is one you cannot decide to share.
+
 **Potentially leaving the browser** — nothing by default. Two modes can send message content, and both
 require an explicit choice *and* an address, neither of which has a default value:
 

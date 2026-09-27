@@ -6,7 +6,14 @@
  * careless edit apart.
  */
 import { describe, expect, it } from 'vitest';
-import { aiRow, cardButtonLabel, findingsLine, headline, healthRow } from '../src/popup/present.js';
+import {
+  aiRow,
+  cardButtonLabel,
+  findingsLine,
+  headline,
+  healthRow,
+  reportRow,
+} from '../src/popup/present.js';
 import type { PopupState } from '../src/popup/present.js';
 import type { TabHealth } from '../src/shared/messaging.js';
 import { DEFAULT_SETTINGS } from '../src/shared/settings.js';
@@ -226,6 +233,45 @@ describe('healthRow', () => {
     ];
     for (const row of rows) {
       expect(row?.detail).toMatch(/none of your mail/i);
+    }
+  });
+});
+
+/**
+ * The copy affordance is deliberately independent of `healthRow` above. That row stays silent while
+ * extraction is healthy, and a score someone disagrees with is a bug report about a healthy session —
+ * so attaching the only copy button to the row made the report unreachable in the case it is most
+ * wanted for.
+ */
+describe('reportRow', () => {
+  it('offers a report on a scored message, with the tally saying nothing', () => {
+    const row = reportRow(scored({ score: 12, classification: 'low' }));
+    expect(row).not.toBeNull();
+    expect(row?.note).toMatch(/checks that ran on this message/i);
+  });
+
+  it('describes the session instead when no message has been scored', () => {
+    const row = reportRow({ kind: 'no-message' });
+    expect(row?.note).toMatch(/how PhishLens has been reading this tab/i);
+    expect(row?.note).toMatch(/open a message first/i);
+  });
+
+  it.each([{ kind: 'not-gmail' } as const, { kind: 'unreachable' } as const])(
+    'offers nothing for $kind, where a report would describe nothing',
+    (state) => {
+      expect(reportRow(state)).toBeNull();
+    },
+  );
+
+  it('says on every branch that the report holds no mail', () => {
+    const states: PopupState[] = [
+      { kind: 'no-message' },
+      { kind: 'pending' },
+      { kind: 'unreadable', missing: ['sender'] },
+      scored(),
+    ];
+    for (const state of states) {
+      expect(reportRow(state)?.note).toMatch(/no text from the message|none of your mail/i);
     }
   });
 });

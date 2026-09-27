@@ -928,6 +928,21 @@ The user-facing end is a line in the popup and a button that copies a report. Bo
 `gmail/diagnostics.ts` are pure functions over counts, part names and selector strings we wrote, which is
 what lets a test assert that neither can put message content on the clipboard.
 
+The session report also accounts for the **score on screen**, because the two halves are different bug
+reports and only one of them was reachable. A selector that stopped matching shows up in the probe list; a
+check that fired when it should not have shows up only in the card, whose every sentence is built around a
+value from the reader's mail and therefore cannot be pasted anywhere public. So the report names the rules
+that ran — id, severity, and the points each contributed — beside what was read as counts: body length,
+link and attachment totals, concealed characters and the CSS that hid them, and the last list pass's rows,
+addresses and marks. Those counts are the deliberate exception to the rule the per-message diagnostic
+follows, which excludes body length as weak leakage: a body read as 0 characters and one read as 5,000
+produce an identical list of rule names and completely different bugs. `summarizeScoring` is the only
+constructor, copying four fields off each signal, because `SecuritySignal` is structurally assignable to
+the shape the report wants and a spread would carry `title`, `description` and `evidence` — all message
+content — along with the id. The copy button is offered whenever a tab answered rather than only when the
+health row fires: the row is silent while extraction is healthy, and a score someone disputes is a bug
+report about a healthy session.
+
 ---
 
 ## 6. A model server the user runs

@@ -22,6 +22,7 @@ import {
   findingsLine,
   headline,
   healthRow,
+  reportRow,
   type PopupState,
 } from './present.js';
 
@@ -71,6 +72,8 @@ class Popup {
   readonly #healthSection = requireElement('healthSection', HTMLElement);
   readonly #healthHeadline = requireElement('healthHeadline', HTMLParagraphElement);
   readonly #healthDetail = requireElement('healthDetail', HTMLParagraphElement);
+  readonly #reportSection = requireElement('reportSection', HTMLElement);
+  readonly #reportNote = requireElement('reportNote', HTMLParagraphElement);
   readonly #copy = requireElement('copy', HTMLButtonElement);
   readonly #healthReport = requireElement('healthReport', HTMLPreElement);
   readonly #settings = requireElement('settings', HTMLButtonElement);
@@ -157,6 +160,7 @@ class Popup {
     this.#test.hidden = !ai.testable;
 
     this.#renderHealth(health);
+    this.#renderReport(state);
 
     this.#showBadgeWhenLow.checked = settings.showBadgeWhenLow;
     this.#highlightEnabled.checked = settings.highlightEnabled;
@@ -169,6 +173,15 @@ class Popup {
 
     this.#healthHeadline.textContent = row.headline;
     this.#healthDetail.textContent = row.detail;
+  }
+
+  #renderReport(state: PopupState): void {
+    const row = reportRow(state);
+    this.#reportSection.hidden = row === null;
+    if (row === null) return;
+
+    this.#reportNote.textContent = row.note;
+    this.#copy.textContent = row.label;
   }
 
   /**

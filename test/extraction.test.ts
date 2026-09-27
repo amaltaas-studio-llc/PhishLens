@@ -20,9 +20,12 @@ import {
   browserVersion,
   formatDiagnostic,
   formatHealth,
+  summarizeScoring,
+  type ListPassCounts,
+  type ScoringSummary,
   type SelectorProbe,
 } from '../src/gmail/diagnostics.js';
-import type { EmailMessage, MessagePart } from '../src/shared/types.js';
+import type { AnalysisResult, EmailMessage, MessagePart } from '../src/shared/types.js';
 import { unreadableNotes } from '../src/ui/format.js';
 import { UNREADABLE_LABEL } from '../src/ui/labels.js';
 import { loadFixture } from './fixtures/load.js';
@@ -340,6 +343,8 @@ describe('the session health tally', () => {
         drifted: ['senderSpan'],
       },
       probes: drifting,
+      scoring: null,
+      listPass: null,
     });
 
     expect(report).toContain('senderSpan');
@@ -348,5 +353,150 @@ describe('the session health tally', () => {
       if (secret === undefined || secret === '') continue;
       expect(report).not.toContain(secret);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The scoring half of the report
+// ---------------------------------------------------------------------------
+
+/**
+ * The section that makes a *score* arguable rather than only an extraction failure.
+ *
+ * It is the one part of the report derived from a scored message, so the danger it carries is different
+ * from the rest of the file's: not that a report says too little, but that it says too much. Every signal
+ * the engine produces travels with a title, a description and an evidence excerpt, all built around a
+ * value from someone's mail, and `SecuritySignal` is structurally assignable to the shape the report
+ * wants. A spread would compile and quietly put a subject line on the clipboard.
+ */
+describe('the scoring half of the report', () => {
+  const probes: SelectorProbe[] = [{ group: 'senderSpan', scope: 'message', candidate: 0 }];
+  const health = { seen: 1, unscorable: 0, misses: [], drifted: [] };
+
+  function reportFor(scoring: ScoringSummary | null, listPass: ListPassCounts | null = null): string {
+    return formatHealth({
+      adapter: 'gmail-dom',
+      version: '0.6.0',
+      browser: 'Chrome/140.0.0.0',
+      health,
+      probes,
+      scoring,
+      listPass,
+    });
+  }
+
+  /** A message whose every free-text field is a string a report must not contain. */
+  const loud: EmailMessage = {
+    senderName: 'Accounts SECRETNAME',
+    senderEmail: 'billing@secretsender.example',
+    subject: 'SECRETSUBJECT about your account',
+    bodyText: 'SECRETBODY, and then several more words of it.',
+    hiddenText: { chars: 40, techniques: ['font-size:0'] },
+    links: [{ href: 'https://secretlink.example/a', text: 'SECRETANCHOR', normalizedDomain: 'secretlink.example' }],
+    attachments: [{ filename: 'SECRETFILE.zip', extension: 'zip' }],
+  };
+
+  const result: AnalysisResult = {
+    score: 50,
+    classification: 'suspicious',
+    signals: [
+      {
+        id: 'identity.display_name_impersonation',
+        category: 'identity',
+        severity: 'high',
+        score: 50,
+        title: 'Display name claims SECRETBRAND',
+        description: 'The sender SECRETSENDER does not belong to SECRETBRAND.',
+        evidence: { value: 'secretsender.example', text: 'SECRETEXCERPT' },
+      },
+      {
+        id: 'content.urgency',
+        category: 'content',
+        severity: 'low',
+        score: 4,
+        title: 'Urgent wording: SECRETPHRASE',
+        description: 'SECRETPHRASE appears in the body.',
+        dampened: true,
+      },
+    ],
+    categoryScores: { identity: 50, link: 0, attachment: 0, content: 4, authentication: 0, llm: 0 },
+    meta: { analyzedAt: 0, engineVersion: 'test', semanticSource: 'none' },
+  };
+
+  it('names every check with the severity and the points it contributed', () => {
+    const report = reportFor(summarizeScoring(result, loud, 'ready'));
+
+    expect(report).toContain('message:     50/100 suspicious, semantic ready');
+    expect(report).toContain('identity.display_name_impersonation');
+    // Severity, then contribution, then the rule name: the order a reader scans for what they disagree
+    // with. Padding is not pinned, since aligning the columns is presentation.
+    expect(report).toMatch(/high\s+50\s+identity\.display_name_impersonation/u);
+  });
+
+  /**
+   * The assertion this section exists to satisfy. Written against every free-text field at once rather
+   * than the ones the current formatter happens to read, so a later line added to the report is caught
+   * by this test rather than by someone reading their own subject line in a public issue.
+   */
+  it('carries no wording from the scored message', () => {
+    const report = reportFor(summarizeScoring(result, loud, 'ready'));
+
+    for (const secret of [
+      'SECRETNAME',
+      'secretsender.example',
+      'SECRETSUBJECT',
+      'SECRETBODY',
+      'SECRETANCHOR',
+      'secretlink.example',
+      'SECRETFILE',
+      'SECRETBRAND',
+      'SECRETSENDER',
+      'SECRETPHRASE',
+      'SECRETEXCERPT',
+    ]) {
+      expect(report).not.toContain(secret);
+    }
+  });
+
+  /** The counts are what distinguish a body that was read from one that was pruned to nothing. */
+  it('reports what was read as counts', () => {
+    const report = reportFor(summarizeScoring(result, loud, 'ready'));
+
+    expect(report).toContain('read:        body 46c, 1 links, 1 attachments');
+    expect(report).toContain('concealed:   40c via font-size:0');
+  });
+
+  it('omits the concealment line when the scan found nothing hidden', () => {
+    const { hiddenText: _hidden, ...plain } = loud;
+    expect(reportFor(summarizeScoring(result, plain, 'ready'))).not.toContain('concealed:');
+  });
+
+  /**
+   * Dampening is one of the commonest reasons a score is lower than a reader expected, so the report
+   * says which finding was softened. Omitting it would invite the same question a second time.
+   */
+  it('marks a dampened finding rather than dropping it', () => {
+    expect(reportFor(summarizeScoring(result, loud, 'ready'))).toContain('content.urgency  (dampened)');
+  });
+
+  it('copies only the four fields a check is allowed to contribute', () => {
+    const [first] = summarizeScoring(result, loud, 'ready').checks;
+    expect(Object.keys(first ?? {}).sort()).toEqual(['dampened', 'id', 'score', 'severity']);
+  });
+
+  it('says outright that nothing on screen was scored', () => {
+    expect(reportFor(null)).toContain('message:     none scored');
+  });
+
+  /**
+   * All three counts, because they answer different questions: no rows means the row selector stopped
+   * matching, rows without addresses means the attribute the sender is read from has moved, and rows
+   * with addresses and no marks is the healthy case on ordinary mail.
+   */
+  it('reports the list pass, and distinguishes a pass with no marks from no pass at all', () => {
+    expect(reportFor(null, { rows: 92, addressable: 92, marked: 0 })).toContain(
+      'list pass:   92 rows, 92 with an address, 0 marked',
+    );
+    expect(reportFor(null)).toContain('list pass:   not run');
   });
 });

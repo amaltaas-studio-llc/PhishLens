@@ -202,6 +202,43 @@ export function healthRow(health: TabHealth): HealthRow | null {
 }
 
 // ---------------------------------------------------------------------------
+// The report
+// ---------------------------------------------------------------------------
+
+export interface ReportRow {
+  label: string;
+  note: string;
+}
+
+/**
+ * The copy-a-report affordance, or `null` when there would be nothing to report about.
+ *
+ * Offered whether or not `healthRow` fired, and that is the point. The health row is deliberately silent
+ * while extraction is working, so attaching the only copy button to it meant the report was unreachable
+ * in exactly the case it is now most useful for: a healthy session that scored one message wrongly.
+ * Disagreeing with a score is a bug report about a *working* install.
+ *
+ * Absent only when no content script answered, where a report would describe nothing. The note names
+ * what the reader is about to paste, because that is the promise the report has to keep — a user who
+ * cannot tell whether their mail is in it has no way to decide whether to attach it to a public issue.
+ */
+export function reportRow(state: PopupState): ReportRow | null {
+  if (state.kind === 'not-gmail' || state.kind === 'unreachable') return null;
+
+  const label = 'Copy a diagnostic report';
+  if (state.kind === 'scored') {
+    return {
+      label,
+      note: 'Names the checks that ran on this message and what each one added to the score, with no text from the message itself. Paste it into an issue if a score looks wrong.',
+    };
+  }
+  return {
+    label,
+    note: 'Describes how PhishLens has been reading this tab, with none of your mail in it. Open a message first if you want to report a score.',
+  };
+}
+
+// ---------------------------------------------------------------------------
 // The AI row
 // ---------------------------------------------------------------------------
 

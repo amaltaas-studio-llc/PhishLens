@@ -214,6 +214,32 @@ describe('marking inbox rows', () => {
     expect(document.querySelector(`#row-0 ${MARK}`)).not.toBeNull();
   });
 
+  /**
+   * The counts the pasteable diagnostic reports. All three, because an inbox with no marks on it is the
+   * expected result and a row selector that has stopped matching Gmail produces the same silence: rows at
+   * zero says the selector broke, rows with addresses and no marks says the feature is working.
+   */
+  it('records what the last pass saw, for the report', async () => {
+    render([
+      { email: 'security@paypa1-alerts.example', name: 'PayPal Security' },
+      { email: 'notifications@northwind-logistics.com', name: 'Northwind Logistics' },
+    ]);
+
+    const marker = startMarking(() => 'reader@northwind-logistics.com');
+    expect(marker.lastPass()).toBeNull();
+    await settle();
+
+    expect(marker.lastPass()).toEqual({ rows: 2, addressable: 2, marked: 1 });
+  });
+
+  it('records a row whose address cannot be read as unaddressable rather than unmarked', async () => {
+    render([{ email: '', name: 'Somebody' }]);
+    const marker = startMarking(() => '');
+    await settle();
+
+    expect(marker.lastPass()).toEqual({ rows: 1, addressable: 0, marked: 0 });
+  });
+
   it('removes everything it drew when marking is switched off', async () => {
     render([{ email: 'security@paypa1-alerts.example', name: 'PayPal Security' }]);
     const marker = startMarking(() => 'reader@northwind-logistics.com');

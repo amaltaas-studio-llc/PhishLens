@@ -20,6 +20,7 @@
  * of extra roots for one glyph. Inline properties beat Gmail's own CSS without either.
  */
 import { triageSender, type TriageSeverity, type TriageVerdict } from '../analysis/triage.js';
+import type { ListPassCounts } from '../gmail/diagnostics.js';
 import { observeWithPath } from '../gmail/roots.js';
 import { OBSERVED_ATTRIBUTES, queryFirst, SELECTORS } from '../gmail/selectors.js';
 import { logger } from '../shared/logger.js';
@@ -94,6 +95,14 @@ export class ListMarks {
   /** Cached once found. It cannot change without a reload, and the read walks Gmail's chrome. */
   #recipientEmail = '';
   #accountWaits = 0;
+  /**
+   * What the last pass saw, for the pasteable diagnostic.
+   *
+   * Deliberately not cleared by `stop()`, which runs at the start of every `start()`: a reattach is
+   * precisely when someone is asking why an inbox has no marks on it, and wiping the counts then would
+   * answer "not run" to the one question being asked.
+   */
+  #lastPass: ListPassCounts | null = null;
 
   start(resolveRoot: () => Element, readAccount: () => string): void {
     this.stop();
@@ -208,12 +217,18 @@ export class ListMarks {
      * zero means the selectors no longer match Gmail's markup, and rows with addresses but no marks means
      * the feature is working and has nothing to say.
      */
-    logger.debug('list pass', { rows: rows.length, addressable, marked });
+    this.#lastPass = { rows: rows.length, addressable, marked };
+    logger.debug('list pass', this.#lastPass);
 
     if (this.#recipientEmail === '' && this.#accountWaits < MAX_ACCOUNT_WAITS) {
       this.#accountWaits += 1;
       this.#schedule();
     }
+  }
+
+  /** The counts from the last pass, for the report. `null` until one has run. */
+  lastPass(): ListPassCounts | null {
+    return this.#lastPass;
   }
 
   /** Resolved once per pass, and retried on later passes for as long as Gmail has not exposed it. */

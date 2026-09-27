@@ -18,7 +18,14 @@
  * The whole point is that a user can read it before sending it, so it is plain text, short, and has
  * nothing in it that needs interpreting.
  */
-import type { MessagePart } from '../shared/types.js';
+import type {
+  AnalysisResult,
+  Classification,
+  EmailMessage,
+  MessagePart,
+  SemanticStatus,
+  Severity,
+} from '../shared/types.js';
 import type { TabHealth } from '../shared/messaging.js';
 import type { MessageHandle } from './adapter.js';
 import { PAGE_SCOPED, SELECTORS } from './selectors.js';
@@ -122,9 +129,94 @@ function describeProbe(probe: SelectorProbe): string {
   return `${probe.scope} #${String(probe.candidate)} ${candidate}`;
 }
 
+/** One check that ran, named by the id it is declared with. Never its wording. */
+export interface CheckSummary {
+  id: string;
+  severity: Severity;
+  score: number;
+  dampened: boolean;
+}
+
+/**
+ * How the message on screen was scored, in counts and the names of our own rules.
+ *
+ * This is the half of a bug report the selector probes cannot give. A selector that stopped matching is
+ * visible in the probe list; a check that fired when it should not have is visible only in the card,
+ * whose every sentence is built around a value from the reader's mail and therefore cannot be pasted
+ * into a public issue. Without this, disagreeing with a score meant installing a development build — a
+ * toolchain, for a bug the person reporting it can see and we cannot.
+ *
+ * What it holds: rule ids, severities, scores, and counts. What it must never hold: `title`,
+ * `description` or `evidence`, each of which is a sentence assembled around a domain, a filename or an
+ * excerpt. `summarizeScoring` is the only way to build one, because `SecuritySignal` is assignable to
+ * `CheckSummary` — a spread would satisfy the compiler and carry the wording along with the id.
+ *
+ * The counts are a deliberate exception to the rule the selector report follows, which excludes body
+ * length as weak leakage that would not help anyway. Here the second half of that reasoning fails: a
+ * body read as 0 characters and one read as 5,000 produce the same list of check names and completely
+ * different bugs, and which of the two happened is what "why did this score 50" turns on.
+ */
+export interface ScoringSummary {
+  score: number;
+  classification: Classification;
+  semantic: SemanticStatus;
+  bodyChars: number;
+  links: number;
+  attachments: number;
+  /** Concealed characters and the CSS techniques found, when the scan found any. */
+  hidden: { chars: number; techniques: readonly string[] } | null;
+  checks: readonly CheckSummary[];
+}
+
+/**
+ * Bounds the pasted report. Signal counts are already bounded by the rules that produce them, so this
+ * is a guard against a future rule that emits per-link findings, not a limit anything reaches today.
+ */
+const MAX_CHECKS_REPORTED = 40;
+
+/** The only constructor for a `ScoringSummary`. Copies field by field, for the reason given above. */
+export function summarizeScoring(
+  result: AnalysisResult,
+  email: EmailMessage,
+  semantic: SemanticStatus,
+): ScoringSummary {
+  const hidden = email.hiddenText;
+  return {
+    score: result.score,
+    classification: result.classification,
+    semantic,
+    bodyChars: email.bodyText.length,
+    links: email.links.length,
+    attachments: email.attachments.length,
+    hidden:
+      hidden === undefined ? null : { chars: hidden.chars, techniques: [...hidden.techniques] },
+    checks: result.signals.slice(0, MAX_CHECKS_REPORTED).map((signal) => ({
+      id: signal.id,
+      severity: signal.severity,
+      score: signal.score,
+      dampened: signal.dampened === true,
+    })),
+  };
+}
+
+/** What the last inbox-list pass saw. Counts only; see `content/list-marks.ts`. */
+export interface ListPassCounts {
+  rows: number;
+  addressable: number;
+  marked: number;
+}
+
 export interface HealthInput extends Pick<DiagnosticInput, 'adapter' | 'version' | 'browser'> {
   health: TabHealth;
   probes: readonly SelectorProbe[];
+  /**
+   * The message on screen, when one has been scored.
+   *
+   * Nullable rather than optional, for both this and `listPass`: "nothing was open" is something the
+   * report should say, and a field a caller can forget is a field that silently says nothing instead.
+   */
+  scoring: ScoringSummary | null;
+  listPass: ListPassCounts | null;
 }
 
 /**
@@ -153,6 +245,8 @@ export function formatHealth(input: HealthInput): string {
     `messages:    ${String(health.seen)}`,
     `not scored:  ${String(health.unscorable)}`,
     `unread:      ${misses}`,
+    `list pass:   ${describeListPass(input.listPass)}`,
+    ...scoringLines(input.scoring),
     'selectors:',
   ];
 
@@ -162,6 +256,56 @@ export function formatHealth(input: HealthInput): string {
   }
 
   return lines.join('\n');
+}
+
+/**
+ * The list-marker line.
+ *
+ * All three counts, because the difference between them is the whole diagnosis: no rows means the row
+ * selector has stopped matching Gmail's markup, rows with addresses and no marks means the feature is
+ * working and ordinary mail earned nothing, and rows without addresses means Gmail has moved the
+ * attribute the sender is read from. An unmarked inbox is the expected result, so "0 marked" on its own
+ * distinguishes none of these.
+ */
+function describeListPass(counts: ListPassCounts | null): string {
+  if (counts === null) return 'not run';
+  return `${String(counts.rows)} rows, ${String(counts.addressable)} with an address, ${String(counts.marked)} marked`;
+}
+
+/**
+ * The message-on-screen section, or the one line that says there is none.
+ *
+ * Severity before score before id, left to right in the order a reader scans for the thing they
+ * disagree with. `dampened` is marked rather than omitted: a finding softened because the sender was
+ * proven is one of the commonest reasons a score is lower than someone expected, and a report that
+ * hides it invites the same question twice.
+ */
+function scoringLines(scoring: ScoringSummary | null): string[] {
+  if (scoring === null) return ['message:     none scored'];
+
+  const lines = [
+    `message:     ${String(scoring.score)}/100 ${scoring.classification}, semantic ${scoring.semantic}`,
+    `read:        body ${String(scoring.bodyChars)}c, ${String(scoring.links)} links, ${String(scoring.attachments)} attachments`,
+  ];
+
+  if (scoring.hidden !== null) {
+    lines.push(
+      `concealed:   ${String(scoring.hidden.chars)}c via ${scoring.hidden.techniques.join(', ')}`,
+    );
+  }
+
+  lines.push('checks:');
+  if (scoring.checks.length === 0) {
+    lines.push('  none');
+    return lines;
+  }
+  for (const check of scoring.checks) {
+    const score = String(check.score).padStart(3);
+    lines.push(
+      `  ${check.severity.padEnd(8)}${score}  ${check.id}${check.dampened ? '  (dampened)' : ''}`,
+    );
+  }
+  return lines;
 }
 
 /** The browser version, without the rest of a user-agent string's fingerprinting surface. */
@@ -178,13 +322,11 @@ export function buildDiagnostic(
   return formatDiagnostic({ ...environment(adapter), missing, probes: probeSelectors(handle) });
 }
 
-/** The whole report for the session. */
+/** The whole report for the session. Takes an object: five positional arguments invite a swap. */
 export function buildHealthReport(
-  health: TabHealth,
-  probes: readonly SelectorProbe[],
-  adapter: string,
+  input: Pick<HealthInput, 'health' | 'probes' | 'scoring' | 'listPass'> & { adapter: string },
 ): string {
-  return formatHealth({ ...environment(adapter), health, probes });
+  return formatHealth({ ...input, ...environment(input.adapter) });
 }
 
 /** The three lines both reports open with, and the only place either of them touches the browser. */

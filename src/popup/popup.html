@@ -222,6 +222,12 @@
         margin: 0;
         font-weight: 500;
       }
+      /* Same voice as `.fix`, but it opens a section rather than following a line inside one. */
+      .report-note {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
       /*
         Shown in full and selectable, not just copied. The clipboard can refuse, and a report a user is
         about to paste into a public issue is one they must be able to read first.
@@ -295,7 +301,15 @@
     <section id="healthSection" hidden>
       <p class="health-headline" id="healthHeadline"></p>
       <p class="fix" id="healthDetail"></p>
-      <button type="button" class="primary" id="copy">Copy report</button>
+    </section>
+
+    <!--
+      Its own section rather than part of the one above, because the report is worth copying when that
+      tally has nothing to say: a score someone disagrees with is a bug in a healthy session.
+    -->
+    <section id="reportSection" hidden>
+      <p class="report-note" id="reportNote"></p>
+      <button type="button" class="primary" id="copy"></button>
       <pre class="report" id="healthReport" hidden></pre>
     </section>
 
