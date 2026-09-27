@@ -494,6 +494,74 @@ describe('lifecycle', () => {
     });
   });
 
+  /**
+   * The badge and the popup are claims about a message on screen. Collapsing the open message, or replying
+   * to it so that the only expanded message is the user's own, leaves nothing readable — and the claim
+   * stood, because the evaluation simply returned. Retracting it needs a delay rather than an immediate
+   * teardown: a momentary absence is exactly what an ordinary Gmail re-render looks like from here.
+   */
+  describe('when a reported message stops being readable', () => {
+    beforeEach(() => {
+      adapter.route = THREAD_A_HASH;
+      adapter.view = thread('a', '1');
+      observer.start();
+      settle();
+    });
+
+    it('retracts it once the absence has lasted', () => {
+      adapter.view = null;
+      triggerMutation();
+      settle(1000);
+
+      expect(noMessageReasons()).toContain('no-open-message');
+    });
+
+    it('says nothing when the message comes back within the grace period', () => {
+      adapter.view = null;
+      triggerMutation();
+      settle(300);
+
+      adapter.view = thread('a', '1');
+      triggerMutation();
+      settle(1000);
+
+      expect(noMessageReasons()).not.toContain('no-open-message');
+    });
+
+    /** A header without a body is a render in progress, and it is the common case, not the edge one. */
+    it('says nothing while a body is still arriving', () => {
+      adapter.view = { ...thread('a', '1'), bodyText: '' };
+      triggerMutation();
+      settle(300);
+
+      adapter.view = thread('a', '1');
+      triggerMutation();
+      settle(1000);
+
+      expect(noMessageReasons()).not.toContain('no-open-message');
+    });
+
+    /** Leaving for a list view is the route handler's business, and it has its own reason for it. */
+    it('leaves a navigation to be reported as a navigation', () => {
+      adapter.view = null;
+      navigate('inbox');
+      settle(1000);
+
+      expect(noMessageReasons()).toContain('navigated-away');
+      expect(noMessageReasons()).not.toContain('no-open-message');
+    });
+
+    it('retracts it only once', () => {
+      adapter.view = null;
+      triggerMutation();
+      settle(1000);
+      triggerMutation();
+      settle(1000);
+
+      expect(noMessageReasons().filter((reason) => reason === 'no-open-message')).toHaveLength(1);
+    });
+  });
+
   it('survives an observation root that is not there yet', () => {
     adapter.rootAvailable = false;
     adapter.route = THREAD_A_HASH;

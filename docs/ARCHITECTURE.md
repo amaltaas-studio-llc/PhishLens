@@ -228,6 +228,12 @@ not cross them — otherwise widening the signature would have turned every repa
 - If the poll times out (Gmail markup drifted, or the thread genuinely has no readable message), the
   observer emits `{ kind: 'no-message' }` and the UI tears the badge down instead of leaving a
   stale one attached.
+- A message that *was* reported and is then no longer readable is retracted the same way, after a 600 ms
+  grace period. Collapsing the open message, or replying so the only expanded message is the reader's own,
+  otherwise leaves the badge and the popup asserting a verdict about a message that is not on screen — a
+  claim the reader cannot check, which is the one thing this project treats as worse than silence. The
+  grace period is what separates that from an ordinary re-render, where a container swap or a header
+  arriving before its body makes the message briefly unreadable and immediate teardown would flicker.
 
 **The staleness guard compares the DOM against itself, never the route against the DOM.** Gmail
 identifies the same thread in two unrelated id namespaces — the hash carries a conversation id

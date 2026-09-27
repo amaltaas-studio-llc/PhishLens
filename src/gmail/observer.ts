@@ -22,6 +22,9 @@
  *    stops staleness.
  *  - If reconciliation times out, `no-message` is emitted so the UI tears the badge down instead of
  *    leaving a stale one attached to the wrong message.
+ *  - A message that was reported and is then no longer readable — collapsed, or replaced by the user's own
+ *    reply — is retracted the same way, after a grace period, because a brief absence is what an ordinary
+ *    re-render looks like from here.
  *
  * The staleness guard compares **the DOM against itself**, never the route against the DOM. Gmail's
  * hash route carries a conversation id (`FMfcgz…`) while the subject element carries a thread perm id
@@ -68,6 +71,8 @@ export interface ObserverOptions {
   reconcileIntervalMs?: number;
   /** Give up reconciling after this long. */
   reconcileTimeoutMs?: number;
+  /** How long a reported message may be absent before its absence is reported in turn. */
+  disappearanceGraceMs?: number;
 }
 
 /** Ancestors watched for the observed root being replaced. Enough to reach `<body>` from a Gmail pane. */
@@ -77,6 +82,12 @@ const DEFAULTS = {
   debounceMs: 200,
   reconcileIntervalMs: 120,
   reconcileTimeoutMs: 4000,
+  /*
+   * Longer than the debounce, so a re-render in progress is not mistaken for a message that has gone;
+   * far shorter than the reconciliation window, because unlike a route change this happens with a badge
+   * already on screen making a claim about a message nobody can see.
+   */
+  disappearanceGraceMs: 600,
 } as const;
 
 export class GmailObserver {
@@ -90,6 +101,8 @@ export class GmailObserver {
   #debounceTimer: ReturnType<typeof setTimeout> | null = null;
   #reconcileTimer: ReturnType<typeof setInterval> | null = null;
   #reconcileDeadline = 0;
+  /** Grace period before a reported message's absence is treated as real. */
+  #vanishTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Signature of the last emitted message. The redundancy guard. */
   #lastSignature = '';
@@ -136,6 +149,7 @@ export class GmailObserver {
     this.#observedRoot = null;
     this.#clearDebounce();
     this.#stopReconciling();
+    this.#stopConfirmingDisappearance();
     this.#lastSignature = '';
     this.#lastEmit = null;
     this.#expectedThreadId = '';
@@ -274,6 +288,54 @@ export class GmailObserver {
     }
   }
 
+  /** The open message and its extraction, or `null` when there is nothing worth reporting yet. */
+  #readView(): { handle: MessageHandle; email: EmailMessage; missing: readonly MessagePart[] } | null {
+    const handle = this.#adapter.currentMessage();
+    if (handle === null) return null;
+
+    const extraction = this.#adapter.extract(handle);
+    const { email } = extraction;
+    // A header rendered before its body: wait rather than analysing an empty message.
+    if (email.bodyText.trim() === '' && email.links.length === 0 && email.attachments.length === 0) {
+      return null;
+    }
+    return { handle, email: extraction.email, missing: extraction.missing };
+  }
+
+  /**
+   * A reported message is no longer readable. Waits, then retracts it.
+   *
+   * Absence has to be confirmed rather than acted on, because a momentary absence is the normal shape of
+   * a Gmail re-render: the container is replaced, or the header arrives before the body, and `#readView`
+   * correctly declines both. Retracting immediately would tear the badge off and rebuild it on ordinary
+   * churn. Waiting *indefinitely* is the bug this replaces, though — collapsing the open message, or
+   * replying to it so that the only expanded message is the user's own, left the badge and the popup
+   * asserting a verdict about a message no longer on screen, which is a claim the reader cannot check.
+   */
+  #noteMessageAbsent(): void {
+    if (this.#lastSignature === '') return;
+    if (this.#vanishTimer !== null) return;
+
+    this.#vanishTimer = setTimeout(() => {
+      this.#vanishTimer = null;
+      if (!this.#started || this.#lastSignature === '') return;
+      // A list route, or a route change, is reported by the route handler with its own reason.
+      if (this.#adapter.routeThreadId() === '') return;
+      if (this.#readView() !== null) return;
+
+      logger.debug('reported message is no longer in the view');
+      this.#lastSignature = '';
+      this.#onEvent({ kind: 'no-message', reason: 'no-open-message' });
+    }, this.#options.disappearanceGraceMs);
+  }
+
+  #stopConfirmingDisappearance(): void {
+    if (this.#vanishTimer !== null) {
+      clearTimeout(this.#vanishTimer);
+      this.#vanishTimer = null;
+    }
+  }
+
   /**
    * The single decision point. Returns `true` when a message event was emitted.
    */
@@ -293,15 +355,13 @@ export class GmailObserver {
       return false;
     }
 
-    const handle = this.#adapter.currentMessage();
-    if (handle === null) return false;
-
-    const { email, missing } = this.#adapter.extract(handle);
-
-    // A header rendered before its body: wait rather than analysing an empty message.
-    if (email.bodyText.trim() === '' && email.links.length === 0 && email.attachments.length === 0) {
+    const view = this.#readView();
+    if (view === null) {
+      this.#noteMessageAbsent();
       return false;
     }
+    this.#stopConfirmingDisappearance();
+    const { handle, email, missing } = view;
 
     // Staleness guard. Route ids and DOM thread ids are different Gmail id namespaces (see the file
     // header), so the DOM is compared against the view we last reported instead. An unchanged view
