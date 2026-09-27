@@ -302,11 +302,14 @@ it is the marker that gets the feature switched off.
 
 ## Confidence in the numbers
 
-1033 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
-`test/fixtures/` holds 22 messages: a plain legitimate message, a legitimate password reset, a legitimate
+1105 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
+`test/fixtures/` holds 25 messages: a plain legitimate message, a legitimate password reset, a legitimate
 one-time code being delivered, a legitimate reply into an existing thread, a newsletter with many links, a
 newsletter whose links are all rewritten through its platform's click tracker, an institutional newsletter
-whose social footer names each network it links to, an invoice, PayPal phishing, a Microsoft lookalike
+whose social footer names each network it links to, an invoice, a developer notice whose display name
+honestly names two brands at once because one brand's product shares the other's keyword, a brand's own
+mail from its own top-level domain, the same brand's mail from a country domain the table does not list,
+PayPal phishing, a Microsoft lookalike
 domain, a brand spoof from an unlisted lead-generation sender, an anchor-URL mismatch, a punycode link, an
 IP-address URL,
 a ZIP attachment, an executable attachment, a gift-card scam, a fake payroll change, an MFA-code request,

@@ -291,9 +291,9 @@ export const DAMPENING: DampeningConfig = Object.freeze({
  * never zero teaches users that its numbers mean nothing.
  *
  * So the semantic score is not proportional to risk, it is proportional to *risk above a threshold*,
- * rescaled so the remaining band still discriminates. The threshold sits at the boundary the prompt
- * itself defines as "recognisable social-engineering structure", so the model has to claim structure,
- * not unease, before it counts for anything.
+ * rescaled so the remaining band still discriminates. The threshold sits at the boundary above which the
+ * prompt asks for social-engineering structure it can support from the wording, so the model has to claim
+ * structure, not unease, before it counts for anything.
  */
 export const SEMANTIC_SCORING = Object.freeze({
   /**
@@ -307,13 +307,14 @@ export const SEMANTIC_SCORING = Object.freeze({
   /**
    * Risk below this contributes exactly zero, and is reported as informational.
    *
-   * 45 is the top of the prompt's "mildly unusual but plausible" band. Everything the model rates at
-   * or under it is, by its own instructions, mail it cannot point at a concrete problem in.
+   * 45 is the top of the band the prompt reserves for an ambiguous request with a plausible ordinary
+   * explanation. Everything the model rates at or under it is, by its own instructions, mail it cannot
+   * point at a concrete problem in.
    */
   minRiskForScoring: 45,
   /**
-   * Top of the prompt's "routine legitimate mail" band, and the point below which a named category is
-   * disregarded when wording the finding.
+   * Top of the prompt's routine band — no concerning request the wording supports — and the point below
+   * which a named category is disregarded when wording the finding.
    *
    * Models fill the `categories` slot as a matter of form. One rated an auto-reply 10/100 and explained
    * itself with "standard auto-reply", having tagged it `social_engineering` anyway, which the panel

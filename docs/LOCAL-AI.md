@@ -70,14 +70,58 @@ Four responses, in the order they apply:
   category slot as a matter of form: one rated an auto-reply 10/100, explained itself with "standard
   auto-reply", and tagged it `social_engineering` anyway.
 - **Corroboration.** Guarantee 2 above.
-- **Explicit guidance for the mail most often misjudged.** Security and account notices — a password was
-  changed, a device signed in, a statement is ready — read like credential phishing to a model that
-  weighs vocabulary, and are the largest single source of false alarms on real mail. The prompt states
-  that reporting an event that already happened is routine, and that directing the reader to a channel
-  they already have (the number on their card, the app) is the opposite of phishing, since an attacker
-  gains nothing from it.
+- **Action-first guidance.** The prompt distinguishes reporting an event that already happened from
+  asking the reader to disclose, transfer, approve, or bypass a safeguard. A routine notification can
+  contain a harmful follow-up, and a familiar banking app can be used to make a fraudulent transfer.
+  Neither reassuring wording nor the absence of urgency clears the request. Short contrasting examples
+  cover code delivery, payment changes, banking apps, and quoted versus active prompt injection.
+
+Concerning reasons must quote a short excerpt from the supplied message and explain its significance.
+This is a prompting instruction, not an enforced guarantee that the model's quotation is accurate. The
+excerpt is never a URL, an address, or a filename, since those are checked from the real values elsewhere
+and quoting one would reintroduce the guessing that withholding them prevents. A concern no sentence can
+be quoted for is rated in the routine band, which is the prompt's closing instruction and its default.
+The response schema and score containment are unchanged. When the body exceeds 4,000 characters, a
+coverage notice outside the untrusted-content block tells the model it has only an opening excerpt.
+Missing context should not be invented; a visible harmful request can still support a high rating.
 
 The verdict is displayed in full either way. It just does not always move the number.
+
+### Comparing prompts on a real model
+
+Unit tests exercise construction, parsing, and scoring with simulated model responses. Passing them
+does **not** demonstrate an improvement in language-model accuracy. The synthetic cases in
+`test/fixtures/semantic/cases.json` are a small smoke evaluation, with wording separate from the examples
+in the prompt. They cover routine mail, quiet scams, ambiguous requests, and injection discussion.
+They are not a representative production benchmark or permanently held-out test set once used for tuning.
+
+Export paired requests from the working tree and an earlier Git revision:
+
+```bash
+npm run eval:prompts -- harness/.build/semantic-eval <baseline-commit>
+```
+
+The default baseline is `HEAD`, useful before committing a prompt change. The command writes
+`baseline.jsonl`, `candidate.jsonl`, a separate `review.json` rubric, and metadata. It uses each revision's
+prompt builder, makes no network requests, and sends no email. Do not send the review rubric to the model.
+
+Run both request sets against the same model version, generation settings, and structured-output mode,
+using a fresh conversation per request. For Chrome's model, use the same system/user separation and
+response constraint as the adapter. Repeat each case at least three times and save the raw responses
+alongside the model and runtime versions. Review blind to the prompt version where possible:
+
+- Count malformed responses separately from usable assessments; do not treat an error as a benign result.
+- For routine cases, count false alarms (risk above 20 or a non-benign category).
+- For concerning cases, count missed concerns (risk at or below 45, or no non-benign category).
+- Review ambiguous cases for qualified explanations and appropriately reduced confidence, not an exact score.
+- Check quotations against the input and count invented evidence, technical speculation, and unsupported
+  accusations separately. Quoting a real sentence does not by itself make the explanation correct.
+- Record latency and response validity as well as false alarms and missed concerns. Keep the existing
+  15-point cap and corroboration checks unchanged regardless of model performance.
+
+These evaluation bands describe the prompt's intended outputs, not new runtime scoring constants.
+Do not claim an accuracy gain until the paired results support it on the intended model and a broader,
+independently labelled corpus. No real-model comparison is part of `npm run verify`.
 
 ## Chrome's Prompt API
 
