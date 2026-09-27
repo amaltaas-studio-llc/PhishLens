@@ -165,3 +165,75 @@ describe('a message changed in place', () => {
     expect(links).toContain('https://northwind-supplies.com.invoices-pay.example/login');
   });
 });
+
+describe('navigation and partially rendered bodies', () => {
+  it.each([true, false])('does not trust the heading when a nested message has an id: %s', async (hasId) => {
+    observer.stop();
+    const inner = message();
+    if (!hasId) inner.removeAttribute('data-message-id');
+    const outer = document.createElement('div');
+    outer.className = 'adn ads';
+    inner.replaceWith(outer);
+    outer.append(inner);
+    const subject = document.querySelector('h2');
+    subject?.setAttribute('data-thread-perm-id', 'thread-f:A');
+    events = [];
+    const adapter = new GmailDomAdapter();
+    expect(adapter.currentMessage()?.messageId).toBe(hasId ? 'msg-18f2a0c' : '');
+    observer = new GmailObserver(adapter, (event) => events.push(event));
+    observer.start();
+    await settle();
+
+    window.location.hash = '#inbox/FMfcgzGxSVbKjRnQPmWdTzXvLhYcNqBt';
+    subject?.setAttribute('data-thread-perm-id', 'thread-f:B');
+    await settle(5000);
+    expect(messageEvents()).toHaveLength(1);
+    expect(noMessageReasons()).toContain('reconciliation-timeout');
+
+    // A message-owned id, unlike the heading, establishes that the next message really arrived.
+    inner.setAttribute('data-message-id', 'msg-next');
+    await settle();
+    expect(messageEvents()).toHaveLength(2);
+  });
+
+  it('does not borrow a message id from sender-authored body markup', () => {
+    message().removeAttribute('data-message-id');
+    const authored = document.createElement('div');
+    authored.setAttribute('data-message-id', 'authored-id');
+    document.querySelector('div.a3s')?.append(authored);
+    expect(new GmailDomAdapter().currentMessage()?.messageId).toBe('');
+  });
+
+  it.each(['style', 'hidden'])('watches %s before the first readable extraction', async (attribute) => {
+    observer.stop();
+    document.querySelector('.aQH')?.remove();
+    const paragraph = document.createElement('p');
+    paragraph.textContent = 'Reply with the verification code we just sent to your phone.';
+    paragraph.setAttribute(attribute, attribute === 'style' ? 'display:none' : '');
+    document.querySelector('div.a3s')?.replaceChildren(paragraph);
+    events = [];
+    observer = new GmailObserver(new GmailDomAdapter(), (event) => events.push(event));
+    observer.start();
+    await settle(5000);
+    expect(messageEvents()).toHaveLength(0);
+
+    paragraph.removeAttribute(attribute);
+    await settle();
+    expect(messageEvents()).toHaveLength(1);
+    const latest = messageEvents().at(-1);
+    expect(latest?.kind === 'message' && latest.email.bodyText).toContain('verification code');
+  });
+
+  it('ends reconciliation when the debounce reports the view before the interval', async () => {
+    observer.stop();
+    events = [];
+    // Make the ordering explicit rather than relying on an unrelated mutation racing the first poll.
+    observer = new GmailObserver(new GmailDomAdapter(), (event) => events.push(event), { debounceMs: 50 });
+    observer.start();
+    await settle(60);
+    expect(messageEvents()).toHaveLength(1);
+    await settle(5000);
+    expect(noMessageReasons()).not.toContain('reconciliation-timeout');
+    expect(messageEvents()).toHaveLength(1);
+  });
+});

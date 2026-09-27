@@ -917,11 +917,11 @@ describe('signatures', () => {
     /**
      * The thread perm id is read from the subject heading, which Gmail renders separately from the
      * conversation and swaps first — so on its own it says the heading has caught up, not the message. It is
-     * still the only thing left to compare when the message carries no id of its own.
+     * not evidence of a new message even when no message id is available.
      */
-    it('reads the thread only where the message has no id of its own', () => {
+    it('ignores the independently rendered thread heading with or without a message id', () => {
       expect(messageIdentity(handle('m1', 't2'), email())).toBe(messageIdentity(base, email()));
-      expect(messageIdentity(handle('', 't2'), email())).not.toBe(
+      expect(messageIdentity(handle('', 't2'), email())).toBe(
         messageIdentity(handle('', 't1'), email()),
       );
     });

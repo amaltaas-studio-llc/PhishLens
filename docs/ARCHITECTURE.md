@@ -291,15 +291,23 @@ by design.
 
 **What the guard compares is not the signature.** It asks which message is rendered — the message's own id
 and its sender, and nothing about what the message says — while the signature above deliberately moves the
-moment any evidence changes. The thread perm id is read only where there is no message id to read, because
+moment any evidence changes. The thread perm id is never evidence that the message changed, because
 it comes from the subject heading rather than from the message: Gmail renders the heading separately and
 swaps it first, so counting it let a heading naming the thread being opened satisfy the guard while the
 message below it was still the previous one. Comparing the signature conflated the two: expanding the details panel on the thread still in the
 pane changed it, the guard read that as Gmail having re-rendered for the new route, and the previous
 thread's message was emitted under the new thread's route with every id in the comparison agreeing that
-nothing had changed. The narrower comparison costs one case — where Gmail exposes no ids at all and the next
+nothing had changed. The narrower comparison costs one case — where Gmail exposes no message ids and the next
 thread is from the same sender, a legitimate render is blocked and the poll reports a timeout — and that
-failure is silence, not a verdict on the wrong message.
+failure is silence, not a verdict on the wrong message. A selected outer wrapper may enclose the element
+carrying the message id; extraction looks along the body's ancestor chain for it, never inside the
+sender-authored body. This preserves the id without allowing message content to nominate its own identity.
+
+The body's visibility watch is installed as soon as a handle exists, before requiring readable text.
+Otherwise an initially hidden body could only become readable through a mutation nobody was watching,
+especially after the reconciliation window ended. Every accepted view stops reconciliation, whether the
+debounce or the interval finds it first; a successful debounce must not leave an interval running that
+later retracts the same view as a timeout.
 
 ### 3.1 Which message in a thread gets assessed
 

@@ -37,6 +37,8 @@ import { SELECTORS, outermost, queryAll, queryAllUnion, queryFirst } from './sel
 /** Upper bound on links extracted from one message. A hostile message can contain thousands. */
 const MAX_LINKS = 300;
 const MAX_ATTACHMENTS = 60;
+/** Message wrappers are shallow; never walk an unbounded ancestor chain looking for an id. */
+const MAX_MESSAGE_WRAPPERS = 32;
 /**
  * Upper bound on quoted subtrees consulted when excluding quoted links.
  *
@@ -143,7 +145,7 @@ export class GmailDomAdapter implements MailAdapter {
         if (bodyElement === null) return null;
 
         return {
-          messageId: readMessageId(element),
+          messageId: readMessageId(element, bodyElement),
           threadId: readThreadId(),
           priorSenders: attempt('priorSenders', () => readPriorSenders(rows, element), []),
           headerElement: findHeaderAnchorPoint(element),
@@ -834,13 +836,20 @@ function stripToDomain(value: string): string {
 // Ids and layout anchors
 // ---------------------------------------------------------------------------
 
-function readMessageId(element: Element): string {
-  return (
-    element.getAttribute('data-message-id') ??
-    element.getAttribute('data-legacy-message-id') ??
-    element.getAttribute('id') ??
-    ''
-  );
+function readMessageId(element: Element, body: Element): string {
+  const own = element.getAttribute('data-message-id') ?? element.getAttribute('data-legacy-message-id');
+  if (own) return own;
+
+  // Selection keeps the outer wrapper, while Gmail may put the id on an inner one. Only ancestors of
+  // the body qualify: searching inside it would let sender-authored markup nominate message identity.
+  let wrapper = body.parentElement;
+  for (let depth = 0; wrapper !== null && wrapper !== element && depth < MAX_MESSAGE_WRAPPERS; depth++) {
+    if (!element.contains(wrapper)) break;
+    const id = wrapper.getAttribute('data-message-id') ?? wrapper.getAttribute('data-legacy-message-id');
+    if (id) return id;
+    wrapper = wrapper.parentElement;
+  }
+  return element.getAttribute('id') ?? '';
 }
 
 function readThreadId(): string {

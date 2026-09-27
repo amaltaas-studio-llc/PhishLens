@@ -330,6 +330,7 @@ export class GmailObserver {
   /** The open message and its extraction, or `null` when there is nothing worth reporting yet. */
   #readView(): { handle: MessageHandle; email: EmailMessage; missing: readonly MessagePart[] } | null {
     const handle = this.#adapter.currentMessage();
+    this.#watchBody(handle?.bodyElement ?? null);
     if (handle === null) return null;
 
     const extraction = this.#adapter.extract(handle);
@@ -339,6 +340,14 @@ export class GmailObserver {
       return null;
     }
     return { handle, email: extraction.email, missing: extraction.missing };
+  }
+
+  /** Visibility can make the first readable extraction possible, so watch before requiring one. */
+  #watchBody(body: Element | null): void {
+    if (body === this.#watchedBody) return;
+    this.#watchedBody = body;
+    // Re-registering releases the previous body's target rather than retaining every opened message.
+    this.#attachMutationObserver();
   }
 
   /**
@@ -431,6 +440,8 @@ export class GmailObserver {
       return false;
     }
 
+    // Acceptance ends reconciliation regardless of whether the interval or the debounce got here first.
+    this.#stopReconciling();
     const signature = viewSignature(routeThreadId, handle, email);
     if (signature === this.#lastSignature && !this.#reportedNodesReplaced(handle)) return false;
 
@@ -446,13 +457,6 @@ export class GmailObserver {
     logger.debug('message opened', { signature });
     this.#onEvent({ kind: 'message', signature, handle, email, missing });
 
-    // The watch follows the body, and re-registering means dropping the previous message's: a target stays
-    // observed until the observer is disconnected, so adding one per message opened would retain every
-    // detached body for the life of the tab.
-    if (handle.bodyElement !== this.#watchedBody) {
-      this.#watchedBody = handle.bodyElement;
-      this.#attachMutationObserver();
-    }
     return true;
   }
 
@@ -512,18 +516,16 @@ export function viewSignature(
 export function messageIdentity(handle: MessageHandle, email: EmailMessage): string {
   const sender = email.senderEmail ?? '';
   /*
-   * The message's own id, and the thread's only when there is no message id to have.
+   * Only message-owned evidence can establish identity across a route transition.
    *
    * The thread perm id is read from the subject heading, which is not part of the message: Gmail renders it
    * separately and swaps it first, so for a moment the heading names the thread being opened while the
    * message below it is still the previous one. Counting it here let that heading update alone satisfy the
-   * guard, which is the failure the guard exists to prevent, arriving through the one component of the
-   * identity the message does not own. It stays as the fallback because with no message id it is the only
-   * thing distinguishing two threads, and a wrong answer there costs a reconciliation timeout, not a
-   * verdict on the wrong message.
+   * guard. With no message id, two threads from the same sender remain ambiguous and time out rather
+   * than letting an independently updated heading vouch for the body beneath it.
    */
   return handle.messageId === ''
-    ? `thread:${handle.threadId}|${sender}`
+    ? `sender:${sender}`
     : `message:${handle.messageId}|${sender}`;
 }
 
