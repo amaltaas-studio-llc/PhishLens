@@ -134,8 +134,29 @@ describe('hidingTechnique', () => {
   });
 
   it('still reads those properties when they are the declaration', () => {
-    expect(hidingTechnique('font-size:14px;height:0')).toBe('height:0');
-    expect(hidingTechnique('line-height:0;max-height:0')).toBe('height:0');
+    expect(hidingTechnique('font-size:14px;height:0;overflow:hidden')).toBe('height:0');
+    expect(hidingTechnique('line-height:0;max-height:0;overflow:hidden')).toBe('height:0');
+  });
+
+  /**
+   * A box with no height does not erase what is in it — the content overflows and is drawn anyway — which
+   * is why the preheader idiom is `max-height:0;overflow:hidden` and never the height alone. Without the
+   * pair, this read a spacer row and any `height:0` layout reset as concealment and removed the visible
+   * paragraphs *inside* them.
+   */
+  it('does not read a zero dimension as concealment unless it is also clipped', () => {
+    for (const style of [
+      'height:0',
+      'max-height:0px',
+      'width:0',
+      'max-width:0;padding:4px 8px',
+      'height:0;overflow:visible',
+    ]) {
+      expect(hidingTechnique(style), style).toBeNull();
+    }
+
+    expect(hidingTechnique('max-height:0;overflow:hidden')).toBe('height:0');
+    expect(hidingTechnique('width:0;overflow-x:hidden')).toBe('width:0');
   });
 
   /**
@@ -160,8 +181,8 @@ describe('hidingTechnique', () => {
     for (const style of ['font-size:0', 'font-size:0.0em', 'font-size:.0px', 'font-size:00']) {
       expect(hidingTechnique(style), style).toBe('font-size:0');
     }
-    expect(hidingTechnique('height:0.0')).toBe('height:0');
-    expect(hidingTechnique('max-width:.0px')).toBe('width:0');
+    expect(hidingTechnique('height:0.0;overflow:hidden')).toBe('height:0');
+    expect(hidingTechnique('max-width:.0px;overflow:hidden')).toBe('width:0');
   });
 
   /** Below a tenth of the parent is unreadable at any body size, and `0.9em` is not. */
@@ -176,7 +197,7 @@ describe('hidingTechnique', () => {
    * `!important` in real mail. Matching a value to the end of its declaration has to allow for it.
    */
   it('reads a declaration the sender insisted on', () => {
-    expect(hidingTechnique('max-height:0 !important')).toBe('height:0');
+    expect(hidingTechnique('max-height:0 !important;overflow:hidden')).toBe('height:0');
     expect(hidingTechnique('font-size:0px!important;color:#fff')).toBe('font-size:0');
     expect(hidingTechnique('opacity:0 ! important')).toBe('opacity:0');
     expect(hidingTechnique('width:0 !important;overflow:hidden')).toBe('width:0');
@@ -247,6 +268,61 @@ describe('findHiddenSubtrees', () => {
     const result = scan(root);
     expect(result.roots).toBe(3);
     expect(result.techniques).toEqual(['display:none', 'font-size:0']);
+  });
+
+  /**
+   * The bug this file existed to prevent, arriving through the one door it left open: a technique was
+   * judged on an element and then applied to its whole subtree. `font-size:0` on a container is how bulk
+   * mail collapses the whitespace between its tags, and every paragraph inside it names its own size and is
+   * drawn at it. A genuine newsletter built that way had its entire body — a thousand characters the reader
+   * was looking at — removed before scoring, which left the message scored on its subject and sender alone
+   * with nothing on the card to say so.
+   */
+  it('leaves a zero font size alone when what is inside sets its own', () => {
+    const root = element().append(
+      element({ style: 'font-size:0;padding:4px 8px' }).append(
+        element({ style: 'font-size:14px;color:#333' }),
+      ),
+    );
+
+    expect(scan(root)).toEqual({ roots: 0, techniques: [] });
+  });
+
+  /** The concealment case is unchanged: nothing inside asks to be drawn, so nothing is. */
+  it('still finds a zero font size whose subtree never overrides it', () => {
+    const root = element().append(
+      element({ style: 'font-size:0' }).append(element({ style: 'color:#333' })),
+    );
+
+    expect(scan(root)).toEqual({ roots: 1, techniques: ['font-size:0'] });
+  });
+
+  /** A descendant restating the property as another way of hiding is not an escape from it. */
+  it('is not fooled by a descendant that hides itself differently', () => {
+    const root = element().append(
+      element({ style: 'font-size:0' }).append(element({ style: 'font-size:0.02em' })),
+    );
+
+    expect(scan(root)).toEqual({ roots: 1, techniques: ['font-size:0'] });
+  });
+
+  /** `visibility` is the other inherited property a child can simply switch back on. */
+  it('leaves a hidden subtree alone when a child makes itself visible again', () => {
+    const root = element().append(
+      element({ style: 'visibility:hidden' }).append(element({ style: 'visibility:visible' })),
+    );
+
+    expect(scan(root)).toEqual({ roots: 0, techniques: [] });
+  });
+
+  /** `display:none` and `opacity:0` cannot be escaped from inside, so no descendant is consulted. */
+  it('ignores what is inside a subtree that is not rendered at all', () => {
+    const root = element().append(
+      element({ style: 'display:none' }).append(element({ style: 'font-size:14px' })),
+      element({ style: 'opacity:0' }).append(element({ style: 'opacity:1' })),
+    );
+
+    expect(scan(root)).toEqual({ roots: 2, techniques: ['display:none', 'opacity:0'] });
   });
 
   it('finds nothing in a body that hides nothing', () => {

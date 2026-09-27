@@ -15,6 +15,9 @@
 /** Ceiling on elements examined. A message can contain thousands of nodes. */
 const MAX_ELEMENTS_SCANNED = 4000;
 
+/** Ceiling on the descendants examined for an override, per candidate. */
+const MAX_ESCAPES_EXAMINED = 200;
+
 /** Ceiling on distinct techniques reported, so one message cannot fill the panel. */
 const MAX_TECHNIQUES = 6;
 
@@ -56,41 +59,117 @@ const ZERO = String.raw`(?:0+(?:\.0+)?|\.0+)`;
  */
 const END = String.raw`\s*(?:!\s*important\b\s*)?(?:;|$)`;
 
-const HIDING_DECLARATIONS: readonly [string, RegExp][] = [
-  ['display:none', new RegExp(`${DECL}display\\s*:\\s*none`, 'u')],
-  ['visibility:hidden', new RegExp(`${DECL}visibility\\s*:\\s*(hidden|collapse)`, 'u')],
-  ['opacity:0', new RegExp(`${DECL}opacity\\s*:\\s*${ZERO}${END}`, 'u')],
+/**
+ * Clipping, without which a zero dimension hides nothing.
+ *
+ * Content in a box with no height is not erased, it overflows and is drawn anyway — which is why the
+ * preheader idiom is `max-height:0;overflow:hidden` and never `max-height:0` alone. Requiring the pair is
+ * what separates concealment from the `height:0` of a spacer row or a layout reset, whose *children* hold
+ * text the reader can see.
+ */
+const CLIPPED = new RegExp(`${DECL}overflow(-[xy])?\\s*:\\s*(hidden|clip)`, 'u');
+
+interface HidingDeclaration {
+  name: string;
+  pattern: RegExp;
+  /** Hides only in combination with clipping. */
+  needsClipping?: boolean;
+  /**
+   * A descendant that can undo it, for the inherited properties.
+   *
+   * `display:none` and `opacity:0` cannot be escaped from inside: the subtree is not rendered, or is
+   * composited at zero as a whole, whatever its children ask for. A zero font size is only the parent's
+   * own, and any descendant naming a size of its own is drawn at that size — which is the entire purpose
+   * of `font-size:0` on a container, since it collapses the whitespace between tags without touching the
+   * text inside them. Treating the container as hidden deletes a paragraph the reader is looking at.
+   */
+  escapedBy?: RegExp;
+}
+
+const HIDING_DECLARATIONS: readonly HidingDeclaration[] = [
+  { name: 'display:none', pattern: new RegExp(`${DECL}display\\s*:\\s*none`, 'u') },
+  {
+    name: 'visibility:hidden',
+    pattern: new RegExp(`${DECL}visibility\\s*:\\s*(hidden|collapse)`, 'u'),
+    escapedBy: new RegExp(`${DECL}visibility\\s*:\\s*visible`, 'u'),
+  },
+  { name: 'opacity:0', pattern: new RegExp(`${DECL}opacity\\s*:\\s*${ZERO}${END}`, 'u') },
   /*
    * Zero at any unit, one to two *pixels*, or under a tenth of a relative unit. Not `1em`, which is
    * ordinary body text, and not `0.9em`, which is ordinary small print.
    */
-  [
-    'font-size:0',
-    new RegExp(
+  {
+    name: 'font-size:0',
+    pattern: new RegExp(
       `${DECL}font-size\\s*:\\s*(?:${ZERO}\\s*[a-z%]*|[0-2](?:\\.\\d+)?\\s*(?:px|pt)|0?\\.0\\d*\\s*(?:em|rem|ex|ch|%))${END}`,
       'u',
     ),
-  ],
-  ['height:0', new RegExp(`${DECL}(max-)?height\\s*:\\s*${ZERO}\\s*[a-z%]*${END}`, 'u')],
-  ['width:0', new RegExp(`${DECL}(max-)?width\\s*:\\s*${ZERO}\\s*[a-z%]*${END}`, 'u')],
-  ['clipped', new RegExp(`${DECL}(clip\\s*:\\s*rect\\(\\s*0|clip-path\\s*:\\s*inset\\(\\s*(100%|50%))`, 'u')],
-  [
-    'moved off screen',
-    new RegExp(`${DECL}(text-indent|left|right|top|margin-left|margin-top)\\s*:\\s*-\\d{3,}`, 'u'),
-  ],
+    escapedBy: new RegExp(`${DECL}font-size\\s*:`, 'u'),
+  },
+  {
+    name: 'height:0',
+    pattern: new RegExp(`${DECL}(max-)?height\\s*:\\s*${ZERO}\\s*[a-z%]*${END}`, 'u'),
+    needsClipping: true,
+  },
+  {
+    name: 'width:0',
+    pattern: new RegExp(`${DECL}(max-)?width\\s*:\\s*${ZERO}\\s*[a-z%]*${END}`, 'u'),
+    needsClipping: true,
+  },
+  {
+    name: 'clipped',
+    pattern: new RegExp(`${DECL}(clip\\s*:\\s*rect\\(\\s*0|clip-path\\s*:\\s*inset\\(\\s*(100%|50%))`, 'u'),
+  },
+  {
+    name: 'moved off screen',
+    pattern: new RegExp(`${DECL}(text-indent|left|right|top|margin-left|margin-top)\\s*:\\s*-\\d{3,}`, 'u'),
+  },
 ];
 
 /**
  * The strongest hiding technique a style attribute applies, or `null` when it applies none.
  *
  * Exported for tests. Takes the attribute as written; whitespace and case vary freely in real mail.
+ *
+ * Answers for the element's own box only. Whether a descendant overrides an inherited property is a
+ * question about a subtree, which `findHiddenSubtrees` asks.
  */
 export function hidingTechnique(styleAttribute: string): string | null {
   const style = styleAttribute.toLowerCase();
-  for (const [name, pattern] of HIDING_DECLARATIONS) {
-    if (pattern.test(style)) return name;
+  for (const { name, pattern, needsClipping } of HIDING_DECLARATIONS) {
+    if (!pattern.test(style)) continue;
+    if (needsClipping === true && !CLIPPED.test(style)) continue;
+    return name;
   }
   return null;
+}
+
+/** The declaration a technique was named for, so the subtree rules can be read off it. */
+function declarationFor(technique: string): HidingDeclaration | undefined {
+  return HIDING_DECLARATIONS.find((declaration) => declaration.name === technique);
+}
+
+/**
+ * Whether something inside the subtree is drawn in spite of the ancestor's declaration.
+ *
+ * Bounded like the outer scan, and inline styles only, for the same reason: a class rule Gmail rewrote is
+ * not readable from here. The consequence is the safe one — a subtree whose override lives in a stylesheet
+ * is still treated as hidden, which under-reports the body rather than inventing concealment.
+ */
+function subtreeEscapes(element: Element, declaration: HidingDeclaration): boolean {
+  const escapedBy = declaration.escapedBy;
+  if (escapedBy === undefined) return false;
+
+  let examined = 0;
+  for (const descendant of element.querySelectorAll('[style]')) {
+    if (examined >= MAX_ESCAPES_EXAMINED) break;
+    examined += 1;
+
+    const style = descendant.getAttribute('style')?.toLowerCase() ?? '';
+    // A descendant restating the property *as another way of hiding* escapes nothing.
+    if (escapedBy.test(style) && hidingTechnique(style) === null) return true;
+  }
+  return false;
 }
 
 /** Letters and digits only: invisible padding (`&nbsp;`, `&zwnj;`) is not content being concealed. */
@@ -144,6 +223,9 @@ export function findHiddenSubtrees(root: Element): HiddenScan {
       hidingTechnique(element.getAttribute('style') ?? '') ??
       (element.hasAttribute('hidden') ? 'hidden attribute' : null);
     if (technique === null) continue;
+
+    const declaration = declarationFor(technique);
+    if (declaration !== undefined && subtreeEscapes(element, declaration)) continue;
 
     roots.push(element);
     if (techniques.size < MAX_TECHNIQUES) techniques.add(technique);

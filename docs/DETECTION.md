@@ -207,6 +207,20 @@ mechanisms exist purely to keep legitimate mail at zero.
   decides the question with a fact about the table rather than one about the message: Apple is written
   before Amazon, so authenticated mail from a domain Amazon owns was read as Apple impersonation and
   correlated with its own verification wording into High Risk.
+- **Concealment judged per element, applied to a subtree.** The hidden-text scan reads inline styles, and
+  what it finds is *removed* from the body before scoring, so an over-eager rule deletes the evidence
+  instead of finding it. Two declarations do not survive being applied to everything underneath them: a zero
+  font size is inherited and any descendant naming its own size is drawn at it — which is the whole purpose
+  of `font-size:0` on a container, since it collapses the whitespace between tags — and a zero height or
+  width hides nothing without `overflow:hidden`, because content in a box with no room overflows and is
+  drawn anyway. A genuine newsletter wrapping its cells in `font-size:0` therefore had its entire body
+  removed, and an empty body was not a *missing* body: the element was there, so the message was scored on
+  its subject and sender alone, every content and link check reading an empty string, with nothing on the
+  card to say so. Underneath both fixes is a floor, since no rule reading inline styles can be exact enough
+  to earn the right to decide a message has no words: a body pruned to nothing is now reported as a part
+  that could not be read, so the message is not scored at all. Substituting the removed text instead was the
+  first attempt and is worse — Gmail renders a body hidden while it is still building the view, so every
+  message caught mid-render would be accused of concealing every word it contains.
 - **Brands that run their own top-level domain.** Ownership is a question about a name's TLD as well as its
   second level. ICANN's Specification 13 restricts registrations in a brand TLD to the operator, its
   affiliates and its trademark licensees, so every name under `.apple` or `.microsoft` is the brand's by the

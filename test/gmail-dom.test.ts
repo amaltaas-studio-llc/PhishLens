@@ -51,6 +51,8 @@ interface PageOptions {
   senderEmail?: string;
   subject?: string;
   body?: string;
+  /** Markup for the body, for the cases where its *structure* is what is being asserted. */
+  bodyHtml?: string;
   /** Gmail's own red banner, or an unrelated live region, depending on what is being asserted. */
   banner?: { text: string; role: 'warning' | 'unrelated' };
 }
@@ -107,7 +109,7 @@ function render(options: PageOptions = {}): void {
         </div>
         <div class="ii gt">
           <div class="a3s aiL">
-            <p>${o.body}</p>
+            ${o.bodyHtml ?? `<p>${o.body}</p>`}
             ${anchors}
             ${o.quoted === undefined ? '' : `<blockquote class="gmail_quote">${o.quoted}</blockquote>`}
           </div>
@@ -196,6 +198,50 @@ describe('reading an ordinary message out of the page', () => {
     const fallback = new GmailDomAdapter().currentMessage()?.headerElement;
     expect(fallback).not.toBeNull();
     expect(fallback?.className).toContain('gE');
+  });
+
+  /**
+   * A container of `font-size:0` around a newsletter, which is how bulk mail collapses the whitespace
+   * between its tags while every paragraph inside names its own size. Removing the subtree took the whole
+   * body with it, and an empty body is not reported as a missing part — the element was there — so the
+   * message was scored on its subject and sender alone with nothing on the card to say what had happened.
+   */
+  it('keeps body text whose container sets a zero font size its contents override', () => {
+    render({
+      bodyHtml: `<table><tr><td style="direction:ltr;font-size:0;padding:4px 8px">
+        <p style="font-size:14px">Your consignment leaves the depot on Tuesday morning.</p>
+      </td></tr></table>`,
+    });
+
+    const { email, missing } = extract();
+    expect(email.bodyText).toContain('leaves the depot on Tuesday');
+    expect(email.hiddenText).toBeUndefined();
+    expect(missing).toEqual([]);
+  });
+
+  /**
+   * The same failure reached from the other side. Reading an inline style cannot be exact, so the guarantee
+   * is not that the scan is always right but that being wrong is *said*: a body read to nothing is reported
+   * as a part that could not be read, which stops the message being scored as though its wording had been
+   * examined and found unremarkable. Substituting the text that was removed would be the worse fix, because
+   * Gmail renders a body hidden while it is still building the view and every such message would be accused
+   * of concealing all of its words.
+   */
+  it('reports a body it has read to nothing as unread rather than scoring an empty one', () => {
+    render({
+      bodyHtml: `<div style="display:none">
+        <p>Your consignment leaves the depot on Tuesday morning.</p>
+        <a href="https://track.northwind-logistics.com/c/9f2a">Track your parcel</a>
+      </div>`,
+    });
+
+    const { email, missing } = extract();
+    expect(email.bodyText).toBe('');
+    // The shape that made this worth reporting: links to judge, and no wording to judge them against.
+    expect(email.links).toHaveLength(1);
+    expect(email.hiddenText?.techniques).toEqual(['display:none']);
+    expect(missing).toContain('body');
+    expect(isScorable(missing)).toBe(false);
   });
 
   it('reports nothing missing, so the message is scorable', () => {

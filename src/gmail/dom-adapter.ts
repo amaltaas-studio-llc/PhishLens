@@ -191,7 +191,7 @@ export class GmailDomAdapter implements MailAdapter {
       ...(Object.keys(raw).length > 0 ? { raw } : {}),
     };
 
-    return { email, missing: missingParts(handle, email) };
+    return { email, missing: missingParts(handle, email, body.prunedToNothing === true) };
   }
 }
 
@@ -207,7 +207,11 @@ export class GmailDomAdapter implements MailAdapter {
  * subject is ordinary mail, so emptiness proves nothing and only the absence of the element itself
  * suggests the selectors have gone stale.
  */
-function missingParts(handle: MessageHandle, email: EmailMessage): readonly MessagePart[] {
+function missingParts(
+  handle: MessageHandle,
+  email: EmailMessage,
+  bodyPrunedToNothing: boolean,
+): readonly MessagePart[] {
   const missing: MessagePart[] = [];
 
   if (email.senderEmail === undefined || email.senderEmail === '') missing.push('sender');
@@ -215,7 +219,11 @@ function missingParts(handle: MessageHandle, email: EmailMessage): readonly Mess
     missing.push('subject');
   }
   // Reached only if `currentMessage()` ever returns a handle without one, which it is written not to.
-  if (handle.bodyElement === null) missing.push('body');
+  // The second case is the body that was found and read to nothing: judged by consequence like the sender,
+  // since a body every visibility rule removed leaves the content checks with the same empty string a
+  // missing element would, and a message with links but no words was otherwise scored as though its wording
+  // had been examined and found unremarkable.
+  if (handle.bodyElement === null || bodyPrunedToNothing) missing.push('body');
 
   if (missing.length > 0) logger.info('parts of the message could not be read', { missing });
   return missing;
@@ -586,7 +594,12 @@ function rawSubject(): string {
  * CSS put something out of view, so hidden filler would otherwise sit inside the string the content rules
  * match against, diluting them in exactly the way it is meant to dilute a spam filter. See `HiddenText`.
  */
-function extractBody(bodyElement: Element | null): { text: string; hidden?: HiddenText } {
+function extractBody(bodyElement: Element | null): {
+  text: string;
+  hidden?: HiddenText;
+  /** Every word the body had was inside something the visibility scan judged hidden. */
+  prunedToNothing?: boolean;
+} {
   if (bodyElement === null) return { text: '' };
 
   const clone = bodyElement.cloneNode(true) as Element;
@@ -605,11 +618,28 @@ function extractBody(bodyElement: Element | null): { text: string; hidden?: Hidd
   }
 
   const text = truncate(normalizeBodyWhitespace(clone.textContent), MAX_BODY_CHARS);
-  if (text === '') logEmptyBody(bodyElement, chars);
+  if (text === '') logEmptyBody(bodyElement, chars, scan.techniques);
 
   return {
     text,
     ...(chars > 0 ? { hidden: { chars, techniques: scan.techniques } } : {}),
+    /*
+     * Removals are reported when they account for the *whole* body, because reading an inline style cannot
+     * be exact — a declaration's effect depends on the subtree under it and on stylesheets this cannot see —
+     * and the two ways of being wrong cost wildly different amounts. Over-report and some hidden filler
+     * joins the body. Strip everything and the body is empty, which is worse than it sounds: a body that is
+     * present but yields nothing was not treated as a missing part, so the message was scored on its subject
+     * and sender alone, every content and link check reading an empty string, with nothing on the card to
+     * say so. A wrapper of `font-size:0` around a whole newsletter — which collapses the whitespace between
+     * its tags and hides none of its text — did exactly that.
+     *
+     * Substituting the unpruned text instead was the first attempt and is worse. Gmail renders a body
+     * hidden while it is still building the view, so a message mid-render would be analysed as one
+     * concealing every word it contains: a frightening finding on ordinary mail, retracted a moment later.
+     * Saying "this could not be read" costs a score on the rare message that really does hide all of its
+     * text, and never accuses anyone.
+     */
+    ...(chars > 0 && text === '' ? { prunedToNothing: true } : {}),
   };
 }
 
@@ -626,13 +656,16 @@ function extractBody(bodyElement: Element | null): { text: string; hidden?: Hidd
  * the quoted-content selectors removed all of it (`before` above zero), text Gmail renders somewhere
  * unreadable such as a sandboxed frame (`frames` above zero), a message that genuinely has no words
  * because its payload is a picture (`images` above zero), and a body candidate that matched the wrong
- * element (everything zero). Counts and tag names only — nothing from the message itself.
+ * element (everything zero). The techniques are this project's own vocabulary, not the message's: naming
+ * them is what turned "the hidden scan removed all of it" into "which declaration did". Counts and tag
+ * names only — nothing from the message itself.
  */
-function logEmptyBody(bodyElement: Element, hiddenChars: number): void {
+function logEmptyBody(bodyElement: Element, hiddenChars: number, techniques: string[]): void {
   logger.debug('body read as empty', {
     element: `${bodyElement.tagName.toLowerCase()}.${bodyElement.className}`.slice(0, 120),
     before: countContentChars(bodyElement.textContent),
     hidden: hiddenChars,
+    techniques,
     quoted: queryAllUnion(bodyElement, SELECTORS.quotedContent).length,
     frames: bodyElement.querySelectorAll('iframe, frame, object, embed').length,
     images: bodyElement.querySelectorAll('img').length,
