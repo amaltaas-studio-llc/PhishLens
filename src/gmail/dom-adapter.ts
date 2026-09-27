@@ -604,10 +604,40 @@ function extractBody(bodyElement: Element | null): { text: string; hidden?: Hidd
     element.remove();
   }
 
+  const text = truncate(normalizeBodyWhitespace(clone.textContent), MAX_BODY_CHARS);
+  if (text === '') logEmptyBody(bodyElement, chars);
+
   return {
-    text: truncate(normalizeBodyWhitespace(clone.textContent), MAX_BODY_CHARS),
+    text,
     ...(chars > 0 ? { hidden: { chars, techniques: scan.techniques } } : {}),
   };
+}
+
+/**
+ * Why a body element that was found produced no text.
+ *
+ * The other silent extraction failure, and a worse one than an empty thread history: `missingParts` only
+ * calls the body missing when the *element* is absent, so a body that is present and yields nothing is
+ * scored — on the subject and the sender alone, with every content and link check reading an empty string,
+ * and nothing on the card to say so. From the outside that is indistinguishable from a message whose
+ * wording is simply unremarkable.
+ *
+ * Four causes look identical in the score and are told apart by the counts here: text that existed until
+ * the quoted-content selectors removed all of it (`before` above zero), text Gmail renders somewhere
+ * unreadable such as a sandboxed frame (`frames` above zero), a message that genuinely has no words
+ * because its payload is a picture (`images` above zero), and a body candidate that matched the wrong
+ * element (everything zero). Counts and tag names only — nothing from the message itself.
+ */
+function logEmptyBody(bodyElement: Element, hiddenChars: number): void {
+  logger.debug('body read as empty', {
+    element: `${bodyElement.tagName.toLowerCase()}.${bodyElement.className}`.slice(0, 120),
+    before: countContentChars(bodyElement.textContent),
+    hidden: hiddenChars,
+    quoted: queryAllUnion(bodyElement, SELECTORS.quotedContent).length,
+    frames: bodyElement.querySelectorAll('iframe, frame, object, embed').length,
+    images: bodyElement.querySelectorAll('img').length,
+    links: bodyElement.querySelectorAll('a[href]').length,
+  });
 }
 
 /** Collapses runs of blank lines while keeping paragraph structure readable for the excerpts. */

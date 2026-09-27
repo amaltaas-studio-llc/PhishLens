@@ -296,6 +296,21 @@ describe('unwrapRedirects', () => {
   });
 
   /**
+   * The form the click trackers of the large sending platforms use, and the one a pattern written for
+   * the literal separators misses: `URL` leaves `%2F` encoded in a pathname, so the destination reads as
+   * ordinary path text and the tracker's own host is taken to be where the link goes. Every rule that
+   * compares a destination against a claimed brand then answers with the tracker.
+   */
+  it('finds a destination embedded in the path with its separators encoded', () => {
+    const tracked = new URL(
+      'https://abc123.r.us-east-1.awstrack.me/L0/https:%2F%2Fdeveloper.example%2Fverify/1/0100abcd',
+    );
+    const result = unwrapRedirects(tracked);
+    expect(result.url.hostname).toBe('developer.example');
+    expect(result.chain).toEqual(['abc123.r.us-east-1.awstrack.me', 'developer.example']);
+  });
+
+  /**
    * Parameters are tried in a fixed order, so an unresolvable one early in that order must not end the
    * search — otherwise adding `?q=//` is enough to hide the destination from every comparison that
    * depends on it.

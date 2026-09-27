@@ -1155,6 +1155,44 @@ describe('a display name that names two brands', () => {
    * The case the rule exists for, kept here so the ownership tiebreak cannot be widened into silence:
    * a domain whose owner is no brand at all suppresses nothing.
    */
+  /**
+   * The links of the same message, in the form its sending platform writes them: the destination sits in
+   * the tracker's path with its separators percent-encoded. `URL` leaves those encoded, so a pattern
+   * written for the literal form reads the tracker as the destination — and a verification button that
+   * the brand's own console serves became a sign-in link the brand supposedly sent to a domain it does
+   * not own, three times over, saturating the link category on its own.
+   */
+  it('reads a tracker-wrapped destination as the brand own domain, not as the tracker', () => {
+    const result = analyzeDeterministic(genuine, { now: FIXED_NOW });
+    expect(hasSignal(result, 'link.credential_link_unrelated_domain')).toBe(false);
+    expect(result.categoryScores.link).toBe(0);
+  });
+
+  /**
+   * And the reverse, which is what makes reading the wrapper better than ignoring it: the same tracker
+   * around a destination the brand does not own is still reported, and the finding names the destination
+   * rather than the tracker that carried it.
+   */
+  it('still flags a credential destination hidden inside the same wrapper', () => {
+    const result = analyzeDeterministic(
+      {
+        ...genuine,
+        links: [
+          {
+            text: 'Start identity verification',
+            href: 'https://a1b2c3d.r.us-east-1.awstrack.me/L0/https:%2F%2Fappstore-developer-verify.com%2Fsignin/1/0100abcdef',
+            normalizedDomain: 'awstrack.me',
+          },
+        ],
+      },
+      { now: FIXED_NOW },
+    );
+
+    const s = signalFor(result, 'link.credential_link_unrelated_domain');
+    expect(s?.description).toContain('appstore-developer-verify.com');
+    expect(s?.description).not.toContain('awstrack.me');
+  });
+
   it('still flags a name claiming a brand from a domain no brand owns', () => {
     const result = analyzeDeterministic(
       {

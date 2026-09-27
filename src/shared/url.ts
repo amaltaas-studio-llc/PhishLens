@@ -314,7 +314,14 @@ function extractRedirectTarget(url: URL): { parsed: URL | null } | null {
   }
 
   // Path-embedded redirects, e.g. `/redirect/https://evil.example/login`.
-  const embedded = /https?:\/\/[^\s"'<>]+/i.exec(url.pathname.slice(1));
+  //
+  // The separators are matched percent-encoded as well, because that is the form the click trackers of
+  // the large sending platforms use: `…/L0/https:%2F%2Fexample.com%2Fpath`. `URL` does not decode `%2F`
+  // in a pathname — correctly, since a decoded slash would change the path's structure — so a pattern
+  // written only for the literal form reads the tracker's own host as the destination. Every rule that
+  // asks where a link goes then answers with the tracker, which is how a brand's genuine mail came to
+  // be reported as sending its readers to a domain the brand does not own.
+  const embedded = /https?:(?:\/\/|%2f%2f)[^\s"'<>]+/i.exec(url.pathname.slice(1));
   if (embedded !== null) {
     const parsed = parseUrl(safeDecode(embedded[0]));
     if (parsed !== null && WEB_SCHEMES.has(parsed.protocol)) return { parsed };

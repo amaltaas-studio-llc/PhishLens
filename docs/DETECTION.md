@@ -190,6 +190,15 @@ mechanisms exist purely to keep legitimate mail at zero.
   reputation is genuinely being borrowed.
 - **Word-boundary brand matching.** Short brand keywords (`irs`, `aws`) must match as whole folded words,
   or "first" and "lawsuit" become brand claims once separators are stripped for comparison.
+- **Destinations inside a tracker's path.** The click trackers of the large sending platforms put the real
+  destination in the path with its separators percent-encoded — `…/L0/https:%2F%2Fexample.com%2Fpath` —
+  and `URL` leaves `%2F` encoded in a pathname, correctly, since decoding it would change the path's
+  structure. Unwrapping therefore reads the encoded form as well as the literal one. Without that, every
+  rule asking where a link goes answers with the tracker: a brand's own verification button read as a
+  sign-in link sent to a domain the brand does not own, once per link, which saturates the link category
+  on ordinary commercial mail. Reading the destination is better than exempting the tracker, because the
+  same wrapper around a domain the brand does not own is still reported, and the finding then names the
+  destination rather than the platform that carried it.
 - **Names claiming two brands.** A product name can contain another brand's word — `Amazon Appstore Team`
   names Amazon and, through the `appstore` keyword, Apple — so the impersonation rules need to know which
   brand the message is *presenting itself as*, not merely which brands it mentions. Among claims from
