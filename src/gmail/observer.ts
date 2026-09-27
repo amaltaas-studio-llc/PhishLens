@@ -431,44 +431,45 @@ export function viewSignature(
  *
  * It covers the *evidence*, not merely the message, and the difference is the whole point. Gmail reveals
  * parts of a message after it has drawn the rest: expanding the details panel adds the Reply-To line and
- * the `mailed-by` / `signed-by` rows, and attachment chips arrive late. A signature made of subject, body
- * length and link count is identical before and after, so the observer read the enrichment as "nothing has
- * changed" and dropped it, leaving the score standing on evidence that had since been superseded — and the
- * fields most often revealed that way are the authentication and Reply-To checks, which is to say the ones
- * hardest to argue with.
+ * the `mailed-by` / `signed-by` rows, and attachment chips arrive late. A signature that does not move when
+ * they arrive reads the enrichment as "nothing has changed" and drops it, leaving the score standing on
+ * evidence that has since been superseded — and the fields most often revealed that way are the
+ * authentication and Reply-To checks, which is to say the ones hardest to argue with.
  *
- * Summaries rather than values: what matters is whether the evidence available has changed, and a count or
- * a verdict letter answers that in a bounded string. This is compared for equality and never parsed.
+ * **Values, not summaries, and every field rather than a chosen list.** Counting was tried twice and was
+ * wrong twice: `invoice.pdf` becoming `invoice.exe` leaves the attachment count at one, which is a score of
+ * 0 becoming a score of 75 behind an identical signature, and a rewritten href or an edited sentence of the
+ * same length does the same for the link and content rules. Any hand-picked list of fields is a list that a
+ * later field is left out of, so the whole extracted message is fingerprinted — everything the engine is
+ * given is exactly what decides whether the engine has to run again.
  */
 export function domSignature(handle: MessageHandle, email: EmailMessage): string {
-  const auth = email.auth;
-  const evidence = [
-    email.subject ?? '',
-    String(email.bodyText.length),
-    String(email.links.length),
-    String(email.attachments.length),
-    email.replyTo ?? '',
-    email.recipientEmail ?? '',
-    auth === undefined ? '' : authShape(auth),
-    email.hiddenText === undefined ? '' : String(email.hiddenText.chars),
-  ].join('|');
-
-  return [handle.messageId, handle.threadId, email.senderEmail ?? '', fingerprint(evidence)].join('|');
+  return [handle.messageId, handle.threadId, email.senderEmail ?? '', fingerprint(evidenceOf(email))].join(
+    '|',
+  );
 }
 
-/** Gmail's authentication summary reduced to the parts whose arrival changes an analysis. */
-function authShape(auth: NonNullable<EmailMessage['auth']>): string {
-  return [
-    auth.spf ?? '',
-    auth.dkim ?? '',
-    auth.dmarc ?? '',
-    auth.signedBy ?? '',
-    auth.mailedBy ?? '',
-    auth.via ?? '',
-    auth.unauthenticatedIndicator === true ? 'unverified' : '',
-    // The banner's presence is what matters; its text is Gmail's own wording and can be long.
-    auth.gmailWarning === undefined ? '' : 'warned',
-  ].join(',');
+/**
+ * Everything the extraction produced, as one string to hash.
+ *
+ * `EmailMessage` is a plain data structure by contract — it is what crosses from the Gmail adapter into an
+ * engine that may not touch the DOM — so serialising it is total, and it stays total as fields are added.
+ * Bounded by extraction rather than here: the adapter truncates the body and caps links and attachments
+ * before any of this is reached.
+ */
+function evidenceOf(email: EmailMessage): string {
+  try {
+    return JSON.stringify(email);
+  } catch {
+    /*
+     * Unreachable with the types in `shared/types.ts`, which admit only strings, numbers, booleans and
+     * arrays of those. Kept because this runs inside a timer callback: a throw here would stop the observer
+     * for the life of the tab, and detection that has quietly stopped is the worst outcome available. The
+     * fallback is deliberately coarse — it misses a changed value, as the old signature did — because
+     * re-analysing on every mutation instead would be a different silent failure.
+     */
+    return `${email.subject ?? ''}|${String(email.bodyText.length)}|${String(email.links.length)}|${String(email.attachments.length)}`;
+  }
 }
 
 /**

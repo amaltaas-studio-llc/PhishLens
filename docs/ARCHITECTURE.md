@@ -201,16 +201,24 @@ domSignature  = `${domMessageId}|${domThreadId}|${sender}|${cheapFingerprint(evi
 viewSignature = `${routeThreadIdFromHash}|${domSignature}`
 ```
 
-`evidence` is every extracted field an analysis depends on — subject, body length, link and attachment
-counts, Reply-To, delivered-to, the authentication summary, the size of any concealed text — and not just
-the shape of the message. That distinction is load-bearing, because Gmail reveals a message in stages and
-the late stages are the ones detection leans on hardest: **expanding the details panel adds the Reply-To
-line and the `mailed-by` / `signed-by` rows**, and attachment chips render after the body. A signature made
-of subject, body length and link count is identical before and after each of those, so the observer read
-new evidence as "nothing has changed", dropped the fresh extraction, and left the badge standing on an
-analysis that could no longer be reproduced from what was on screen. Anything injected by this extension is
-invisible to that fingerprint, because the badge and card live behind shadow roots and `querySelector` does
-not cross them — otherwise widening the signature would have turned every repaint into a re-analysis.
+`evidence` is the **whole extracted message**, serialised and hashed — every field, by value. Two narrower
+versions of this were tried and both left stale verdicts on screen. A signature of subject, body length and
+link count does not move when Gmail reveals a message in stages, and the late stages are the ones detection
+leans on hardest: **expanding the details panel adds the Reply-To line and the `mailed-by` / `signed-by`
+rows**, and attachment chips render after the body. Adding counts for those fixed the arrival case and not
+the change case — `invoice.pdf` becoming `invoice.exe` keeps the count at one, which is a score of 0 and a
+score of 75 behind one signature, and a rewritten href or an edited sentence of the same length does the
+same to the link and content rules.
+
+The lesson is that any hand-picked list of fields is a list something is later left out of. `EmailMessage` is
+a plain data structure by contract, because it has to cross from the Gmail adapter into an engine that may
+not touch the DOM, so serialising all of it is total and stays total as fields are added: what the engine is
+given is exactly what decides whether the engine runs again. Bounds come from extraction, which truncates the
+body and caps links and attachments before any of this is reached.
+
+Anything injected by this extension is invisible to the fingerprint, because the badge and card live behind
+shadow roots and `querySelector` does not cross them — otherwise widening the signature would have turned
+every repaint into a re-analysis.
 
 - A debounced (200 ms) `MutationObserver` on the conversation container recomputes the signature.
   **Unchanged signature → no emit.** That kills redundant re-analysis.

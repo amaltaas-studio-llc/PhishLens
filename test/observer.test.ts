@@ -673,4 +673,76 @@ describe('signatures', () => {
       expect(domSignature(base, withAuth)).toBe(domSignature(base, withAuth));
     });
   });
+
+  /**
+   * Counting is not reading. A count answers "has something arrived", and the signature has to answer "is
+   * this the same evidence" — `invoice.pdf` becoming `invoice.exe` keeps the attachment count at one while
+   * turning a score of 0 into a score of 75, and a rewritten href or an edited sentence of the same length
+   * does the same for the link and content rules. Each of these is a stale verdict left standing behind a
+   * signature that claims nothing has changed.
+   */
+  describe('evidence that changed without changing shape', () => {
+    const base = handle('m1', 't1');
+
+    const attachment = (filename: string, extension: string): EmailMessage =>
+      email({ attachments: [{ filename, extension }] });
+
+    it('changes when an attachment becomes an executable', () => {
+      expect(domSignature(base, attachment('invoice.exe', 'exe'))).not.toBe(
+        domSignature(base, attachment('invoice.pdf', 'pdf')),
+      );
+    });
+
+    it('changes when a link points somewhere else', () => {
+      const to = (href: string): EmailMessage =>
+        email({ links: [{ text: 'Sign in', href, normalizedDomain: new URL(href).hostname }] });
+
+      expect(domSignature(base, to('https://accounts.example/login'))).not.toBe(
+        domSignature(base, to('https://accounts.example.attacker.test/login')),
+      );
+    });
+
+    it('changes when anchor text is rewritten under the same href', () => {
+      const anchor = (text: string): EmailMessage =>
+        email({
+          links: [{ text, href: 'https://redirect.example/c/1', normalizedDomain: 'redirect.example' }],
+        });
+
+      expect(domSignature(base, anchor('paypal.com'))).not.toBe(domSignature(base, anchor('Read more')));
+    });
+
+    it('changes when the body is edited to the same length', () => {
+      expect(domSignature(base, email({ bodyText: 'Send the invoice' }))).not.toBe(
+        domSignature(base, email({ bodyText: 'Send the payment' })),
+      );
+    });
+
+    it('changes when the display name changes under the same address', () => {
+      expect(domSignature(base, email({ senderName: 'Microsoft Account Team' }))).not.toBe(
+        domSignature(base, email({ senderName: 'Accounts Payable' })),
+      );
+    });
+
+    it('changes when the conversation above the message does', () => {
+      const alone = email();
+      const inThread = email({
+        thread: { priorSenders: [{ email: 'other@example.com', name: 'Dana' }] },
+      });
+
+      expect(domSignature(base, inThread)).not.toBe(domSignature(base, alone));
+    });
+
+    it('changes when a concealment technique is found that was not there before', () => {
+      expect(
+        domSignature(base, email({ hiddenText: { chars: 800, techniques: ['display:none'] } })),
+      ).not.toBe(domSignature(base, email({ hiddenText: { chars: 800, techniques: ['font-size:0'] } })));
+    });
+
+    it('changes when the unnormalised spelling of an address changes', () => {
+      // Read only by the formatting detectors, and `DoNoT.rEpLy` is itself the evidence.
+      expect(
+        domSignature(base, email({ raw: { senderEmail: 'DoNoT.rEpLy@example.com' } })),
+      ).not.toBe(domSignature(base, email({ raw: { senderEmail: 'donotreply@example.com' } })));
+    });
+  });
 });
