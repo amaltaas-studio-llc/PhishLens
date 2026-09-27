@@ -108,22 +108,27 @@ export class GmailDomAdapter implements MailAdapter {
         const root = this.observationRoot() ?? document.body;
 
         /*
-         * The union of every candidate selector, reduced to one element per message. Both steps matter,
-         * because selection asks for the *last* expanded message: the raw union lists each message once
-         * per selector that matched it, so a thread arrives as an interleaving of wrappers ordered by
+         * The conversation as one element per message, in document order: the union of every candidate
+         * selector, reduced to the outermost match for each message. Both steps matter, because
+         * selection asks for the *last* expanded message: the raw union lists each message once per
+         * selector that matched it, so a thread arrives as an interleaving of wrappers ordered by
          * selector rather than by position on screen, and "the last" is then whichever message the
          * least specific selector happened to reach last. Collapsing to the outermost before testing
          * for expansion is deliberate too — a collapsed row can contain a body, and asking the wrapper
          * is how the row's own state gets to decide.
          */
-        const candidates = outermost(queryAllUnion(root, SELECTORS.messageContainer)).filter(
-          (element) => isExpanded(element),
-        );
+        const rows = outermost(queryAllUnion(root, SELECTORS.messageContainer));
 
-        // Every row, expanded or not, from the first candidate selector that matched anything — the
-        // history needs a complete conversation in document order, where the union's mixture of depths
-        // cannot answer "what came before this".
-        const rows = queryAll(root, SELECTORS.messageContainer);
+        /*
+         * History and selection come from that one population, which is the only way the two can be
+         * compared. Reading the rows separately — from the first candidate selector that matched
+         * anything — gave the history a different set of elements at a different depth, and where the
+         * wrapper selected here *contained* the rows rather than the other way round, locating the
+         * assessed message among them failed and the history came back empty. Empty history is the
+         * failure with no symptom: it looks exactly like an ordinary thread, and the thread-hijack rules
+         * that read it simply never fire.
+         */
+        const candidates = rows.filter((element) => isExpanded(element));
 
         const index = selectReadableMessage(
           candidates.map((candidate) => readIdentity(candidate)),
@@ -315,9 +320,12 @@ export function accountAddressFromTitle(title: string): string | undefined {
  * where Gmail puts the reader's own later reply, or a message opened out of order — was not.
  */
 function readPriorSenders(rows: readonly Element[], current: Element): ThreadParticipant[] {
-  // Located by containment rather than identity: `rows` and the assessed element are found by
-  // different selectors, so the row holding this message is often an ancestor of it rather than it.
-  const boundary = rows.findIndex((row) => row === current || row.contains(current));
+  // Identity, because the assessed message is one of these rows: caller and history read the same
+  // population, one element per message. Containment was the test while they were read separately, and
+  // it only ever worked in one direction — a row containing the assessed element. Where the element was
+  // the outer wrapper and the rows were the `[data-message-id]` elements inside it, the containment ran
+  // the other way, nothing matched, and the history was silently empty.
+  const boundary = rows.indexOf(current);
 
   // An unlocatable boundary yields no history, rather than treating every row as preceding. Rows below
   // the assessed message would then be compared against it, and a wrong history can invent a finding —
@@ -326,9 +334,6 @@ function readPriorSenders(rows: readonly Element[], current: Element): ThreadPar
 
   const senders: ThreadParticipant[] = [];
   for (const row of preceding.slice(-MAX_THREAD_ROWS)) {
-    // Gmail nests quoted content, which is written by whoever sent the message, so a row inside the
-    // assessed one is not a sibling message.
-    if (current.contains(row)) continue;
     const participant = readParticipant(row);
     if (participant !== null) senders.push(participant);
   }

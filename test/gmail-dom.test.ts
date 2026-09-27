@@ -343,6 +343,50 @@ describe('choosing a message when the markup is inconsistent', () => {
     expect(email.auth?.signedBy).toBe('northwind-invoices.example');
     expect(missing).toEqual([]);
   });
+
+  /**
+   * The thread history, read from the same rows selection is made from — and it has to be the same rows,
+   * or the assessed message cannot be located among them.
+   *
+   * Reading them separately, from the first candidate selector that matched anything, put the two at
+   * different depths: a `.adn.ads` wrapper enclosing a `[data-message-id]` element is one message twice,
+   * and selection keeps the wrapper while the history listed the rows inside. Locating the wrapper among
+   * those rows failed, so the history came back empty — and an empty history is indistinguishable from an
+   * ordinary one-message thread, which is to say every thread-hijack rule quietly stopped firing.
+   */
+  describe('the thread history behind the assessed message', () => {
+    const FIRST = 'enquiries@northwind-suppliers.example';
+    const ASSESSED = 'accounts@northwind-invoices.example';
+
+    /** One message matched twice: by the wrapper Gmail puts around it, and by the row inside it. */
+    function wrapped(id: string, email: string, body: string): string {
+      return `<div class="adn ads">${message(`data-message-id="${id}"`, email, body)}</div>`;
+    }
+
+    it('reads the senders above it when the wrapper encloses the row', () => {
+      draw(
+        wrapped('msg-1', FIRST, 'Could you confirm the balance on this account?') +
+          wrapped('msg-2', ASSESSED, 'Attached is the statement you asked for.'),
+      );
+
+      const handle = new GmailDomAdapter().currentMessage();
+      expect(handle?.priorSenders.map((party) => party.email)).toEqual([FIRST]);
+    });
+
+    it('excludes the assessed message itself and anything below it', () => {
+      draw(
+        wrapped('msg-1', FIRST, 'Could you confirm the balance on this account?') +
+          wrapped('msg-2', ASSESSED, 'Attached is the statement you asked for.') +
+          // Collapsed, so selection stays on the message above it.
+          `<div class="adn ads kv">${message('data-message-id="msg-3"', 'dispatch@northwind-couriers.example', 'Later in the thread.')}</div>`,
+      );
+
+      const addresses = new GmailDomAdapter()
+        .currentMessage()
+        ?.priorSenders.map((party) => party.email);
+      expect(addresses).toEqual([FIRST]);
+    });
+  });
 });
 
 /**
