@@ -68,7 +68,15 @@ organisation: unlike the brand rules, nothing here enumerates which domains a co
 gift cards, manufactured urgency and consequence, and the structural tells of a lure (a body that is
 nothing but a link, a subject padded to hide its real text).
 
-Two of the tells are about a message manipulating its own reading rather than what it asks for. A body that
+One distinction inside this category carries more weight than its size suggests: **asking for a one-time
+code is the attack, and supplying one is the most ordinary mail there is.** The wording of the two barely
+differs, so the rule keys on the verb — share, send, forward, reply with — and never on the presence of a
+code. Matching "your verification code is 123456" scored every OTP notification ever sent at 50/100, and
+because such mail usually comes from a domain no brand table contains, nothing downstream was going to
+rescue it. `legitimate-verification-code` in the fixture corpus is that message, including the sentence
+real ones carry and phishes do not: never share this code with anyone.
+
+Two further tells are about a message manipulating its own reading rather than what it asks for. A body that
 vouches for itself — "this message was sent from a trusted sender" — is forging a verdict, because that
 sentence belongs to a mail provider and no real sender writes it. And a body carrying hundreds of
 characters of unrelated prose hidden with CSS is diluting the ratio of suspicious wording to innocent
@@ -141,6 +149,12 @@ mechanisms exist purely to keep legitimate mail at zero.
   and not impersonating anyone — a real password-reset email says all the same alarming things a fake one
   does. The signals are still reported; they carry a `dampened` flag and are excluded from corroborating
   the AI verdict, so a softened finding cannot be used to license a score elsewhere.
+  **Consumer mailboxes are excluded**, because a brand owning a domain is not the same as a mailbox
+  speaking for the brand: `gmail.com` is Google's, so reading ownership as authority quietly handed
+  dampening to every personal account at every consumer provider — "please send me your verification code"
+  from a stranger's Gmail scored 13/100 and Low Risk, where the identical sentence from an unfamiliar
+  domain scored 50. The brand table is right to list those domains, since that is what makes `gmai1.com` a
+  lookalike; the ownership-as-authority reading is what was wrong.
 - **Bulk-mail shape.** Newsletters have many links across many domains and would otherwise trip
   link-heavy heuristics. Recognising the shape suppresses the heuristics that assume person-to-person
   mail. The suppression is withdrawn when the body conceals prose with CSS: bulk shape is cheap to forge —
@@ -211,12 +225,13 @@ it is the marker that gets the feature switched off.
 
 ## Confidence in the numbers
 
-913 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
-`test/fixtures/` holds 21 messages: a plain legitimate message, a legitimate password reset, a legitimate
-reply into an existing thread, a newsletter with many links, a newsletter whose links are all rewritten
-through its platform's click tracker, an institutional newsletter whose social footer names each network it
-links to, an invoice, PayPal phishing, a Microsoft lookalike domain, a brand spoof from an unlisted
-lead-generation sender, an anchor-URL mismatch, a punycode link, an IP-address URL,
+927 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
+`test/fixtures/` holds 22 messages: a plain legitimate message, a legitimate password reset, a legitimate
+one-time code being delivered, a legitimate reply into an existing thread, a newsletter with many links, a
+newsletter whose links are all rewritten through its platform's click tracker, an institutional newsletter
+whose social footer names each network it links to, an invoice, PayPal phishing, a Microsoft lookalike
+domain, a brand spoof from an unlisted lead-generation sender, an anchor-URL mismatch, a punycode link, an
+IP-address URL,
 a ZIP attachment, an executable attachment, a gift-card scam, a fake payroll change, an MFA-code request,
 two reply-chain hijacks — one by a lookalike domain, one reusing a participant's name — and a storage-quota
 lure built so that every field has an innocent answer, which is the fixture that documents the most about

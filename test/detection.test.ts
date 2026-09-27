@@ -31,6 +31,7 @@ const LEGITIMATE_FIXTURES = [
   'legitimate-institutional-newsletter',
   'legitimate-invoice',
   'legitimate-thread-reply',
+  'legitimate-verification-code',
 ];
 
 const MALICIOUS_FIXTURES = [
@@ -627,6 +628,31 @@ describe('fake payroll-change email', () => {
 
   it('recognises the steer away from the HR portal', () => {
     expect(hasSignal(result, 'content.process_bypass')).toBe(true);
+  });
+});
+
+/**
+ * Both directions of the one distinction this rule rests on: a message that *contains* a code is
+ * delivering one, and a message that asks the reader to hand a code over is the attack. The wording
+ * overlaps almost entirely, which is why a pattern matching "your verification code is 123456" scored
+ * every OTP notification ever sent at 50/100 — from a domain with no dampening available, precision in
+ * the rule is the only thing standing between ordinary mail and a Suspicious verdict.
+ */
+describe('a verification code being delivered rather than solicited', () => {
+  const result = analyzeFixture('legitimate-verification-code');
+
+  it('raises no request-for-a-code finding', () => {
+    expect(hasSignal(result, 'content.mfa_request')).toBe(false);
+  });
+
+  it('scores low despite containing the phrase a code phish contains', () => {
+    expect(result.classification).toBe('low');
+    expect(result.score).toBeLessThan(25);
+  });
+
+  it('is not rescued by dampening, because none is available to it', () => {
+    const dampened = result.signals.filter((s) => s.dampened === true);
+    expect(dampened).toEqual([]);
   });
 });
 

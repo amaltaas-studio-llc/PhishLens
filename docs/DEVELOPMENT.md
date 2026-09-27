@@ -124,14 +124,14 @@ UI change is one command away from being reflected in the README instead of sile
 
 ## Testing
 
-913 tests, all in plain Node — no Chrome, no Gmail, no network. One file asks for a DOM and gets it from
+927 tests, all in plain Node — no Chrome, no Gmail, no network. One file asks for a DOM and gets it from
 `jsdom`, which is why that is the only dev dependency here that is not a build or lint tool; see the note
 below the table.
 
 | File | Covers |
 | --- | --- |
 | `test/aggregate.test.ts` | The scoring functions in isolation: per-severity ceilings, category caps, `[0, 100]` clamping, and zero contribution from an empty category, which is the "no local model" path. |
-| `test/detection.test.ts` | The full pipeline against 20 fixtures, invariants across all of them, and which message in a thread gets picked — including the forged-from-yourself cases that must *not* be skipped. |
+| `test/detection.test.ts` | The full pipeline against 22 fixtures, invariants across all of them, and which message in a thread gets picked — including the forged-from-yourself cases that must *not* be skipped. |
 | `test/semantic.test.ts` | The containment guarantees, the calibration limits, and the unavailable / throwing / hanging / cancelled analyzer paths — including which status each reports and which may be cached. |
 | `test/chrome-prompt.test.ts` | The on-device adapter against fakes for every API shape Chrome has shipped and every malformed shape it might, plus concurrency: a session fake that rejects overlapping prompts the way the real one does. |
 | `test/url.test.ts` | Obfuscated IP forms, forged suffix boundaries, redirect chains, hostnames `new URL()` accepts but that cannot exist. |

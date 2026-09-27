@@ -18,10 +18,19 @@ import {
   withTrustedSender,
   withoutTrustedSender,
 } from '../src/shared/trust.js';
-import type { EmailAuthInfo, EmailMessage } from '../src/shared/types.js';
+import type {
+  AnalysisResult,
+  EmailAuthInfo,
+  EmailMessage,
+  SecuritySignal,
+} from '../src/shared/types.js';
 import { loadAllFixtures, loadFixture, toEmailLink } from './fixtures/load.js';
 
 const FIXED_NOW = 1_760_000_000_000;
+
+function signalFor(result: AnalysisResult, id: string): SecuritySignal | undefined {
+  return result.signals.find((s) => s.id === id);
+}
 
 const PROVEN: EmailAuthInfo = {
   spf: 'pass',
@@ -326,6 +335,89 @@ describe('trustState', () => {
   it('stops offering once the list is full', () => {
     const full = Array.from({ length: MAX_TRUSTED_SENDERS }, (_, i) => `sender-${String(i)}.example`);
     expect(trustState(full, routine.senderEmail ?? '', PROVEN, 'low').kind).toBe('none');
+  });
+});
+
+/**
+ * Brand ownership is not mailbox authority.
+ *
+ * `gmail.com` belongs to Google, which is why `gmai1.com` can be reported as a lookalike, and it is also
+ * where a billion individuals keep their mail. Reading ownership as "this sender is a verified brand"
+ * therefore handed brand dampening to every personal account at every consumer provider, quartering the
+ * one category that carries "send me your code" and zeroing its combinations. Asserted through scores
+ * rather than through the flag, because the flag is not what the user sees.
+ */
+describe('a consumer mailbox at a brand-owned domain', () => {
+  const asking = (senderEmail: string): AnalysisResult =>
+    analyzeDeterministic(
+      {
+        senderName: 'Alice Chen',
+        senderEmail,
+        recipientEmail: 'sam@northwind-logistics.com',
+        subject: 'Quick favour',
+        bodyText:
+          'Hi, I am locked out of my account. Please send me your verification code as soon as it arrives. It is urgent.',
+        links: [],
+        attachments: [],
+      },
+      { now: FIXED_NOW },
+    );
+
+  it('is scored exactly as the same message from a domain nobody has enumerated', () => {
+    const fromGmail = asking('alice.chen.1984@gmail.com');
+    const fromElsewhere = asking('alice.chen.1984@mail.northwind-unrelated.com');
+
+    expect(fromGmail.score).toBe(fromElsewhere.score);
+    expect(fromGmail.classification).toBe(fromElsewhere.classification);
+  });
+
+  it('keeps the request finding at full weight', () => {
+    const signal = signalFor(asking('alice.chen.1984@gmail.com'), 'content.mfa_request');
+    expect(signal?.severity).toBe('high');
+    expect(signal?.dampened).toBeUndefined();
+  });
+
+  /** The impersonation case: claiming the brand whose mail service you happen to be a customer of. */
+  it('gets no dampening from claiming the brand that owns its own domain', () => {
+    const result = analyzeDeterministic(
+      {
+        senderName: 'Google Security',
+        senderEmail: 'google.security.team.2026@gmail.com',
+        recipientEmail: 'sam@northwind-logistics.com',
+        subject: 'Critical security alert',
+        bodyText:
+          'We detected unusual activity on your account and have restricted access. Reply to this email with the verification code we just sent you to confirm your identity and restore access immediately.',
+        links: [],
+        attachments: [],
+      },
+      { now: FIXED_NOW },
+    );
+
+    expect(result.signals.filter((s) => s.dampened === true)).toEqual([]);
+    expect(result.classification).not.toBe('low');
+  });
+
+  /**
+   * The direction this change could have gone wrong. Removing dampening makes every personal message
+   * score on its wording alone, so ordinary correspondence has to stay quiet on its own merits.
+   */
+  it('leaves ordinary personal mail alone', () => {
+    const result = analyzeDeterministic(
+      {
+        senderName: 'Alice Chen',
+        senderEmail: 'alice.chen.1984@gmail.com',
+        recipientEmail: 'sam@northwind-logistics.com',
+        subject: 'Saturday',
+        bodyText:
+          'Thanks for sorting the tickets out. I will bring the cake and Dan is bringing the drinks, so there is nothing left for you to do. See you at seven.',
+        links: [],
+        attachments: [],
+      },
+      { now: FIXED_NOW },
+    );
+
+    expect(result.classification).toBe('low');
+    expect(result.signals.filter((s) => s.score > 0)).toEqual([]);
   });
 });
 

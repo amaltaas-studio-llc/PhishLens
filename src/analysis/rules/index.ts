@@ -58,9 +58,23 @@ function refine(signals: SecuritySignal[], context: AnalysisContext): SecuritySi
       isAtLeast(s.severity, DAMPENING.blockingMinSeverity),
   );
 
+  /*
+   * A brand-owned domain says the organisation runs the mail service. It does not say the mailbox speaks
+   * for the organisation, and for a consumer mail provider it says close to the opposite: `gmail.com` is
+   * Google's, so every personal Gmail account was arriving here as a verified brand and having its
+   * `content` findings quartered and its combinations zeroed. "Please send me your verification code"
+   * from a stranger's Gmail scored 13/100 and Low Risk; the same sentence from a domain nobody has
+   * enumerated scored 50. The brand table is right to list those domains — that is what makes `gmai1.com`
+   * a lookalike — so the fix belongs here, at the one place that treats ownership as authority.
+   *
+   * Both branches are gated, not just the claimless one: a message from a personal Gmail account that
+   * *claims* to be Google is an impersonation attempt, and it would otherwise satisfy
+   * `senderAlignedWithClaim` and be softened for saying so.
+   */
   const senderIsVerifiedBrand =
-    context.senderAlignedWithClaim ||
-    (context.senderOwnedByBrand !== undefined && context.primaryClaim === undefined);
+    !context.senderIsFreemail &&
+    (context.senderAlignedWithClaim ||
+      (context.senderOwnedByBrand !== undefined && context.primaryClaim === undefined));
 
   // Links that all resolve to the sender's own organisation or to the brand it legitimately is.
   const allLinksAligned =
