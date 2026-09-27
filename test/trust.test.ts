@@ -421,6 +421,78 @@ describe('a consumer mailbox at a brand-owned domain', () => {
   });
 });
 
+/**
+ * Brand dampening needs the same proof of origin that trust needs.
+ *
+ * A From header is a claim, not evidence, and forging a famous one is the attack this whole extension is
+ * about. Dampening on the domain alone therefore rewarded exactly the mail it should punish: "send me your
+ * verification code" from a `paypal.com` address that nothing tied to PayPal came out at 8/100 and Low Risk,
+ * the most reassuring thing the extension can say, on a message whose sender is unverified and whose request
+ * is the request no real organisation makes.
+ *
+ * Asserted through the score and through `dampened`, in both directions, because the useful half is that
+ * genuine brand mail still gets the benefit — a gate this easy to over-tighten would quietly make the
+ * feature unreachable, which is how the trust gate broke once already.
+ */
+describe('brand dampening and proof of origin', () => {
+  const impersonation: EmailMessage = {
+    senderName: 'PayPal Security',
+    senderEmail: 'security@paypal.com',
+    recipientEmail: 'sam.okafor@northwind-logistics.com',
+    subject: 'Verify your account',
+    bodyText:
+      'We detected unusual activity on your account. Please send me your verification code so we can confirm your identity and restore access immediately.',
+    links: [],
+    attachments: [],
+  };
+
+  const PROVEN_BRAND: EmailAuthInfo = {
+    spf: 'pass',
+    dkim: 'pass',
+    dmarc: 'pass',
+    signedBy: 'paypal.com',
+    mailedBy: 'paypal.com',
+  };
+
+  it('does not dampen a message nothing ties to the brand it came from', () => {
+    const result = analyzeDeterministic(impersonation, { now: FIXED_NOW });
+
+    expect(result.signals.filter((s) => s.dampened === true)).toEqual([]);
+    expect(result.classification).not.toBe('low');
+    expect(signalFor(result, 'content.mfa_request')?.severity).toBe('high');
+  });
+
+  it('still dampens the same message when Gmail proved the sender', () => {
+    const result = analyzeDeterministic({ ...impersonation, auth: PROVEN_BRAND }, { now: FIXED_NOW });
+
+    expect(signalFor(result, 'content.mfa_request')?.dampened).toBe(true);
+    expect(result.classification).toBe('low');
+  });
+
+  it('accepts an aligned signed-by row on its own, as the trust gate does', () => {
+    // The only authentication evidence most Gmail builds actually render. A gate needing more than this is
+    // a gate that never fires in production while passing every test here.
+    const result = analyzeDeterministic(
+      { ...impersonation, auth: { signedBy: 'paypal.com' } },
+      { now: FIXED_NOW },
+    );
+
+    expect(signalFor(result, 'content.mfa_request')?.dampened).toBe(true);
+  });
+
+  it.each<[string, EmailAuthInfo]>([
+    ['a failed DMARC', { spf: 'pass', dkim: 'pass', dmarc: 'fail', signedBy: 'paypal.com' }],
+    ['a signature belonging to somebody else', { dkim: 'pass', signedBy: 'bulk-sender.example' }],
+    ['an envelope and nothing more', { spf: 'pass', mailedBy: 'paypal.com' }],
+    ["Gmail's own unauthenticated marker", { signedBy: 'paypal.com', unauthenticatedIndicator: true }],
+  ])('refuses to dampen on %s', (_label, auth) => {
+    const result = analyzeDeterministic({ ...impersonation, auth }, { now: FIXED_NOW });
+
+    expect(result.signals.filter((s) => s.dampened === true)).toEqual([]);
+    expect(result.classification).not.toBe('low');
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Stored state
 // ---------------------------------------------------------------------------

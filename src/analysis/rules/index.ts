@@ -59,6 +59,13 @@ function refine(signals: SecuritySignal[], context: AnalysisContext): SecuritySi
   );
 
   /*
+   * Proof of origin first, and for the same reason trust needs it: a From header is a claim, and forging a
+   * famous one is the attack. Dampening on the domain alone therefore rewarded exactly the mail it should
+   * punish — "send me your verification code" from a `paypal.com` address that nothing tied to PayPal came
+   * out at 8/100 and Low Risk, the most reassuring thing this extension can say, about an unverified sender
+   * making a request no real organisation makes. With a valid PayPal signature the same message still lands
+   * in `low`, which is the half worth keeping.
+   *
    * A brand-owned domain says the organisation runs the mail service. It does not say the mailbox speaks
    * for the organisation, and for a consumer mail provider it says close to the opposite: `gmail.com` is
    * Google's, so every personal Gmail account was arriving here as a verified brand and having its
@@ -72,6 +79,7 @@ function refine(signals: SecuritySignal[], context: AnalysisContext): SecuritySi
    * `senderAlignedWithClaim` and be softened for saying so.
    */
   const senderIsVerifiedBrand =
+    context.senderProven &&
     !context.senderIsFreemail &&
     (context.senderAlignedWithClaim ||
       (context.senderOwnedByBrand !== undefined && context.primaryClaim === undefined));

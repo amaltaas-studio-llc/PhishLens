@@ -445,9 +445,17 @@ Naive keyword matching flags every real password-reset email and every marketing
 mechanisms in `refine()` prevent that, both driven by config:
 
 - **Sender alignment.** If the sender's registrable domain is a known-owned domain of the brand the
-  message claims to be from, *and* no `identity`/`link` signal of `medium`+ severity fired, then
-  `content` signals are dampened one severity step. A real password reset from `paypal.com` linking
-  to `paypal.com` lands in `low`.
+  message claims to be from, Gmail's own surfaces **prove the message came from that domain**, *and* no
+  `identity`/`link` signal of `medium`+ severity fired, then `content` signals are dampened one severity
+  step. A real password reset from `paypal.com` linking to `paypal.com` lands in `low`.
+
+  The proof requirement is the same `isSenderProven` that gates user trust, and for the same reason: a From
+  header is a claim, and forging a famous one is the attack this extension exists to catch. Without it,
+  dampening rewarded precisely the mail it should punish — "send me your verification code" from a
+  `paypal.com` address that nothing tied to PayPal scored 8/100 and **Low Risk**, which is the most
+  reassuring thing this extension can say, about an unverified sender making a request no real organisation
+  makes. The same message with a valid PayPal signature still lands in `low`, which is the half that makes
+  the mechanism worth having.
 - **Bulk-mail shape.** Many links + a working `List-Unsubscribe`-style footer + no credential ask
   looks like a newsletter, so the "many links" and "link-heavy body" signals are suppressed. This is
   the difference between a newsletter scoring 8 and scoring 40.

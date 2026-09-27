@@ -145,10 +145,16 @@ to less than the total looks like broken arithmetic otherwise.
 A security indicator that cries wolf gets ignored, at which point it is worse than nothing. Several
 mechanisms exist purely to keep legitimate mail at zero.
 
-- **Dampening.** Content findings are softened when the sender is authenticated, on a brand-owned domain,
-  and not impersonating anyone — a real password-reset email says all the same alarming things a fake one
-  does. The signals are still reported; they carry a `dampened` flag and are excluded from corroborating
-  the AI verdict, so a softened finding cannot be used to license a score elsewhere.
+- **Dampening.** Content findings are softened when the sender is on a brand-owned domain, is not
+  impersonating anyone, and Gmail's own surfaces **prove the message came from that domain** — a real
+  password-reset email says all the same alarming things a fake one does. The signals are still reported;
+  they carry a `dampened` flag and are excluded from corroborating the AI verdict, so a softened finding
+  cannot be used to license a score elsewhere.
+  **Proof is required, not assumed.** A From header is a claim, and forging a famous one is the attack this
+  is all for, so dampening on the domain alone rewarded the mail it should punish: "send me your
+  verification code" from a `paypal.com` address that nothing tied to PayPal came out at 8/100 and Low Risk.
+  The gate is the same `isSenderProven` that trust uses, satisfied by an aligned `signed-by` row on its own,
+  since that is the only authentication evidence most Gmail builds actually render.
   **Consumer mailboxes are excluded**, because a brand owning a domain is not the same as a mailbox
   speaking for the brand: `gmail.com` is Google's, so reading ownership as authority quietly handed
   dampening to every personal account at every consumer provider — "please send me your verification code"
