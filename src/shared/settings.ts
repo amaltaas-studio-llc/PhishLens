@@ -214,6 +214,52 @@ export function isModelServerConfigured(settings: Settings): boolean {
   return settings.aiMode === 'server' && settings.modelBaseUrl !== '' && settings.modelName !== '';
 }
 
+/**
+ * What a settings change asks of the message already on screen.
+ *
+ * Here rather than inside the content script so it can be asserted without a DOM, and in one place so the
+ * question "does this setting change a verdict, or only the picture of one" has to be answered when a
+ * setting is added. Getting it wrong is invisible in both directions: a verdict that silently keeps the
+ * old model's contribution, or a badge that ignores the switch the reader just moved.
+ */
+export interface SettingsImpact {
+  /** Cached results are no longer what an analysis would produce, so they have to be discarded. */
+  rescore: boolean;
+  /** Which model is asked, so a session built for the previous one is no longer the right one. */
+  remodel: boolean;
+  /** Only what is drawn has changed; the existing result stands and is simply applied again. */
+  repaint: boolean;
+  listMarks: boolean;
+  highlights: boolean;
+}
+
+export function settingsImpact(previous: Settings, next: Settings): SettingsImpact {
+  /*
+   * The endpoint and model name count as much as the mode does. A different server is a different judge:
+   * its reasons and its risk number differ, and it may be a large model where the last was a small one.
+   * Leaving them out meant switching model and seeing the previous one's verdicts replayed from cache for
+   * the life of the tab, which reads as the new setting having been ignored.
+   */
+  const remodel =
+    previous.aiMode !== next.aiMode ||
+    previous.modelBaseUrl !== next.modelBaseUrl ||
+    previous.modelName !== next.modelName ||
+    previous.backendBaseUrl !== next.backendBaseUrl;
+
+  return {
+    remodel,
+    rescore: remodel || !sameEntries(previous.trustedSenders, next.trustedSenders),
+    repaint: previous.showBadgeWhenLow !== next.showBadgeWhenLow,
+    listMarks: previous.listMarksEnabled !== next.listMarksEnabled,
+    highlights: previous.highlightEnabled !== next.highlightEnabled,
+  };
+}
+
+/** Order-insensitive, since the trust list is a set stored as an array. */
+function sameEntries(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((entry) => b.includes(entry));
+}
+
 /** True when a configured model server is off this machine, and message content crosses a network. */
 export function isModelServerRemote(settings: Settings): boolean {
   if (settings.modelBaseUrl === '') return false;

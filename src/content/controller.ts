@@ -23,7 +23,7 @@ import { buildDiagnostic, probeSelectors } from '../gmail/diagnostics.js';
 import { GmailObserver, type ObserverEvent } from '../gmail/observer.js';
 import { logger } from '../shared/logger.js';
 import { isTabRequest, sendMessage, type TabResponse, type TabStatus } from '../shared/messaging.js';
-import { DEFAULT_SETTINGS } from '../shared/settings.js';
+import { DEFAULT_SETTINGS, settingsImpact } from '../shared/settings.js';
 import { trustState, withTrustedSender, withoutTrustedSender } from '../shared/trust.js';
 import type {
   AnalysisResult,
@@ -452,18 +452,34 @@ export class Controller {
     this.#settings = await loadSettings();
     logger.debug('settings reloaded', { aiMode: this.#settings.aiMode });
 
-    // Both of these change what an analysis would produce, so every cached result is stale: the AI mode
-    // changes the llm contribution, and the trust list changes the dampening the rule engine applies.
-    const aiChanged = previous.aiMode !== this.#settings.aiMode;
-    const trustChanged = !sameEntries(previous.trustedSenders, this.#settings.trustedSenders);
+    const impact = settingsImpact(previous, this.#settings);
 
-    if (aiChanged || trustChanged) {
+    if (impact.rescore) {
       this.#cache.clear();
-      if (aiChanged) this.#warmModel();
+      if (impact.remodel) this.#warmModel();
       this.#observer.refresh();
+    } else if (impact.repaint) {
+      /*
+       * Repainted rather than re-analysed. `showBadgeWhenLow` decides whether a low verdict is shown at
+       * all, and the verdict itself is unchanged — so running the message through the engine again to
+       * make the badge appear would reset the AI status to pending, re-record a health sample, and on a
+       * cache miss ask the model a question it has already answered. Without this the switch did nothing
+       * until the reader opened another message, which looks like a setting that does not work.
+       */
+      this.#repaintActive();
     }
 
-    if (previous.listMarksEnabled !== this.#settings.listMarksEnabled) this.#applyListMarks();
+    // Marks and highlights are torn down by their owners, which is why they are not part of a repaint.
+    if (impact.highlights && !this.#settings.highlightEnabled) this.#highlighter.clear();
+    if (impact.listMarks) this.#applyListMarks();
+  }
+
+  /** Re-applies the result already in hand, for a change that alters the picture and not the verdict. */
+  #repaintActive(): void {
+    const active = this.#active;
+    const result = active?.result ?? null;
+    if (active === null || result === null) return;
+    this.#applyResult(result, this.#analysisToken, active.semantic);
   }
 
   /**
@@ -503,10 +519,6 @@ function viewOf(active: ActiveView, result: AnalysisResult, settings: Settings):
   };
 }
 
-/** Order-insensitive comparison, since the trust list is a set stored as an array. */
-function sameEntries(a: readonly string[], b: readonly string[]): boolean {
-  return a.length === b.length && a.every((entry) => b.includes(entry));
-}
 
 /** Reads settings via the worker, falling back to defaults if it is mid-restart. */
 async function loadSettings(): Promise<Settings> {
