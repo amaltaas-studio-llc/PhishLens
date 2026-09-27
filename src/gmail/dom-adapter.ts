@@ -32,7 +32,7 @@ import type {
 import { normalizeDomain, parseUrl } from '../shared/url.js';
 import type { Extraction, MailAdapter, MessageHandle } from './adapter.js';
 import { countContentChars, findHiddenSubtrees } from './hidden-text.js';
-import { SELECTORS, queryAll, queryAllUnion, queryFirst } from './selectors.js';
+import { SELECTORS, outermost, queryAll, queryAllUnion, queryFirst } from './selectors.js';
 
 /** Upper bound on links extracted from one message. A hostile message can contain thousands. */
 const MAX_LINKS = 300;
@@ -106,16 +106,23 @@ export class GmailDomAdapter implements MailAdapter {
       'currentMessage',
       () => {
         const root = this.observationRoot() ?? document.body;
-        const candidates = queryAllUnion(root, SELECTORS.messageContainer).filter((element) =>
-          isExpanded(element),
+
+        /*
+         * The union of every candidate selector, reduced to one element per message. Both steps matter,
+         * because selection asks for the *last* expanded message: the raw union lists each message once
+         * per selector that matched it, so a thread arrives as an interleaving of wrappers ordered by
+         * selector rather than by position on screen, and "the last" is then whichever message the
+         * least specific selector happened to reach last. Collapsing to the outermost before testing
+         * for expansion is deliberate too — a collapsed row can contain a body, and asking the wrapper
+         * is how the row's own state gets to decide.
+         */
+        const candidates = outermost(queryAllUnion(root, SELECTORS.messageContainer)).filter(
+          (element) => isExpanded(element),
         );
 
-        // One entry per message, in document order — `queryAll` takes the first candidate selector
-        // that matches anything, where `queryAllUnion` takes them all. The union is right for finding
-        // the message to assess, which only needs the set, and wrong here: it returns each message once
-        // per selector that matched it, so a single message arrives as several nested wrappers, ordered
-        // by selector rather than by position on screen. Neither survives being asked "what came
-        // before this".
+        // Every row, expanded or not, from the first candidate selector that matched anything — the
+        // history needs a complete conversation in document order, where the union's mixture of depths
+        // cannot answer "what came before this".
         const rows = queryAll(root, SELECTORS.messageContainer);
 
         const index = selectReadableMessage(

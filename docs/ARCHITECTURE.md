@@ -243,6 +243,15 @@ warning might matter for sits collapsed *earlier* in DOM order and cannot be sel
 `currentMessage()` therefore picks the last expanded message **that the user did not write**, and reports
 nothing when every expanded message is their own. Expanding an older received message selects that.
 
+"Last" is a claim about the page, so the candidates have to be in the page's order, and a prioritised
+selector list does not produce one. The union lists every match of `div[data-message-id]`, then every match
+of `.gs`, then every match of `.adn.ads`: a thread whose messages are marked differently arrives in an
+order Gmail never rendered, and a message marked several ways arrives several times, once per depth that
+matched. So the candidates are sorted by document position and reduced to the outermost element per
+message before anything is selected. Both failures are silent — a badge appears either way, carrying a
+verdict on a message the reader is not looking at, or on a fragment of one with the header outside it —
+which is why `test/gmail-dom.test.ts` asserts each against a thread built to be inconsistent.
+
 The hard part is deciding what "the user wrote it" means, because the obvious test is a security hole.
 "The From address is my own address" is not enough: mail forged to appear as if it came from the
 reader's own account is a scam genre in its own right ("I have access to your account, pay me"), it

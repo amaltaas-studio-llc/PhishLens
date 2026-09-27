@@ -237,7 +237,7 @@ export function queryAll(root: ParentNode, candidates: readonly string[]): Eleme
   return [];
 }
 
-/** Union of matches across every candidate selector, de-duplicated. */
+/** Union of matches across every candidate selector, de-duplicated, in document order. */
 export function queryAllUnion(root: ParentNode, candidates: readonly string[]): Element[] {
   const seen = new Set<Element>();
   for (const selector of candidates) {
@@ -247,5 +247,48 @@ export function queryAllUnion(root: ParentNode, candidates: readonly string[]): 
       // Skip invalid selectors.
     }
   }
-  return [...seen];
+  return inDocumentOrder([...seen]);
+}
+
+/**
+ * Elements sorted by position on screen.
+ *
+ * A union arrives grouped by selector — every match of the first candidate, then every match of the
+ * second — and that is not the order on screen as soon as the candidates disagree about which element
+ * marks a message. Callers asking for "the last one" or "what came before this" mean the page, not this
+ * file's ordering of its own guesses, and the answer they get from selector order is a different message
+ * rather than a missing one.
+ */
+export function inDocumentOrder(elements: readonly Element[]): Element[] {
+  return [...elements].sort((a, b) => {
+    if (a === b) return 0;
+    try {
+      const relation = a.compareDocumentPosition(b);
+      // An ancestor precedes its descendants: `CONTAINED_BY` arrives with `FOLLOWING` set.
+      if ((relation & Node.DOCUMENT_POSITION_FOLLOWING) !== 0) return -1;
+      if ((relation & Node.DOCUMENT_POSITION_PRECEDING) !== 0) return 1;
+    } catch {
+      // Disconnected or exotic nodes keep their relative position rather than throwing.
+    }
+    return 0;
+  });
+}
+
+/**
+ * The same elements with any that sit inside another removed.
+ *
+ * Several candidate selectors routinely match one message at different depths, which hands a caller the
+ * same message several times over. The outermost is the one kept because it is the only one guaranteed to
+ * contain the whole of the message — header, body and attachment row — and every field is then looked up
+ * within it. This relies on the candidate lists naming per-message elements: a selector matching a wrapper
+ * around *several* messages would collapse them into one, which is why nothing in `messageContainer`
+ * matches the conversation itself.
+ */
+export function outermost(elements: readonly Element[]): Element[] {
+  const kept: Element[] = [];
+  for (const element of inDocumentOrder(elements)) {
+    if (kept.some((ancestor) => ancestor.contains(element))) continue;
+    kept.push(element);
+  }
+  return kept;
 }

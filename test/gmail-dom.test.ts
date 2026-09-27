@@ -272,6 +272,80 @@ describe('Gmail’s own warning banner', () => {
 });
 
 /**
+ * Which message in a thread gets assessed, when the candidate selectors disagree about which element is
+ * a message.
+ *
+ * Selection asks for the *last* expanded message the user did not write, and "last" only means anything if
+ * the candidates are in the order they appear on screen. The union of a prioritised selector list is not:
+ * it lists every match of the first candidate, then every match of the second, so a thread whose messages
+ * are marked differently arrives in an order Gmail never rendered — and one message arrives repeatedly, at
+ * each depth a candidate happened to match.
+ *
+ * Both failures pick the wrong element silently, which is the reason to assert them here: a badge appears
+ * either way, carrying a verdict on a message the reader is not looking at.
+ */
+describe('choosing a message when the markup is inconsistent', () => {
+  const ACCOUNT = '<a aria-label="Northwind Mail (reader@northwind-logistics.com)" href="#"></a>';
+
+  function message(attributes: string, email: string, body: string): string {
+    return `<div ${attributes}>
+      <div class="gE iv gt">
+        <table class="cf gJ"><tr>
+          <td><span class="gD" email="${email}" name="Sender">Sender</span></td>
+          <td class="gH"><div class="gK">10:24</div></td>
+        </tr></table>
+      </div>
+      <div class="ii gt"><div class="a3s aiL"><p>${body}</p></div></div>
+    </div>`;
+  }
+
+  function draw(markup: string): void {
+    const html = `<!doctype html><html><body>${ACCOUNT}
+      <div role="main"><h2 class="hP">Invoice 4471</h2>${markup}</div>
+    </body></html>`;
+    const parsed = new DOMParser().parseFromString(html, 'text/html');
+    document.body.replaceChildren(...parsed.body.childNodes);
+  }
+
+  /**
+   * The earlier message is the one a lower-priority selector reaches, so selector order puts it last. The
+   * reader is looking at the message below it.
+   */
+  it('assesses the lower message when the upper one matches a later selector', () => {
+    draw(
+      message('class="adn ads"', 'first@northwind-suppliers.example', 'The earlier message.') +
+        message('data-message-id="msg-2"', 'second@northwind-invoices.example', 'The message on top.'),
+    );
+
+    expect(extract().email.senderEmail).toBe('second@northwind-invoices.example');
+  });
+
+  /**
+   * One message, matched at two depths. Choosing the inner element loses everything outside it — here the
+   * header, so the sender and the authentication summary — and the message still looks readable.
+   */
+  it('reads a message matched at two depths from its outermost element', () => {
+    draw(`<div data-message-id="msg-3">
+      <div class="gE iv gt">
+        <table class="cf gJ">
+          <tr>
+            <td><span class="gD" email="billing@northwind-invoices.example" name="Billing">Billing</span></td>
+            <td class="gH"><div class="gK">09:02</div></td>
+          </tr>
+          <tr><td class="gL">signed-by:</td><td class="gM">northwind-invoices.example</td></tr>
+        </table>
+      </div>
+      <div class="gs"><div class="ii gt"><div class="a3s aiL"><p>The invoice is attached.</p></div></div></div>
+    </div>`);
+
+    const { email, missing } = extract();
+    expect(email.senderEmail).toBe('billing@northwind-invoices.example');
+    expect(email.auth?.signedBy).toBe('northwind-invoices.example');
+    expect(missing).toEqual([]);
+  });
+});
+
+/**
  * The failure the project refuses to accept is a confident all-clear on a message nobody read. It is
  * worth asserting through the DOM as well as through the rule, because the interesting half is that the
  * adapter *notices*: a sender it could not parse has to arrive as an unread part rather than as an empty
