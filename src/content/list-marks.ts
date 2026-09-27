@@ -10,7 +10,10 @@
  * sender it was marked for, and a row whose sender has changed is re-evaluated rather than left alone.
  *
  * **A list re-renders constantly.** Every pass is debounced, bounded to the rows actually on screen, and
- * skips rows whose sender is unchanged, so the steady state costs one attribute read per row.
+ * skips rows whose sender is unchanged *and* whose mark is still where it was put, so the steady state costs
+ * an attribute read or two per row. Both halves are needed: Gmail rewrites a row's cells when the message
+ * becomes read, which discards the mark without disturbing the row, and a skip that trusted the sender alone
+ * made that loss permanent.
  *
  * The mark itself is inline-styled rather than given a stylesheet or a shadow root. Both alternatives
  * were tried: a stylesheet in the page is a global we do not want, and a shadow host per row is dozens
@@ -24,6 +27,15 @@ import { el } from '../ui/dom.js';
 
 /** Marks the row was computed for, so a recycled row is re-evaluated rather than trusted. */
 const MARKED_FOR = 'data-phishlens-row';
+/**
+ * What the last pass concluded about the row: a severity, or `none`.
+ *
+ * Recorded because the sender key alone cannot tell a row that has nothing to say from one whose mark has
+ * been thrown away. Gmail keeps the `tr` and rewrites the cells inside it when a message becomes read, so
+ * opening a marked message and coming back left the row's key intact with its mark gone — skipped on every
+ * later pass, and a warning silently absent from exactly the row a reader had just been told to distrust.
+ */
+const MARK_STATE = 'data-phishlens-mark';
 const MARK_CLASS = 'phishlens-row-mark';
 
 /**
@@ -176,12 +188,13 @@ export class ListMarks {
        * the tab, so the check only ever ran on mail that arrived later.
        */
       const key = `${recipient.recipientEmail ?? ''}|${sender.senderEmail}|${sender.senderName}`;
-      if (row.getAttribute(MARKED_FOR) === key) continue;
+      if (row.getAttribute(MARKED_FOR) === key && markIntact(row)) continue;
 
       removeMark(row);
       row.setAttribute(MARKED_FOR, key);
 
       const verdict = sender.senderEmail === '' ? null : triageSender({ ...sender, ...recipient });
+      row.setAttribute(MARK_STATE, verdict?.severity ?? 'none');
       if (verdict === null) continue;
       if (addMark(row, verdict)) marked += 1;
     }
@@ -212,6 +225,7 @@ export class ListMarks {
   #clearAll(): void {
     for (const mark of document.querySelectorAll(`.${MARK_CLASS}`)) mark.remove();
     for (const row of document.querySelectorAll(`[${MARKED_FOR}]`)) row.removeAttribute(MARKED_FOR);
+    for (const row of document.querySelectorAll(`[${MARK_STATE}]`)) row.removeAttribute(MARK_STATE);
   }
 }
 
@@ -248,6 +262,20 @@ function readSender(row: Element): { senderName: string; senderEmail: string } {
 
 function removeMark(row: Element): void {
   row.querySelector(`.${MARK_CLASS}`)?.remove();
+}
+
+/**
+ * Whether the row still shows what the last pass decided it should.
+ *
+ * A row that earned nothing is intact by definition: there is nothing Gmail could have removed. A row that
+ * earned a mark is intact only while the mark is in it, which is what turns a re-render into a re-mark
+ * instead of permanent silence. An unrecorded state is treated as not intact, so a row marked by an earlier
+ * version of this file is recomputed rather than trusted.
+ */
+function markIntact(row: Element): boolean {
+  const state = row.getAttribute(MARK_STATE);
+  if (state === null) return false;
+  return state === 'none' || row.querySelector(`.${MARK_CLASS}`) !== null;
 }
 
 /** Returns whether the mark was placed; a row whose cells cannot be found is left alone. */

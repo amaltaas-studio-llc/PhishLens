@@ -190,6 +190,30 @@ describe('marking inbox rows', () => {
     expect(marks()).toHaveLength(1);
   });
 
+  /**
+   * Opening a marked message and coming back to the list. Gmail keeps the `tr` — same sender, same
+   * attributes — and rewrites the cells inside it to draw the row as read, which throws the mark away. A
+   * skip that trusted the recorded sender alone read that as "already handled": the warning vanished from
+   * the one row the reader had just been told to distrust, and never came back for the life of the tab.
+   */
+  it('restores a mark Gmail discarded when it redrew the row as read', async () => {
+    render([{ email: 'security@paypa1-alerts.example', name: 'PayPal Security' }]);
+    startMarking(() => 'reader@northwind-logistics.com');
+    await settle();
+    expect(marks()).toHaveLength(1);
+
+    const cell = document.querySelector('td.xY');
+    const subject = document.createElement('div');
+    subject.className = 'y6';
+    subject.append(document.createElement('span'));
+    cell?.replaceChildren(subject);
+    expect(marks()).toEqual([]);
+
+    await settle();
+
+    expect(document.querySelector(`#row-0 ${MARK}`)).not.toBeNull();
+  });
+
   it('removes everything it drew when marking is switched off', async () => {
     render([{ email: 'security@paypa1-alerts.example', name: 'PayPal Security' }]);
     const marker = startMarking(() => 'reader@northwind-logistics.com');
@@ -199,5 +223,6 @@ describe('marking inbox rows', () => {
 
     expect(marks()).toEqual([]);
     expect(document.querySelectorAll('[data-phishlens-row]')).toHaveLength(0);
+    expect(document.querySelectorAll('[data-phishlens-mark]')).toHaveLength(0);
   });
 });

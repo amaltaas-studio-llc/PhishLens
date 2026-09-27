@@ -855,7 +855,16 @@ anything, either: the same sender `span` can be given a different `email` and `n
 attributes and text as well as structure. A missing mark is a missed warning, but a mark left beside the
 message that replaced the one it was computed for is a false accusation, which costs more. And a list
 **re-renders constantly**, so passes are debounced, bounded to the rows on screen, and skip rows whose
-sender is unchanged, leaving a steady state of one attribute read per row.
+sender is unchanged, leaving a steady state of an attribute read or two per row.
+
+A row therefore records **what was concluded** as well as what it was concluded from, because the sender key
+cannot distinguish a row with nothing to say from one whose mark has been thrown away. Opening a marked
+message and returning to the list does exactly that: Gmail keeps the `tr`, sender attributes and all, and
+rewrites the cells inside it to draw the row as read. Skipping on the key alone read that as already handled,
+so the warning disappeared from the one row the reader had just been told to distrust and never returned for
+the life of the tab. A row is now skipped only while its key matches *and* the mark it earned is still in it,
+which turns a re-render into a re-mark; a row that earned nothing has nothing Gmail could remove, so the
+common case still costs one comparison.
 
 What a row records is everything its verdict was computed from, which includes the **signed-in address** —
 not because it changes, but because it arrives late. The first passes run at `document_idle`, before Gmail
