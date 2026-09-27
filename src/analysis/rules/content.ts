@@ -125,7 +125,13 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
       /\b(share|send|provide|forward|enter|give|tell (me|us)|read (me|us))\b[^.!?]{0,40}\b(otp|one[- ]time (code|password|passcode|pin)|verification code|security code|authentication code|2fa code|mfa code|sms code|access code)\b/u,
       // "reply to this email with the verification code" — the verb and the preposition are separated.
       /\b(reply|respond|get back)\b[^.!?]{0,40}\bwith\b[^.!?]{0,40}\b(otp|one[- ]time (code|password|passcode|pin)|verification code|security code|authentication code|2fa code|mfa code|sms code|access code|code)\b/u,
-      /\b(otp|verification code|security code|authentication code) (is|:)\s*\d/u,
+      // Deliberately no pattern for "your verification code is 123456". A message *containing* a code is
+      // delivering one, which is the most ordinary transactional mail there is, and every service that
+      // sends one says so in those words — usually right next to "never share this code with anyone",
+      // which is the opposite of the request this rule reports. Solicitation needs a verb asking the
+      // reader to hand it over, and the patterns above are those verbs. An attacker who includes a
+      // plausible code to look authentic is not thereby ignored: whatever they want done with it is what
+      // the rest of this table and the link rules are looking at.
       /\bapprove (the )?(sign[- ]?in|login|request|notification|prompt)\b[^.!?]{0,30}\b(on your (phone|device)|when (you|it) (see|receive))/u,
       /\b(mfa|2fa|two[- ]factor)\b[^.!?]{0,40}\b(re-?register|re-?enroll|reset|disable|remove|bypass)\b/u,
     ],
