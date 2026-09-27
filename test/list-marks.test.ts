@@ -150,6 +150,27 @@ describe('marking inbox rows', () => {
   });
 
   /**
+   * Recycling a row does not have to replace anything in it: the same `span` can be given a different
+   * `email` and `name`. Watching structure alone, the mark computed for the message that used to be in the
+   * row stayed beside the one that replaced it — a warning about the wrong sender, which is worse than none.
+   */
+  it('re-evaluates a row whose sender attributes were rewritten in place', async () => {
+    // Starting from mail with nothing to say about it, so the only thing that can wake the marker is the
+    // rewrite: a pass that draws a mark inserts an element, and would schedule the next pass by itself.
+    render([{ email: 'notifications@northwind-logistics.com', name: 'Northwind Logistics' }]);
+    startMarking(() => 'reader@northwind-logistics.com');
+    await settle();
+    expect(marks()).toEqual([]);
+
+    const sender = document.querySelector('span[email]');
+    sender?.setAttribute('email', 'security@paypa1-alerts.example');
+    sender?.setAttribute('name', 'PayPal Security');
+    await settle();
+
+    expect(marks()).toHaveLength(1);
+  });
+
+  /**
    * Gmail replaces its main region wholesale on a view change, and a `MutationObserver` holds the node it
    * was given. Pointed at an element, the marker went on watching a region that was no longer in the
    * document — rows kept arriving and none was ever looked at — and no mark is indistinguishable from mail

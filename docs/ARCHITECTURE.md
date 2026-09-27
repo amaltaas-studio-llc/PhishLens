@@ -827,9 +827,12 @@ nothing the manifest can be read for references it.
 nobody opened, and the design constraints follow from how little a row contains. The pure half is described
 in §4.4; the DOM half has two problems of its own. Gmail **recycles row elements** — scrolling and
 refreshing reuse the same `tr` with different mail in it — so each row records the sender it was marked
-for, and a row whose sender changed is re-evaluated rather than trusted. And a list **re-renders
-constantly**, so passes are debounced, bounded to the rows on screen, and skip rows whose sender is
-unchanged, leaving a steady state of one attribute read per row.
+for, and a row whose sender changed is re-evaluated rather than trusted. Recycling need not replace
+anything, either: the same sender `span` can be given a different `email` and `name`, so the watch covers
+attributes and text as well as structure. A missing mark is a missed warning, but a mark left beside the
+message that replaced the one it was computed for is a false accusation, which costs more. And a list
+**re-renders constantly**, so passes are debounced, bounded to the rows on screen, and skip rows whose
+sender is unchanged, leaving a steady state of one attribute read per row.
 
 What a row records is everything its verdict was computed from, which includes the **signed-in address** —
 not because it changes, but because it arrives late. The first passes run at `document_idle`, before Gmail

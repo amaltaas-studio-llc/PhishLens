@@ -18,7 +18,7 @@
  */
 import { triageSender, type TriageSeverity, type TriageVerdict } from '../analysis/triage.js';
 import { observeWithPath } from '../gmail/roots.js';
-import { queryFirst, SELECTORS } from '../gmail/selectors.js';
+import { OBSERVED_ATTRIBUTES, queryFirst, SELECTORS } from '../gmail/selectors.js';
 import { logger } from '../shared/logger.js';
 import { el } from '../ui/dom.js';
 
@@ -113,7 +113,20 @@ export class ListMarks {
       this.#ensureAttached();
       this.#schedule();
     });
-    observeWithPath(this.#observer, root, { childList: true, subtree: true });
+    /*
+     * Attributes and text as well as structure, because recycling a row does not have to replace anything:
+     * Gmail can rewrite the sender cell's `email` and `name` in place, and then a mark computed for one
+     * message sits beside another. A missing mark is a missed warning; a mark on the wrong row is a false
+     * accusation, which is the more expensive of the two. Filtered to the attributes the selectors read,
+     * so the cost of the wider watch is a debounced pass that reads one attribute per row and stops.
+     */
+    observeWithPath(this.#observer, root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: [...OBSERVED_ATTRIBUTES],
+      characterData: true,
+    });
     logger.debug('list marks attached');
   }
 
