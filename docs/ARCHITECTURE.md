@@ -272,10 +272,19 @@ identifies the same thread in two unrelated id namespaces — the hash carries a
 (`FMfcgzQhWLMhlXGCZNdTpfpfWQXRPjNz`) while the subject element carries a thread perm id
 (`thread-f:1798…`). They are never equal, so testing them for equality rejects *every* message and
 silently analyses nothing on a real inbox while every analysis-layer test stays green. The guard instead
-asks "has the rendered view moved on from what I last reported?", and applies only when the route has
+asks "is the message I last reported still the one on screen?", and applies only when the route has
 changed since the last emit, because re-opening the same thread renders a byte-identical view and must
 still emit. `test/observer.test.ts` covers both directions, since every negative decision here is silent
 by design.
+
+**What the guard compares is not the signature.** It asks which message is rendered — ids and sender, and
+nothing about what the message says — while the signature above deliberately moves the moment any evidence
+changes. Comparing the signature conflated the two: expanding the details panel on the thread still in the
+pane changed it, the guard read that as Gmail having re-rendered for the new route, and the previous
+thread's message was emitted under the new thread's route with every id in the comparison agreeing that
+nothing had changed. The narrower comparison costs one case — where Gmail exposes no ids at all and the next
+thread is from the same sender, a legitimate render is blocked and the poll reports a timeout — and that
+failure is silence, not a verdict on the wrong message.
 
 ### 3.1 Which message in a thread gets assessed
 

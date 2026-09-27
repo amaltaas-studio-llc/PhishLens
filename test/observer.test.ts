@@ -17,8 +17,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Extraction, MailAdapter, MessageHandle } from '../src/gmail/adapter.js';
-import { GmailObserver, domSignature, viewSignature, type ObserverEvent } from '../src/gmail/observer.js';
-import type { EmailMessage } from '../src/shared/types.js';
+import {
+  GmailObserver,
+  domSignature,
+  messageIdentity,
+  viewSignature,
+  type ObserverEvent,
+} from '../src/gmail/observer.js';
+import type { EmailAuthInfo, EmailMessage } from '../src/shared/types.js';
 
 // ---------------------------------------------------------------------------
 // Fakes
@@ -30,6 +36,12 @@ interface RenderedView {
   senderEmail: string;
   subject: string;
   bodyText: string;
+  /**
+   * Evidence Gmail reveals after it has drawn the message — the `mailed-by` / `signed-by` rows behind the
+   * details toggle. Here because it changes what the engine is given without changing which message is on
+   * screen, which is the distinction the staleness guard turns on.
+   */
+  auth?: EmailAuthInfo;
 }
 
 /**
@@ -110,6 +122,7 @@ class FakeAdapter implements MailAdapter {
       bodyText: view.bodyText,
       links: [],
       attachments: [],
+      ...(view.auth === undefined ? {} : { auth: view.auth }),
     };
     return { email, missing: view.senderEmail === '' ? ['sender'] : [] };
   }
@@ -281,6 +294,25 @@ describe('redundant re-render suppression', () => {
     expect(messageEvents()).toHaveLength(1);
   });
 
+  /**
+   * The half that must survive the staleness guard being narrowed to message identity: on the route the
+   * reader is actually on, evidence arriving is the most important re-analysis there is — Gmail's
+   * authentication summary is what several of the highest-severity rules read.
+   */
+  it('re-emits when evidence arrives on the message already on screen', () => {
+    adapter.route = THREAD_A_HASH;
+    adapter.view = thread('a', '1');
+    observer.start();
+    settle();
+    expect(messageEvents()).toHaveLength(1);
+
+    adapter.view = { ...thread('a', '1'), auth: { dmarc: 'fail' } };
+    triggerMutation();
+    settle();
+
+    expect(messageEvents()).toHaveLength(2);
+  });
+
   it('re-emits when the body arrives after the header', () => {
     adapter.route = THREAD_A_HASH;
     adapter.view = { ...thread('a', '1'), bodyText: '' };
@@ -348,6 +380,34 @@ describe('staleness guard', () => {
 
     expect(messageEvents()).toHaveLength(1);
     expect(noMessageReasons()).toContain('reconciliation-timeout');
+  });
+
+  /**
+   * Evidence arriving on the message the reader has just left.
+   *
+   * Gmail reveals parts of a message after drawing the rest — the `mailed-by` / `signed-by` rows behind
+   * the details toggle, attachment chips — and it does so on the thread still in the pane, whether or not
+   * the route has moved on. Comparing the whole rendered *view* made that enrichment read as "Gmail has
+   * re-rendered for the new route", so the previous thread's message was emitted under the new thread's
+   * route: a verdict attributed to a message the reader is no longer looking at, which is the one thing
+   * this guard exists to prevent, and with every id in the comparison agreeing nothing had changed.
+   */
+  it('does not emit the previous thread when its evidence is enriched under the new route', () => {
+    adapter.route = THREAD_A_HASH;
+    adapter.view = thread('a', '1');
+    observer.start();
+    settle();
+    expect(messageEvents()).toHaveLength(1);
+
+    navigate(THREAD_B_HASH);
+    settle(200);
+
+    // Still A in the pane, now with the details panel expanded on it.
+    adapter.view = { ...thread('a', '1'), auth: { spf: 'pass', mailedBy: 'northwind-tools.example' } };
+    triggerMutation();
+    settle(300);
+
+    expect(messageEvents()).toHaveLength(1);
   });
 
   /**
@@ -762,6 +822,35 @@ describe('signatures', () => {
     it('does not change when the same evidence is read again', () => {
       const withAuth = email({ auth: { spf: 'pass', signedBy: 'example.com' }, replyTo: 'a@example.com' });
       expect(domSignature(base, withAuth)).toBe(domSignature(base, withAuth));
+    });
+  });
+
+  /**
+   * The other half of the same distinction. The signature has to move when evidence arrives; the identity
+   * the staleness guard compares has to stay still, because that guard reads a change as "Gmail has
+   * re-rendered for the route the reader has moved to" — and a details panel expanding on the thread still
+   * in the pane is not that.
+   */
+  describe('which message, as against what it says', () => {
+    const base = handle('m1', 't1');
+
+    it('is unmoved by evidence the render revealed late', () => {
+      const initial = messageIdentity(base, email());
+
+      expect(messageIdentity(base, email({ auth: { spf: 'pass' } }))).toBe(initial);
+      expect(messageIdentity(base, email({ replyTo: 'billing@unrelated.example' }))).toBe(initial);
+      expect(
+        messageIdentity(base, email({ attachments: [{ filename: 'invoice.pdf', extension: 'pdf' }] })),
+      ).toBe(initial);
+      expect(messageIdentity(base, email({ bodyText: 'The body, arriving at last.' }))).toBe(initial);
+    });
+
+    it('moves when the rendered message is a different one', () => {
+      const initial = messageIdentity(base, email());
+
+      expect(messageIdentity(handle('m2', 't1'), email())).not.toBe(initial);
+      expect(messageIdentity(handle('m1', 't2'), email())).not.toBe(initial);
+      expect(messageIdentity(base, email({ senderEmail: 'b@example.com' }))).not.toBe(initial);
     });
   });
 

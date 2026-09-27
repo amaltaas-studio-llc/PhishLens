@@ -121,10 +121,10 @@ export class GmailObserver {
    */
   #reported = false;
   /**
-   * The route and DOM identity of the last message actually emitted. The staleness guard compares the
-   * current DOM against `domSignature` when the route has moved on from `routeThreadId`.
+   * The route and the *identity* of the last message actually emitted. The staleness guard compares the
+   * rendered message against `identity` when the route has moved on from `routeThreadId`.
    */
-  #lastEmit: { routeThreadId: string; domSignature: string } | null = null;
+  #lastEmit: { routeThreadId: string; identity: string } | null = null;
   /** Thread id the *route* says should be on screen, used to detect route changes. */
   #expectedThreadId = '';
   #started = false;
@@ -400,14 +400,14 @@ export class GmailObserver {
     const { handle, email, missing } = view;
 
     // Staleness guard. Route ids and DOM thread ids are different Gmail id namespaces (see the file
-    // header), so the DOM is compared against the view we last reported instead. An unchanged view
+    // header), so the DOM is compared against the message we last reported instead. The *same message*
     // under a changed route means Gmail has not re-rendered yet.
-    const domSig = domSignature(handle, email);
+    const identity = messageIdentity(handle, email);
     const lastEmit = this.#lastEmit;
     if (
       lastEmit !== null &&
       lastEmit.routeThreadId !== routeThreadId &&
-      lastEmit.domSignature === domSig
+      lastEmit.identity === identity
     ) {
       logger.debug('DOM has not caught up with the route yet', {
         expected: routeThreadId,
@@ -421,7 +421,7 @@ export class GmailObserver {
 
     this.#lastSignature = signature;
     this.#reported = true;
-    this.#lastEmit = { routeThreadId, domSignature: domSig };
+    this.#lastEmit = { routeThreadId, identity };
     this.#expectedThreadId = routeThreadId;
     logger.debug('message opened', { signature });
     this.#onEvent({ kind: 'message', signature, handle, email, missing });
@@ -461,7 +461,29 @@ export function viewSignature(
 }
 
 /**
- * Identity of the rendered message, derived purely from the DOM.
+ * *Which* message is rendered, and nothing about what it says.
+ *
+ * The staleness guard needs this rather than the signature below, and the difference between the two is
+ * the difference between the two questions asked of the DOM. "Has anything changed?" must move when a
+ * Reply-To line or an attachment chip arrives late, or the enrichment is dropped. "Is this still the
+ * message I reported?" must *not* move when it does — the guard reads inequality as "Gmail has
+ * re-rendered for the new route", so expanding the details panel on a message the reader has navigated
+ * away from was enough to have it emitted under the next thread's route, with its own ids unchanged and
+ * every id in the comparison agreeing that it had not changed.
+ *
+ * Ids, the sender, and no more. The subject is left out even though it is as stable as the ids for the
+ * same reason the body is: Gmail renders the thread's subject element separately from the message, so a
+ * transition where it is briefly absent would read as a different message, which is the failure this is
+ * guarding against. Where the ids are unreadable and the sender is the same, the guard blocks a render it
+ * should have allowed and the reconciliation poll reports a timeout — silence rather than a verdict
+ * attributed to the wrong thread, which is the direction this project errs in.
+ */
+export function messageIdentity(handle: MessageHandle, email: EmailMessage): string {
+  return [handle.messageId, handle.threadId, email.senderEmail ?? ''].join('|');
+}
+
+/**
+ * Identity of the rendered *view*, derived purely from the DOM: what is on screen, down to the evidence.
  *
  * Deliberately excludes the route, so it can answer "is Gmail still showing what it showed before?"
  * independently of what the URL now claims.
