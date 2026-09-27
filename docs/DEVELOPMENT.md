@@ -118,7 +118,7 @@ npm run screenshots  # in another
 ```
 
 `scripts/screenshots.mjs` drives headless Chrome — no Puppeteer or Playwright, since a browser automation
-stack is a large amount of supply chain to own for five PNGs — and overwrites `docs/assets/`. Set
+stack is a large amount of supply chain to own for eight PNGs — and overwrites `docs/assets/`. Set
 `CHROME_PATH` if Chrome is somewhere unusual. Because the images are renders of the shipping components, a
 UI change is one command away from being reflected in the README instead of silently outdating it.
 

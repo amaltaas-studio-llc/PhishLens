@@ -43,16 +43,42 @@ const SHOTS = [
     name: 'card-light.png',
     query: { fixture: 'microsoft-phish', semantic: 'ready', view: 'card', bare: '1' },
     width: 424,
-    height: 664,
+    // Matches the ordinary-mail card below, which the README sets beside this one: different heights
+    // there leave the two captions on different lines.
+    height: 628,
     caption: 'the explanation card',
   },
   {
     name: 'card-dark.png',
     query: { fixture: 'microsoft-phish', semantic: 'ready', view: 'card', bare: '1' },
     width: 424,
-    height: 664,
+    height: 628,
     dark: true,
     caption: 'the same card in dark mode',
+  },
+  {
+    // The counterpart to the shot above, and the one that makes the README's claim checkable: the same
+    // card on ordinary mail, where it finds nothing and says so.
+    name: 'card-low.png',
+    query: { fixture: 'legitimate-invoice', semantic: 'ready', view: 'card', bare: '1' },
+    width: 424,
+    height: 628,
+    caption: 'the card on ordinary mail',
+  },
+  {
+    name: 'card-low-dark.png',
+    query: { fixture: 'legitimate-invoice', semantic: 'ready', view: 'card', bare: '1' },
+    width: 424,
+    height: 628,
+    dark: true,
+    caption: 'the same ordinary-mail card in dark mode',
+  },
+  {
+    name: 'card-unreadable.png',
+    query: { fixture: 'microsoft-phish', missing: 'sender', view: 'card', bare: '1' },
+    width: 424,
+    height: 508,
+    caption: 'the card when a message could not be read',
   },
   {
     name: 'badges.png',
