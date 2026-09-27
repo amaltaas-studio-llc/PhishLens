@@ -30,18 +30,49 @@ const MAX_TECHNIQUES = 6;
  *
  * `font-size` is capped at 2px rather than 0: a one-pixel font is the standard preheader idiom and is
  * unreadable in the same way zero is. Offsets have to be large and negative — `left:-2px` is a nudge,
- * `left:-9999px` is a removal.
+ * `left:-9999px` is a removal. Zero is spelled out by `ZERO` rather than matched loosely, for the reason
+ * recorded there.
  */
 const DECL = String.raw`(?:^|;)\s*`;
+
+/**
+ * Zero however CSS spells it — `0`, `00`, `0.0`, `.0`, `0.` — and nothing else.
+ *
+ * Written out because the obvious `0(\.\d+)?` reads the leading zero of `0.9em` as the whole value and
+ * treats nine-tenths of the parent font as invisible. Relative units make that the common case rather than
+ * a curiosity: `font-size:0.9em` is how a great deal of legitimate mail sets small print, and since a
+ * caller strips what this matches, the mistake is not a spurious finding but a paragraph the reader can see
+ * being removed from the analysis — the direction an attacker would choose.
+ */
+const ZERO = String.raw`(?:0+(?:\.0+)?|\.0+)`;
+
+/**
+ * The end of a declaration, `!important` included.
+ *
+ * A value has to be matched to its end rather than to a word boundary, or `0` matches the first character
+ * of `0.9em` and the rest of the value is never looked at. `!important` is here because it is not an edge
+ * case in mail: the whole point of a preheader is to survive a client that disagrees, so `display:none
+ * !important` and `max-height:0 !important` are how these declarations are usually written.
+ */
+const END = String.raw`\s*(?:!\s*important\b\s*)?(?:;|$)`;
 
 const HIDING_DECLARATIONS: readonly [string, RegExp][] = [
   ['display:none', new RegExp(`${DECL}display\\s*:\\s*none`, 'u')],
   ['visibility:hidden', new RegExp(`${DECL}visibility\\s*:\\s*(hidden|collapse)`, 'u')],
-  ['opacity:0', new RegExp(`${DECL}opacity\\s*:\\s*0*(\\.0+)?\\s*(;|$)`, 'u')],
-  // Zero at any unit, or one to two *pixels*. Not `1em`, which is ordinary body text.
-  ['font-size:0', new RegExp(`${DECL}font-size\\s*:\\s*(0(\\.\\d+)?\\s*[a-z%]*|[0-2](\\.\\d+)?\\s*(px|pt))\\b`, 'u')],
-  ['height:0', new RegExp(`${DECL}(max-)?height\\s*:\\s*0(\\.\\d+)?\\s*[a-z%]*\\s*(;|$)`, 'u')],
-  ['width:0', new RegExp(`${DECL}(max-)?width\\s*:\\s*0(\\.\\d+)?\\s*[a-z%]*\\s*(;|$)`, 'u')],
+  ['opacity:0', new RegExp(`${DECL}opacity\\s*:\\s*${ZERO}${END}`, 'u')],
+  /*
+   * Zero at any unit, one to two *pixels*, or under a tenth of a relative unit. Not `1em`, which is
+   * ordinary body text, and not `0.9em`, which is ordinary small print.
+   */
+  [
+    'font-size:0',
+    new RegExp(
+      `${DECL}font-size\\s*:\\s*(?:${ZERO}\\s*[a-z%]*|[0-2](?:\\.\\d+)?\\s*(?:px|pt)|0?\\.0\\d*\\s*(?:em|rem|ex|ch|%))${END}`,
+      'u',
+    ),
+  ],
+  ['height:0', new RegExp(`${DECL}(max-)?height\\s*:\\s*${ZERO}\\s*[a-z%]*${END}`, 'u')],
+  ['width:0', new RegExp(`${DECL}(max-)?width\\s*:\\s*${ZERO}\\s*[a-z%]*${END}`, 'u')],
   ['clipped', new RegExp(`${DECL}(clip\\s*:\\s*rect\\(\\s*0|clip-path\\s*:\\s*inset\\(\\s*(100%|50%))`, 'u')],
   [
     'moved off screen',

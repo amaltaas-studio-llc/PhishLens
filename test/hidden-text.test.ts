@@ -137,6 +137,50 @@ describe('hidingTechnique', () => {
     expect(hidingTechnique('font-size:14px;height:0')).toBe('height:0');
     expect(hidingTechnique('line-height:0;max-height:0')).toBe('height:0');
   });
+
+  /**
+   * A value beginning `0.` is not zero, and reading it as zero costs more than a false finding: a caller
+   * strips what this matches out of the body, so `font-size:0.9em` — a common way to set small print —
+   * would delete a paragraph the reader can see from everything downstream of extraction.
+   */
+  it('does not read the leading zero of a fraction as the whole value', () => {
+    for (const style of [
+      'font-size:0.9em',
+      'font-size:0.95rem',
+      'font-size:0.8em;color:#666',
+      'height:0.9em',
+      'max-width:0.5in',
+      'width:0.25%',
+    ]) {
+      expect(hidingTechnique(style), style).toBeNull();
+    }
+  });
+
+  it('reads zero however CSS spells it', () => {
+    for (const style of ['font-size:0', 'font-size:0.0em', 'font-size:.0px', 'font-size:00']) {
+      expect(hidingTechnique(style), style).toBe('font-size:0');
+    }
+    expect(hidingTechnique('height:0.0')).toBe('height:0');
+    expect(hidingTechnique('max-width:.0px')).toBe('width:0');
+  });
+
+  /** Below a tenth of the parent is unreadable at any body size, and `0.9em` is not. */
+  it('reads a relative font size under a tenth as concealment', () => {
+    expect(hidingTechnique('font-size:0.01em')).toBe('font-size:0');
+    expect(hidingTechnique('font-size:.05rem')).toBe('font-size:0');
+    expect(hidingTechnique('font-size:0.09%')).toBe('font-size:0');
+  });
+
+  /**
+   * The point of a preheader is to survive a client that disagrees, so these declarations usually carry
+   * `!important` in real mail. Matching a value to the end of its declaration has to allow for it.
+   */
+  it('reads a declaration the sender insisted on', () => {
+    expect(hidingTechnique('max-height:0 !important')).toBe('height:0');
+    expect(hidingTechnique('font-size:0px!important;color:#fff')).toBe('font-size:0');
+    expect(hidingTechnique('opacity:0 ! important')).toBe('opacity:0');
+    expect(hidingTechnique('width:0 !important;overflow:hidden')).toBe('width:0');
+  });
 });
 
 describe('countContentChars', () => {
