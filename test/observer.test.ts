@@ -560,6 +560,44 @@ describe('lifecycle', () => {
 
       expect(noMessageReasons().filter((reason) => reason === 'no-open-message')).toHaveLength(1);
     });
+
+    /**
+     * Retraction has to survive the signature being forgotten, because forgetting it is routine: it is how
+     * a re-evaluation is forced. Reattaching to a replaced conversation root does it, and a replacement
+     * arriving without a readable message is precisely the case the grace period was added for — Gmail
+     * rebuilding the pane around the user's own reply. Reading an empty signature as "nothing was
+     * asserted" cancelled the retraction there, and left the badge on the message underneath.
+     */
+    it('still retracts after the conversation root has been replaced', () => {
+      adapter.replaceRoot();
+      adapter.view = null;
+      triggerMutation();
+      settle(1000);
+
+      expect(noMessageReasons()).toContain('no-open-message');
+    });
+
+    it('still retracts on navigation after the conversation root has been replaced', () => {
+      adapter.view = null;
+      adapter.replaceRoot();
+      triggerMutation();
+      // Long enough to evaluate the replacement, short of the grace period, so the retraction that
+      // follows has to come from the navigation.
+      settle(300);
+
+      navigate('inbox');
+      settle(1000);
+
+      expect(noMessageReasons()).toContain('navigated-away');
+    });
+
+    /** The other half: forcing a re-evaluation must not fabricate a retraction either. */
+    it('says nothing on a refresh while the message is still readable', () => {
+      observer.refresh();
+      settle(1000);
+
+      expect(noMessageReasons()).toEqual([]);
+    });
   });
 
   it('survives an observation root that is not there yet', () => {

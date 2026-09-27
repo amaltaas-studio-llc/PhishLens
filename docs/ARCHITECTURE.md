@@ -242,6 +242,13 @@ every repaint into a re-analysis.
   claim the reader cannot check, which is the one thing this project treats as worse than silence. The
   grace period is what separates that from an ordinary re-render, where a container swap or a header
   arriving before its body makes the message briefly unreadable and immediate teardown would flicker.
+- **Whether something is asserted is tracked separately from the signature.** The signature answers "has
+  this view already been reported", and clearing it is how a re-evaluation is forced — on a settings change,
+  and on reattaching to a replaced conversation root, whose contents nothing has looked at. Using it to also
+  answer "is there a verdict on screen" made the second question wrong whenever the first was deliberately
+  forgotten: a replaced root holding no readable message cancelled its own retraction, which is the exact
+  case the grace period exists for, since rebuilding the pane around the reader's own reply does both at
+  once.
 
 **The staleness guard compares the DOM against itself, never the route against the DOM.** Gmail
 identifies the same thread in two unrelated id namespaces — the hash carries a conversation id

@@ -104,8 +104,21 @@ export class GmailObserver {
   /** Grace period before a reported message's absence is treated as real. */
   #vanishTimer: ReturnType<typeof setTimeout> | null = null;
 
-  /** Signature of the last emitted message. The redundancy guard. */
+  /** Signature of the last emitted message. The redundancy guard, and *only* that. */
   #lastSignature = '';
+  /**
+   * Whether a message event is outstanding — whether the UI is, right now, asserting something about a
+   * message.
+   *
+   * Separate from `#lastSignature` because the two answer different questions, and conflating them made
+   * the answer to this one wrong whenever the other was deliberately forgotten. Clearing the signature is
+   * how a re-evaluation is forced: `refresh()` does it on a settings change, and reattaching to a replaced
+   * conversation root does it because the replacement holds a render nothing has looked at. Read as "there
+   * is no assertion on screen", an empty signature then cancelled the retraction — so replacing the root
+   * with a view whose message cannot be read left a badge and a card standing on the previous message,
+   * which is the one thing the disappearance grace exists to prevent.
+   */
+  #reported = false;
   /**
    * The route and DOM identity of the last message actually emitted. The staleness guard compares the
    * current DOM against `domSignature` when the route has moved on from `routeThreadId`.
@@ -151,6 +164,7 @@ export class GmailObserver {
     this.#stopReconciling();
     this.#stopConfirmingDisappearance();
     this.#lastSignature = '';
+    this.#reported = false;
     this.#lastEmit = null;
     this.#expectedThreadId = '';
   }
@@ -213,7 +227,8 @@ export class GmailObserver {
       connected: observed?.isConnected ?? false,
     });
     this.#attachMutationObserver();
-    // The replacement holds a different render, which nothing has looked at yet.
+    // The replacement holds a different render, which nothing has looked at yet. Only the redundancy
+    // guard is cleared: whatever was reported is still on screen, and stays retractable.
     this.#lastSignature = '';
   }
 
@@ -224,10 +239,7 @@ export class GmailObserver {
       // Navigated to a list view; there is no open message to report on.
       this.#expectedThreadId = '';
       this.#stopReconciling();
-      if (this.#lastSignature !== '') {
-        this.#lastSignature = '';
-        this.#onEvent({ kind: 'no-message', reason: 'navigated-away' });
-      }
+      this.#retract('navigated-away');
       return;
     }
 
@@ -235,10 +247,7 @@ export class GmailObserver {
 
     this.#expectedThreadId = threadId;
     // The previous thread's badge must go immediately; it describes a message no longer on screen.
-    if (this.#lastSignature !== '') {
-      this.#lastSignature = '';
-      this.#onEvent({ kind: 'no-message', reason: 'navigated-away' });
-    }
+    this.#retract('navigated-away');
     this.#startReconciling();
   };
 
@@ -261,6 +270,10 @@ export class GmailObserver {
       if (Date.now() > this.#reconcileDeadline) {
         this.#stopReconciling();
         logger.debug('reconciliation timed out', { expected: this.#expectedThreadId });
+        // Reported unconditionally, unlike the other two: it says the route asked for a thread that never
+        // arrived, which the consumer needs to hear whether or not anything was on screen before it.
+        this.#lastSignature = '';
+        this.#reported = false;
         this.#onEvent({ kind: 'no-message', reason: 'reconciliation-timeout' });
       }
     }, this.#options.reconcileIntervalMs);
@@ -313,20 +326,34 @@ export class GmailObserver {
    * asserting a verdict about a message no longer on screen, which is a claim the reader cannot check.
    */
   #noteMessageAbsent(): void {
-    if (this.#lastSignature === '') return;
+    if (!this.#reported) return;
     if (this.#vanishTimer !== null) return;
 
     this.#vanishTimer = setTimeout(() => {
       this.#vanishTimer = null;
-      if (!this.#started || this.#lastSignature === '') return;
+      if (!this.#started || !this.#reported) return;
       // A list route, or a route change, is reported by the route handler with its own reason.
       if (this.#adapter.routeThreadId() === '') return;
       if (this.#readView() !== null) return;
 
       logger.debug('reported message is no longer in the view');
-      this.#lastSignature = '';
-      this.#onEvent({ kind: 'no-message', reason: 'no-open-message' });
+      this.#retract('no-open-message');
     }, this.#options.disappearanceGraceMs);
+  }
+
+  /**
+   * Withdraws the outstanding assertion, if there is one.
+   *
+   * Silent when nothing is outstanding, which is what keeps a retraction from being reported twice and
+   * what keeps an ordinary arrival at a list view from announcing the absence of a message nobody was
+   * shown a verdict for.
+   */
+  #retract(reason: 'navigated-away' | 'no-open-message'): void {
+    this.#lastSignature = '';
+    if (!this.#reported) return;
+
+    this.#reported = false;
+    this.#onEvent({ kind: 'no-message', reason });
   }
 
   #stopConfirmingDisappearance(): void {
@@ -348,10 +375,7 @@ export class GmailObserver {
 
     const routeThreadId = this.#adapter.routeThreadId();
     if (routeThreadId === '') {
-      if (this.#lastSignature !== '') {
-        this.#lastSignature = '';
-        this.#onEvent({ kind: 'no-message', reason: 'navigated-away' });
-      }
+      this.#retract('navigated-away');
       return false;
     }
 
@@ -384,6 +408,7 @@ export class GmailObserver {
     if (signature === this.#lastSignature) return false;
 
     this.#lastSignature = signature;
+    this.#reported = true;
     this.#lastEmit = { routeThreadId, domSignature: domSig };
     this.#expectedThreadId = routeThreadId;
     logger.debug('message opened', { signature });
