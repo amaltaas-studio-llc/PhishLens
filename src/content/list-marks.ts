@@ -17,6 +17,7 @@
  * of extra roots for one glyph. Inline properties beat Gmail's own CSS without either.
  */
 import { triageSender, type TriageSeverity, type TriageVerdict } from '../analysis/triage.js';
+import { observeWithPath } from '../gmail/roots.js';
 import { queryFirst, SELECTORS } from '../gmail/selectors.js';
 import { logger } from '../shared/logger.js';
 import { el } from '../ui/dom.js';
@@ -57,7 +58,18 @@ const COLOURS: Readonly<Record<TriageSeverity, string>> = {
 export class ListMarks {
   #observer: MutationObserver | null = null;
   #timer: ReturnType<typeof setTimeout> | null = null;
+  /** The region being watched, so its replacement can be noticed. */
   #root: Element | null = null;
+  /**
+   * How to find the region to watch, asked again rather than resolved once.
+   *
+   * Gmail replaces its main region wholesale on a view change, and a `MutationObserver` holds the node it
+   * was given. Started with an element, the marker stayed attached to a region that was no longer in the
+   * document: rows kept arriving, none of them was ever looked at, and the absence of a mark is
+   * indistinguishable from mail with nothing to say about it. Nothing else restarts it either — the message
+   * observer's own reattachment is about the conversation pane and says nothing to this.
+   */
+  #resolveRoot: (() => Element) | null = null;
   /**
    * How to read the signed-in address, so the lookalike-of-your-own-domain check can run.
    *
@@ -71,17 +83,12 @@ export class ListMarks {
   #recipientEmail = '';
   #accountWaits = 0;
 
-  start(root: Element, readAccount: () => string): void {
+  start(resolveRoot: () => Element, readAccount: () => string): void {
     this.stop();
-    this.#root = root;
+    this.#resolveRoot = resolveRoot;
     this.#readAccount = readAccount;
-
-    this.#observer = new MutationObserver(() => {
-      this.#schedule();
-    });
-    this.#observer.observe(root, { childList: true, subtree: true });
+    this.#attach();
     this.#schedule();
-    logger.debug('list marks attached');
   }
 
   stop(): void {
@@ -92,6 +99,32 @@ export class ListMarks {
     this.#accountWaits = 0;
     this.#clearAll();
     this.#root = null;
+    this.#resolveRoot = null;
+  }
+
+  #attach(): void {
+    const root = this.#resolveRoot?.() ?? null;
+    if (root === null) return;
+
+    this.#observer?.disconnect();
+    this.#root = root;
+    this.#observer = new MutationObserver(() => {
+      // Before scheduling, because this may be the last mutation a detached observer ever reports.
+      this.#ensureAttached();
+      this.#schedule();
+    });
+    observeWithPath(this.#observer, root, { childList: true, subtree: true });
+    logger.debug('list marks attached');
+  }
+
+  /** Reattaches when the region being watched is no longer the region to watch. Cheap when it is. */
+  #ensureAttached(): void {
+    const root = this.#resolveRoot?.() ?? null;
+    if (root === null) return;
+    if (this.#root === root && root.isConnected) return;
+
+    logger.debug('list region replaced, reattaching');
+    this.#attach();
   }
 
   #schedule(): void {
@@ -103,6 +136,10 @@ export class ListMarks {
   }
 
   #scan(): void {
+    // The second recovery path, and the only one that does not need a mutation to arrive: a replaced region
+    // may produce no churn the detached observer can report, and the account-address retries run here.
+    this.#ensureAttached();
+
     const root = this.#root;
     if (root === null) return;
 

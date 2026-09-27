@@ -10,14 +10,14 @@
  *
  * Markup is built with `DOMParser`, not `innerHTML`, as everywhere else in this suite.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ListMarks } from '../src/content/list-marks.js';
 
 const MARK = '.phishlens-row-mark';
 
 /** An inbox of rows in Gmail's shape: the address in `email`, the display name in `name`. */
-function render(rows: { email: string; name: string }[]): Element {
+function render(rows: { email: string; name: string }[]): void {
   const markup = rows
     .map(
       ({ email, name }, index) => `<tr class="zA" id="row-${index}">
@@ -32,7 +32,13 @@ function render(rows: { email: string; name: string }[]): Element {
     'text/html',
   );
   document.body.replaceChildren(...parsed.body.childNodes);
+}
 
+/**
+ * Where the marker is pointed: resolved on every call, the way the controller resolves it from the
+ * adapter. Handing over a fixed element is what left the marker watching a region Gmail had replaced.
+ */
+function region(): Element {
   const root = document.querySelector('div[role="main"]');
   if (root === null) throw new Error('the rendered page has no main region');
   return root;
@@ -52,19 +58,39 @@ async function settle(): Promise<void> {
   await Promise.resolve();
 }
 
+/**
+ * Started markers, stopped after each test. A marker keeps asking for passes while it waits for the
+ * account address, so one left running scans the *next* test's page — and with the root resolved afresh
+ * each pass, it would find it.
+ */
+let markers: ListMarks[] = [];
+
+function startMarking(readAccount: () => string): ListMarks {
+  const marker = new ListMarks();
+  markers.push(marker);
+  marker.start(region, readAccount);
+  return marker;
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
   document.body.replaceChildren();
 });
 
+afterEach(() => {
+  for (const marker of markers) marker.stop();
+  markers = [];
+  vi.useRealTimers();
+});
+
 describe('marking inbox rows', () => {
   it('marks a sender impersonating a known brand and leaves ordinary mail alone', async () => {
-    const root = render([
+    render([
       { email: 'security@paypa1-alerts.example', name: 'PayPal Security' },
       { email: 'notifications@northwind-logistics.com', name: 'Northwind Logistics' },
     ]);
 
-    new ListMarks().start(root, () => '');
+    startMarking(() => '');
     await settle();
 
     expect(marks()).toHaveLength(1);
@@ -79,10 +105,10 @@ describe('marking inbox rows', () => {
    * was skipped for the life of the tab, so the check only ever ran on mail that arrived afterwards.
    */
   it('re-triages rows already on screen once the account address appears', async () => {
-    const root = render([{ email: 'accounts@northwind-Iogistics.com', name: 'Accounts' }]);
+    render([{ email: 'accounts@northwind-Iogistics.com', name: 'Accounts' }]);
 
     let account = '';
-    new ListMarks().start(root, () => account);
+    startMarking(() => account);
     await settle();
     expect(marks()).toEqual([]);
 
@@ -97,7 +123,8 @@ describe('marking inbox rows', () => {
 
   it('stops looking for an account address that never arrives', async () => {
     const reads = vi.fn(() => '');
-    new ListMarks().start(render([{ email: 'a@b.example', name: 'Somebody' }]), reads);
+    render([{ email: 'a@b.example', name: 'Somebody' }]);
+    startMarking(reads);
 
     for (let pass = 0; pass < 40; pass += 1) await settle();
 
@@ -107,9 +134,8 @@ describe('marking inbox rows', () => {
 
   /** Gmail recycles row elements, so a mark must not outlive the message it was computed for. */
   it('re-evaluates a row whose sender has been replaced', async () => {
-    const root = render([{ email: 'security@paypa1-alerts.example', name: 'PayPal Security' }]);
-    const marker = new ListMarks();
-    marker.start(root, () => 'reader@northwind-logistics.com');
+    render([{ email: 'security@paypa1-alerts.example', name: 'PayPal Security' }]);
+    startMarking(() => 'reader@northwind-logistics.com');
     await settle();
     expect(marks()).toHaveLength(1);
 
@@ -123,10 +149,29 @@ describe('marking inbox rows', () => {
     expect(marks()).toEqual([]);
   });
 
+  /**
+   * Gmail replaces its main region wholesale on a view change, and a `MutationObserver` holds the node it
+   * was given. Pointed at an element, the marker went on watching a region that was no longer in the
+   * document — rows kept arriving and none was ever looked at — and no mark is indistinguishable from mail
+   * with nothing to say about it. Nothing else restarts it: the message observer reattaches for its own
+   * purposes and says nothing to this.
+   */
+  it('keeps marking after Gmail replaces the list region', async () => {
+    render([{ email: 'notifications@northwind-logistics.com', name: 'Northwind Logistics' }]);
+    startMarking(() => 'reader@northwind-logistics.com');
+    await settle();
+    expect(marks()).toEqual([]);
+
+    // A fresh main region in place of the old one, carrying a row that has something to say.
+    render([{ email: 'security@paypa1-alerts.example', name: 'PayPal Security' }]);
+    await settle();
+
+    expect(marks()).toHaveLength(1);
+  });
+
   it('removes everything it drew when marking is switched off', async () => {
-    const root = render([{ email: 'security@paypa1-alerts.example', name: 'PayPal Security' }]);
-    const marker = new ListMarks();
-    marker.start(root, () => 'reader@northwind-logistics.com');
+    render([{ email: 'security@paypa1-alerts.example', name: 'PayPal Security' }]);
+    const marker = startMarking(() => 'reader@northwind-logistics.com');
     await settle();
 
     marker.stop();

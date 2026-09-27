@@ -527,11 +527,17 @@ export class Controller {
       this.#listMarks.stop();
       return;
     }
-    // `document.body` when Gmail has not rendered its main region yet, which at `document_idle` it often
-    // has not. Widening the observed subtree costs nothing here: a pass is debounced and bounded, and the
-    // row selectors match list rows and nothing else on the page.
-    const root = this.#adapter.observationRoot() ?? document.body;
-    this.#listMarks.start(root, () => this.#adapter.accountAddress());
+    /*
+     * A resolver rather than an element, because the answer changes: `document.body` when Gmail has not
+     * rendered its main region yet — which at `document_idle` it often has not — and the main region
+     * afterwards, which Gmail then replaces on a view change. Widening the observed subtree to the body
+     * costs nothing here: a pass is debounced and bounded, and the row selectors match list rows and
+     * nothing else on the page.
+     */
+    this.#listMarks.start(
+      () => this.#adapter.observationRoot() ?? document.body,
+      () => this.#adapter.accountAddress(),
+    );
   }
 }
 

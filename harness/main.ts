@@ -430,7 +430,10 @@ function renderList(): void {
 
   const list = el('table', { class: 'list', children: [el('tbody', { children: rows })] });
   stage.replaceChildren(list);
-  listMarks.start(list, () => 'sam.okafor@northwind-logistics.com');
+  listMarks.start(
+    () => list,
+    () => 'sam.okafor@northwind-logistics.com',
+  );
 }
 
 async function renderCardOnly(state: HarnessState): Promise<void> {

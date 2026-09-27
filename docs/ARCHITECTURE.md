@@ -840,6 +840,13 @@ again, so the check only ever ran on mail that arrived afterwards. For the same 
 its own retries, bounded, while the address is still unknown: nothing in the list necessarily changes at the
 moment it appears, so waiting for churn to notice is waiting on luck.
 
+The marker is pointed at a **resolver** rather than a region, for the same reason the message observer
+watches the path out of its root, and through the same helper (`src/gmail/roots.ts`). Gmail replaces its
+main region wholesale on a view change; started with an element, the marker went on watching a region
+detached from the document, and rows arrived in the replacement with nothing looking at them. That failure
+has no symptom — an unmarked row is what ordinary mail looks like — and nothing else restarts it, since the
+message observer's reattachment concerns the conversation pane and says nothing to this.
+
 The mark is inline-styled rather than given a stylesheet or a shadow root. A stylesheet in Gmail's page is a
 global this project does not otherwise create, and a shadow host per row is dozens of extra roots for one
 glyph; inline properties beat Gmail's own CSS without either. Where the glyph is inserted matters more than

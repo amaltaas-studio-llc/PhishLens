@@ -44,6 +44,7 @@
 import { logger } from '../shared/logger.js';
 import type { EmailMessage, MessagePart } from '../shared/types.js';
 import type { MailAdapter, MessageHandle } from './adapter.js';
+import { observeWithPath } from './roots.js';
 import { OBSERVED_ATTRIBUTES } from './selectors.js';
 
 export interface MessageOpenedEvent {
@@ -75,9 +76,6 @@ export interface ObserverOptions {
   /** How long a reported message may be absent before its absence is reported in turn. */
   disappearanceGraceMs?: number;
 }
-
-/** Ancestors watched for the observed root being replaced. Enough to reach `<body>` from a Gmail pane. */
-const MAX_WATCHED_ANCESTORS = 24;
 
 const DEFAULTS = {
   debounceMs: 200,
@@ -198,31 +196,15 @@ export class GmailObserver {
      * filterable, so relative timestamps ticking over arrive here too; both are absorbed by the debounce
      * and then by the unchanged-signature guard, which is the cheap half of the evaluation.
      */
-    this.#mutationObserver.observe(root, {
+    // Plus the path out of the root, because Gmail replaces the conversation container rather than
+    // emptying it and an observer holding the old one reports nothing again. See `roots.ts`.
+    observeWithPath(this.#mutationObserver, root, {
       childList: true,
       subtree: true,
       attributes: true,
       attributeFilter: [...OBSERVED_ATTRIBUTES],
       characterData: true,
     });
-
-    /*
-     * The path from the root to the document, watched for the root being swapped out rather than
-     * changed. A MutationObserver holds the node it was given: when Gmail replaces the conversation
-     * container — which it does on some in-place actions, not only on navigation — the observer stays
-     * attached to an element no longer in the document and reports nothing ever again. Nothing else
-     * notices, because every other trigger in this file is downstream of a mutation, so the extension
-     * goes quiet on a page that still looks like it is working.
-     *
-     * `childList` without `subtree` on each ancestor is what makes that observable: replacing any node
-     * on the path is a child-list change on its parent, and this is the one form of Gmail churn that
-     * happens outside the observed subtree. The cost is a handful of targets that almost never fire,
-     * as against watching `document.body` wholesale — which would catch it too, and would also re-run
-     * extraction every time the chat roster or an advert changed.
-     */
-    for (const ancestor of pathToDocument(root)) {
-      this.#mutationObserver.observe(ancestor, { childList: true });
-    }
 
     logger.debug('mutation observer attached', { root: root.tagName });
   }
@@ -427,22 +409,6 @@ export class GmailObserver {
     this.#onEvent({ kind: 'message', signature, handle, email, missing });
     return true;
   }
-}
-
-/**
- * The ancestors of an element, outward to the document.
- *
- * Bounded because it is walked on every reattachment and the shape of the page is Gmail's to change; the
- * limit is generous enough to reach `<body>` from the conversation container several times over.
- */
-function pathToDocument(element: Element): Element[] {
-  const path: Element[] = [];
-  let current: Element | null = element.parentElement ?? null;
-  while (current !== null && path.length < MAX_WATCHED_ANCESTORS) {
-    path.push(current);
-    current = current.parentElement ?? null;
-  }
-  return path;
 }
 
 /**
