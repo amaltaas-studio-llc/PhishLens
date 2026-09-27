@@ -144,6 +144,8 @@ export interface BrandClaim {
   brand: Brand;
   source: 'sender-name' | 'sender-local-part' | 'subject' | 'body';
   matchedKeyword: string;
+  /** Where the keyword was found in its folded source, which orders two claims from the same place. */
+  position: number;
 }
 
 export interface AnalysisContext {
@@ -273,12 +275,15 @@ export function buildContext(email: EmailMessage, options: ContextOptions = {}):
   );
 
   const senderLocalPart = emailLocalPart(senderEmail);
-  const claims = detectBrandClaims([
-    claimSource('sender-name', senderName),
-    claimSource('sender-local-part', senderLocalPart),
-    claimSource('subject', subject),
-    claimSource('body', matchText),
-  ]);
+  const claims = detectBrandClaims(
+    [
+      claimSource('sender-name', senderName),
+      claimSource('sender-local-part', senderLocalPart),
+      claimSource('subject', subject),
+      claimSource('body', matchText),
+    ],
+    senderRegistrable,
+  );
   const primaryClaim = choosePrimaryClaim(claims);
   const senderOwnedByBrand = brandOwningDomain(senderRegistrable);
 
@@ -462,13 +467,46 @@ function claimSource(origin: BrandClaim['source'], text: string): ClaimSource {
  * Short keywords therefore have to be a whole folded word. The cost is missing `I.R.S.`, which no rule
  * relies on; the benefit is that ordinary prose no longer claims to be a tax authority.
  */
-function detectBrandClaims(sources: readonly ClaimSource[]): BrandClaim[] {
+function detectBrandClaims(
+  sources: readonly ClaimSource[],
+  senderRegistrable: string,
+): BrandClaim[] {
   const claims: BrandClaim[] = [];
   for (const brand of BRANDS) {
     const claim = strongestClaim(brand, sources);
     if (claim !== undefined) claims.push(claim);
   }
-  return claims;
+  return orderClaims(claims, senderRegistrable);
+}
+
+/**
+ * Which claim a reader would say the message is making, when it names more than one brand.
+ *
+ * Ordering matters because the impersonation rules read the first claim, and a display name naming two
+ * brands is not unusual: a product can carry one brand's word inside its own name. A name like `Amazon
+ * Appstore Team` claims Amazon and, through the `appstore` keyword, Apple — so with the table's own order
+ * as the only tiebreak, mail from a domain Amazon owns was reported as Apple impersonation at `high`,
+ * with a correlation on top of it. Nothing about such a message is wrong; the answer to "which brand is
+ * this?" was decided by which entry happens to be written first in `brands.ts`, which is not a fact
+ * about the message at all.
+ *
+ * So, after the source that named it: a brand that owns the sending domain wins, because a message from
+ * `amazon.com` naming Amazon *is* Amazon and the second name is a product word. Failing that, the
+ * earliest mention wins, which reads a name left to right the way a person does — and keeps the wording
+ * right on the phishing version of the same name, where no claimed brand owns the domain and the finding
+ * should say Amazon rather than Apple.
+ */
+function orderClaims(claims: BrandClaim[], senderRegistrable: string): BrandClaim[] {
+  const ownsSender = (claim: BrandClaim): number =>
+    senderRegistrable !== '' && claim.brand.domains.includes(senderRegistrable) ? 1 : 0;
+
+  return [...claims].sort((a, b) => {
+    const bySource = CLAIM_SOURCE_PRIORITY[b.source] - CLAIM_SOURCE_PRIORITY[a.source];
+    if (bySource !== 0) return bySource;
+    const byOwnership = ownsSender(b) - ownsSender(a);
+    if (byOwnership !== 0) return byOwnership;
+    return a.position - b.position;
+  });
 }
 
 /**
@@ -489,7 +527,16 @@ function strongestClaim(brand: Brand, sources: readonly ClaimSource[]): BrandCla
           ? source.stripped.includes(folded)
           : source.words.includes(folded);
 
-      if (found) return { brand, source: source.origin, matchedKeyword: keyword };
+      if (found) {
+        return {
+          brand,
+          source: source.origin,
+          matchedKeyword: keyword,
+          // Found by the word list for a short keyword, but located in the stripped text either way: the
+          // two agree on which mention comes first, and only the ordering uses this.
+          position: Math.max(source.stripped.indexOf(folded), 0),
+        };
+      }
     }
   }
   return undefined;
@@ -509,10 +556,7 @@ const IDENTITY_CLAIM_SOURCES: readonly BrandClaim['source'][] = [
   'subject',
 ];
 
-function choosePrimaryClaim(claims: BrandClaim[]): BrandClaim | undefined {
-  const strong = claims.filter((c) => IDENTITY_CLAIM_SOURCES.includes(c.source));
-  if (strong.length === 0) return undefined;
-  return [...strong].sort(
-    (a, b) => CLAIM_SOURCE_PRIORITY[b.source] - CLAIM_SOURCE_PRIORITY[a.source],
-  )[0];
+/** The first claim from a source strong enough to count, `orderClaims` having settled what "first" means. */
+function choosePrimaryClaim(claims: readonly BrandClaim[]): BrandClaim | undefined {
+  return claims.find((c) => IDENTITY_CLAIM_SOURCES.includes(c.source));
 }

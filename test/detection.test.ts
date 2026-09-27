@@ -32,6 +32,7 @@ const LEGITIMATE_FIXTURES = [
   'legitimate-invoice',
   'legitimate-thread-reply',
   'legitimate-verification-code',
+  'legitimate-brand-product-name',
 ];
 
 const MALICIOUS_FIXTURES = [
@@ -1097,6 +1098,77 @@ describe('short brand keywords inside ordinary words', () => {
       attachments: [],
     });
     expect(context.primaryClaim?.source).toBe('sender-name');
+  });
+});
+
+/**
+ * A display name can name two brands honestly, because a product name can contain another brand's word:
+ * `Amazon Appstore Team` claims Amazon, and `appstore` is one of Apple's keywords. Both claims are real,
+ * so the question is not which to keep but which the message is *making* — and that used to be answered
+ * by whichever brand appeared earlier in `brands.ts`, which is a fact about the table and not about the
+ * message. Apple precedes Amazon there, so authenticated mail from a domain Amazon owns was reported as
+ * Apple impersonation at `high`, correlated with the verification wording into a `critical`, 75/100.
+ *
+ * Both halves matter. Resolving the tie by ownership has to leave the phishing version of the same name
+ * flagged, and has to make its finding name the brand a reader would say was being imitated.
+ */
+describe('a display name that names two brands', () => {
+  const genuine = loadFixture('legitimate-brand-product-name').email;
+
+  const claimsOf = (email: EmailMessage): string[] =>
+    buildContext(email).claims.map((claim) => claim.brand.label);
+
+  it('sees both brands in the name, since both are really there', () => {
+    expect(claimsOf(genuine)).toEqual(['Amazon', 'Apple']);
+  });
+
+  it('reads the message as claiming the brand that owns the sending domain', () => {
+    expect(buildContext(genuine).primaryClaim?.brand.label).toBe('Amazon');
+  });
+
+  it('raises no impersonation finding against mail from that brand own domain', () => {
+    const result = analyzeDeterministic(genuine, { now: FIXED_NOW });
+    expect(hasSignal(result, 'identity.display_name_impersonation')).toBe(false);
+    expect(hasSignal(result, 'identity.impersonation_with_credential_request')).toBe(false);
+    expect(result.categoryScores.identity).toBe(0);
+    expect(result.classification).toBe('low');
+  });
+
+  /**
+   * The same name from a domain neither brand owns. Ownership cannot break this tie, so the earliest
+   * mention does — which is what a reader does with a name, and it keeps the sentence checkable: the
+   * name says Amazon, so the finding has to say Amazon.
+   */
+  it('still flags the same name sent from an unrelated domain, and names the brand the name claims', () => {
+    const result = analyzeDeterministic(
+      { ...genuine, senderEmail: 'no-reply@appstore-amazon-developer.com', auth: undefined },
+      { now: FIXED_NOW },
+    );
+
+    const s = signalFor(result, 'identity.display_name_impersonation');
+    expect(s?.title).toContain('Amazon');
+    expect(s?.title).not.toContain('Apple');
+    expect(s?.severity).toBe('high');
+  });
+
+  /**
+   * The case the rule exists for, kept here so the ownership tiebreak cannot be widened into silence:
+   * a domain whose owner is no brand at all suppresses nothing.
+   */
+  it('still flags a name claiming a brand from a domain no brand owns', () => {
+    const result = analyzeDeterministic(
+      {
+        senderName: 'Microsoft Account Team',
+        senderEmail: 'security@notify-ms-alerts.com',
+        subject: 'Unusual sign-in activity',
+        bodyText: 'We noticed a sign-in from a new device. Review the activity on your account.',
+        links: [],
+        attachments: [],
+      },
+      { now: FIXED_NOW },
+    );
+
+    expect(signalFor(result, 'identity.display_name_impersonation')?.title).toContain('Microsoft');
   });
 });
 

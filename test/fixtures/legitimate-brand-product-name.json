@@ -1,0 +1,22 @@
+{
+  "name": "legitimate-brand-product-name",
+  "description": "False-positive resistance for a display name that honestly names two brands at once: a developer notice from a brand's own domain, whose product name happens to contain another brand's keyword — `appstore` belongs to Apple in the brand table, and Amazon has a product called Appstore. Both claims are real, and only one of them is the sender. With the table's own order as the tiebreak the wrong one won, and authenticated mail from a domain Amazon owns was read as Apple impersonation asking for credentials: 75/100, High Risk. The verification wording is kept because that is what turned a misidentified brand into a correlated critical finding rather than a merely wrong sentence.",
+  "email": {
+    "senderName": "Amazon Appstore Team",
+    "senderEmail": "developer-relations@developer.amazon.com",
+    "recipientEmail": "sam.okafor@northwind-logistics.com",
+    "subject": "Action required: confirm your developer account details",
+    "bodyText": "Hello,\n\nWe still need you to confirm the account details for your developer account before the end of the month. Accounts that have not been confirmed by then cannot publish updates until the details are in place.\n\nSign in to the developer console and open Account Settings to check the contact address and tax details we hold for you. Nothing else is needed if both are already correct.\n\nYou can reach the console from your usual bookmark, or from the link below.\n\nThe Amazon Appstore Team",
+    "links": [
+      { "text": "developer.amazon.com", "href": "https://developer.amazon.com/settings/account" }
+    ],
+    "attachments": [],
+    "auth": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass",
+      "signedBy": "amazon.com",
+      "mailedBy": "developer.amazon.com"
+    }
+  }
+}

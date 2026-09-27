@@ -190,6 +190,14 @@ mechanisms exist purely to keep legitimate mail at zero.
   reputation is genuinely being borrowed.
 - **Word-boundary brand matching.** Short brand keywords (`irs`, `aws`) must match as whole folded words,
   or "first" and "lawsuit" become brand claims once separators are stripped for comparison.
+- **Names claiming two brands.** A product name can contain another brand's word — `Amazon Appstore Team`
+  names Amazon and, through the `appstore` keyword, Apple — so the impersonation rules need to know which
+  brand the message is *presenting itself as*, not merely which brands it mentions. Among claims from
+  equally authoritative places, the brand owning the sending domain wins, and otherwise the earliest
+  mention does. Using the order of the entries in `src/shared/brands.ts` instead, as the first version did,
+  decides the question with a fact about the table rather than one about the message: Apple is written
+  before Amazon, so authenticated mail from a domain Amazon owns was read as Apple impersonation and
+  correlated with its own verification wording into High Risk.
 - **The AI dead zone.** Verdicts below 45/100, and any verdict no deterministic check corroborates, score
   zero. See [LOCAL-AI.md](LOCAL-AI.md).
 - **Trusted senders.** The user's own answer to a false positive, and the only one on this list that is
