@@ -181,8 +181,11 @@ export function hasStyledLetterforms(text: string): boolean {
   return STYLED_LETTERFORMS.test(text);
 }
 
+/** Global, so shareable: `String.replace` resets `lastIndex` before it starts. */
+const BIDI_AND_INVISIBLE_ALL = new RegExp(BIDI_AND_INVISIBLE.source, 'gu');
+
 export function stripBidiAndInvisible(text: string): string {
-  return text.replace(new RegExp(BIDI_AND_INVISIBLE, 'gu'), '');
+  return text.replace(BIDI_AND_INVISIBLE_ALL, '');
 }
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,15 @@
+{
+  "name": "soft-hyphen-executable",
+  "description": "Malware delivery: an executable whose extension is split by an invisible soft hyphen, so a filter comparing the raw extension sees `ex\u00ade` rather than `exe`.",
+  "email": {
+    "senderName": "Northwind Payroll",
+    "senderEmail": "payroll@northwind-hr-portal.xyz",
+    "recipientEmail": "sam.okafor@northwind-logistics.com",
+    "subject": "Your September payslip",
+    "bodyText": "Hello,\n\nYour payslip for September is attached. Open the attached viewer to display it.\n\nNorthwind Payroll",
+    "links": [],
+    "attachments": [
+      { "filename": "payslip_viewer.ex\u00ade" }
+    ]
+  }
+}

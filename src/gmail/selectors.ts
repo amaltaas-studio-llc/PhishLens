@@ -317,8 +317,9 @@ export function inDocumentOrder(elements: readonly Element[]): Element[] {
  */
 export function outermost(elements: readonly Element[]): Element[] {
   const kept: Element[] = [];
+  // In document order, and none kept is inside another, so only the last kept can be an ancestor.
   for (const element of inDocumentOrder(elements)) {
-    if (kept.some((ancestor) => ancestor.contains(element))) continue;
+    if (kept.at(-1)?.contains(element) === true) continue;
     kept.push(element);
   }
   return kept;

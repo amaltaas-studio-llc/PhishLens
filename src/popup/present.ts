@@ -17,6 +17,7 @@ import {
   UNREADABLE_LABEL,
 } from '../ui/labels.js';
 import { isModelServerConfigured } from '../shared/settings.js';
+import { formatList } from '../shared/text.js';
 
 /**
  * `not-gmail` and `unreachable` are the popup's own states, not the tab's: no content script answered,
@@ -53,10 +54,10 @@ const PART_NOUNS: Readonly<Record<MessagePart, string>> = {
 
 /** "who it is from", "who it is from and its text" — a list a sentence can contain. */
 function describeParts(missing: readonly MessagePart[]): string {
-  const names = missing.map((part) => PART_NAMES[part]);
-  if (names.length === 0) return 'this message';
-  if (names.length === 1) return names[0] ?? 'this message';
-  return `${names.slice(0, -1).join(', ')} and ${String(names[names.length - 1])}`;
+  return formatList(
+    missing.map((part) => PART_NAMES[part]),
+    missing.length,
+  ) || 'this message';
 }
 
 export function headline(state: PopupState): Headline {

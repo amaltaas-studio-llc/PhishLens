@@ -52,11 +52,6 @@ function displayNameImpersonation(context: AnalysisContext): SecuritySignal[] {
   // market the brand may well operate an impersonation of the one it does.
   if (brandNamingDomain(context.senderRegistrable)?.id === claim.brand.id) return [];
 
-  // A brand's own domain sending mail that mentions another brand is not impersonation
-  // (e.g. LinkedIn mail referencing Microsoft).
-  const owner = brandOwningDomain(context.senderRegistrable);
-  if (owner?.id === claim.brand.id) return [];
-
   const viaFreemail = context.senderIsFreemail;
   if (!viaFreemail && LEGAL_NOTICE_ROLE.test(context.senderNameMatch)) {
     return [legalNoticeNamingBrand(context, claim.brand)];
@@ -294,7 +289,7 @@ function replyToMismatch(context: AnalysisContext): SecuritySignal[] {
 
   // Legitimate senders route replies to a related brand domain or to an ESP. Same brand owner on
   // both sides is fine (e.g. From `@github.com`, Reply-To `@notifications.github.com`).
-  const fromOwner = brandOwningDomain(context.senderRegistrable);
+  const fromOwner = context.senderOwnedByBrand;
   const replyOwner = brandOwningDomain(context.replyToRegistrable);
   if (fromOwner !== undefined && fromOwner.id === replyOwner?.id) return [];
 
@@ -504,7 +499,7 @@ function malformedSenderDomain(context: AnalysisContext): SecuritySignal[] {
  */
 function brandInWrongPosition(context: AnalysisContext): SecuritySignal[] {
   if (context.senderRegistrable === '') return [];
-  if (brandOwningDomain(context.senderRegistrable) !== undefined) return [];
+  if (context.senderOwnedByBrand !== undefined) return [];
 
   const subdomain = context.senderDomain.slice(
     0,

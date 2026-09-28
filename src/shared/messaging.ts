@@ -5,6 +5,7 @@
  * complete, self-contained request; nothing here depends on a previous message having been handled
  * by the same worker instance.
  */
+import { DEFAULT_SETTINGS } from './settings.js';
 import type {
   Classification,
   MessagePart,
@@ -86,9 +87,19 @@ const REQUEST_TYPES: ReadonlySet<string> = new Set([
 ]);
 
 export function isExtensionRequest(value: unknown): value is ExtensionRequest {
+  return hasType(value, REQUEST_TYPES);
+}
+
+function hasType(value: unknown, types: ReadonlySet<string>): boolean {
   if (value === null || typeof value !== 'object') return false;
   const type = (value as Record<string, unknown>)['type'];
-  return typeof type === 'string' && REQUEST_TYPES.has(type);
+  return typeof type === 'string' && types.has(type);
+}
+
+/** Both channels answer `{ ok: boolean, ... }`; anything else is treated as no answer. */
+function isResponse(value: unknown): boolean {
+  if (value === null || typeof value !== 'object') return false;
+  return typeof (value as Record<string, unknown>)['ok'] === 'boolean';
 }
 
 // ---------------------------------------------------------------------------
@@ -175,9 +186,7 @@ const TAB_REQUEST_TYPES: ReadonlySet<string> = new Set([
 ]);
 
 export function isTabRequest(value: unknown): value is TabRequest {
-  if (value === null || typeof value !== 'object') return false;
-  const type = (value as Record<string, unknown>)['type'];
-  return typeof type === 'string' && TAB_REQUEST_TYPES.has(type);
+  return hasType(value, TAB_REQUEST_TYPES);
 }
 
 /**
@@ -191,9 +200,7 @@ export async function sendTabMessage(
 ): Promise<TabResponse | null> {
   try {
     const response: unknown = await chrome.tabs.sendMessage(tabId, request);
-    if (response === null || typeof response !== 'object') return null;
-    if (typeof (response as Record<string, unknown>)['ok'] !== 'boolean') return null;
-    return response as TabResponse;
+    return isResponse(response) ? (response as TabResponse) : null;
   } catch {
     return null;
   }
@@ -206,11 +213,15 @@ export async function sendTabMessage(
 export async function sendMessage(request: ExtensionRequest): Promise<ExtensionResponse | null> {
   try {
     const response: unknown = await chrome.runtime.sendMessage(request);
-    if (response === null || typeof response !== 'object') return null;
-    const ok = (response as Record<string, unknown>)['ok'];
-    if (typeof ok !== 'boolean') return null;
-    return response as ExtensionResponse;
+    return isResponse(response) ? (response as ExtensionResponse) : null;
   } catch {
     return null;
   }
+}
+
+/** Reads settings via the worker, falling back to defaults if it is mid-restart. */
+export async function requestSettings(): Promise<Settings> {
+  const response = await sendMessage({ type: 'GET_SETTINGS' });
+  if (response !== null && response.ok && response.type === 'SETTINGS') return response.settings;
+  return { ...DEFAULT_SETTINGS };
 }

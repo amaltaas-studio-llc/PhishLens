@@ -33,14 +33,7 @@ export function el<K extends keyof HTMLElementTagNameMap>(
   if (options.class !== undefined) node.className = options.class;
   if (options.text !== undefined) node.textContent = options.text;
 
-  if (options.attrs !== undefined) {
-    for (const [name, value] of Object.entries(options.attrs)) {
-      if (value === undefined || value === false) continue;
-      // `setAttribute` cannot introduce script here because no attribute name we pass is an event
-      // handler, and callers never derive attribute names from email content.
-      node.setAttribute(name, value === true ? '' : String(value));
-    }
-  }
+  if (options.attrs !== undefined) setAttrs(node, options.attrs);
 
   if (options.style !== undefined) {
     for (const [property, value] of Object.entries(options.style)) {
@@ -48,11 +41,7 @@ export function el<K extends keyof HTMLElementTagNameMap>(
     }
   }
 
-  if (options.children !== undefined) {
-    for (const child of options.children) {
-      if (child !== null && child !== undefined && child !== false) node.append(child);
-    }
-  }
+  if (options.children !== undefined) appendChildren(node, options.children);
 
   if (options.on !== undefined) {
     for (const [type, handler] of Object.entries(options.on)) {
@@ -84,27 +73,31 @@ export function svg<K extends keyof SVGElementTagNameMap>(
 ): SVGElementTagNameMap[K] {
   const node = document.createElementNS(SVG_NS, tag);
   if (options.class !== undefined) node.setAttribute('class', options.class);
-  if (options.attrs !== undefined) {
-    for (const [name, value] of Object.entries(options.attrs)) {
-      if (value === undefined || value === false) continue;
-      node.setAttribute(name, value === true ? '' : String(value));
-    }
-  }
-  if (options.children !== undefined) {
-    for (const child of options.children) {
-      if (child !== null && child !== undefined && child !== false) node.append(child);
-    }
-  }
+  if (options.attrs !== undefined) setAttrs(node, options.attrs);
+  if (options.children !== undefined) appendChildren(node, options.children);
   return node;
 }
 
-export function text(value: string): Text {
-  return document.createTextNode(value);
+function setAttrs(node: Element, attrs: Attrs): void {
+  for (const [name, value] of Object.entries(attrs)) {
+    if (value === undefined || value === false) continue;
+    // `setAttribute` cannot introduce script here because no attribute name we pass is an event
+    // handler, and callers never derive attribute names from email content.
+    node.setAttribute(name, value === true ? '' : String(value));
+  }
 }
 
-/** Removes every child of a node without touching `innerHTML`. */
-export function clear(node: Node): void {
-  while (node.firstChild !== null) node.removeChild(node.firstChild);
+function appendChildren(node: Element, children: readonly (Node | null | undefined | false)[]): void {
+  for (const child of children) {
+    if (child !== null && child !== undefined && child !== false) node.append(child);
+  }
+}
+
+/** Looks up an element the page's static markup must contain, failing loudly if the markup drifted. */
+export function requireElement<T extends HTMLElement>(id: string, ctor: new () => T): T {
+  const element = document.getElementById(id);
+  if (!(element instanceof ctor)) throw new Error(`missing #${id}`);
+  return element;
 }
 
 /**

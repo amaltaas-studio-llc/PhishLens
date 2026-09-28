@@ -158,9 +158,15 @@ export class GmailDomAdapter implements MailAdapter {
   }
 
   extract(handle: MessageHandle): Extraction {
-    const sender = attempt('sender', () => extractSender(handle.root), {});
+    // Read once: the sender, the authentication summary and the `via` line all come from this table.
+    const details = attempt('details', () => extractDetailRows(handle.root), new Map<string, string>());
+    const sender = attempt('sender', () => extractSender(handle.root, details), {});
     const body = attempt('body', () => extractBody(handle.bodyElement), { text: '' });
-    const auth = attempt<EmailAuthInfo | undefined>('auth', () => extractAuth(handle.root), undefined);
+    const auth = attempt<EmailAuthInfo | undefined>(
+      'auth',
+      () => extractAuth(handle.root, details),
+      undefined,
+    );
     const raw = attempt<RawFields>('raw', () => {
       const original = rawSubject();
       const collapsed = collapseWhitespace(original);
@@ -468,7 +474,7 @@ interface SenderFields {
   recipient?: string;
 }
 
-function extractSender(root: Element): SenderFields {
+function extractSender(root: Element, details: ReadonlyMap<string, string>): SenderFields {
   const fields: SenderFields = {};
 
   const span = queryFirst(root, SELECTORS.senderSpan);
@@ -495,7 +501,6 @@ function extractSender(root: Element): SenderFields {
     }
   }
 
-  const details = extractDetailRows(root);
   const replyTo = details.get('reply-to');
   if (replyTo !== undefined) {
     const parsed = parseMailbox(replyTo);
@@ -784,9 +789,8 @@ function readVerdict(text: string): AuthVerdict | undefined {
  * unauthenticated-sender avatar. All are frequently absent, which is why the `authentication`
  * detectors are written to stay silent rather than guess. See `rules/authentication.ts`.
  */
-function extractAuth(root: Element): EmailAuthInfo | undefined {
+function extractAuth(root: Element, rows: ReadonlyMap<string, string>): EmailAuthInfo | undefined {
   const info: EmailAuthInfo = {};
-  const rows = extractDetailRows(root);
 
   const mailedBy = rows.get('mailed-by');
   if (mailedBy !== undefined) info.mailedBy = normalizeDomain(stripToDomain(mailedBy));
@@ -812,7 +816,7 @@ function extractAuth(root: Element): EmailAuthInfo | undefined {
     if (verdict !== undefined) info[key] = verdict;
   }
 
-  const via = readVia(root);
+  const via = readVia(root, rows);
   if (via !== undefined) info.via = via;
 
   const banner = queryFirst(root, SELECTORS.warningBanner)?.textContent ?? '';
@@ -872,8 +876,8 @@ const SECURITY_VERDICT =
  * Message bodies are excluded for the same reason, and more urgently — `queryFirst` on a header selector
  * can land inside quoted content in a threaded view.
  */
-function readVia(root: Element): string | undefined {
-  const row = extractDetailRows(root).get('via');
+function readVia(root: Element, details: ReadonlyMap<string, string>): string | undefined {
+  const row = details.get('via');
   if (row !== undefined) return normalizeDomain(stripToDomain(row));
 
   const block = queryFirst(root, SELECTORS.senderHeaderBlock);

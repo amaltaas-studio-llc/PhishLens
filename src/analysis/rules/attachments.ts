@@ -54,10 +54,20 @@ const DECOY_EXTENSIONS: ReadonlySet<string> = new Set([
   'csv', 'rtf', 'html', 'htm', 'mp4', 'mp3', 'zip', 'invoice', 'receipt', 'scan', 'statement',
 ]);
 
+/** Every extension a rule below reports on, so the all-clear note cannot drift from the rules. */
+const RISKY_EXTENSION_SETS: readonly ReadonlySet<string>[] = [
+  EXECUTABLE_EXTENSIONS,
+  DISK_IMAGE_EXTENSIONS,
+  ARCHIVE_EXTENSIONS,
+  MACRO_CAPABLE_EXTENSIONS,
+  SCRIPT_CONTAINER_EXTENSIONS,
+];
+
 /** Directly executable attachments. */
 function executableAttachments(context: AnalysisContext): SecuritySignal[] {
   const hits = context.attachments.filter((a) => EXECUTABLE_EXTENSIONS.has(a.extension));
   if (hits.length === 0) return [];
+  const files = formatList(hits.map((h) => h.filename));
 
   return [
     signal({
@@ -66,8 +76,8 @@ function executableAttachments(context: AnalysisContext): SecuritySignal[] {
       severity: 'critical',
       score: 40,
       title: 'Attachment is a program rather than a document',
-      description: `The message carries ${formatList(hits.map((h) => h.filename))}. Files of this type run code when opened. Legitimate correspondence does not deliver programs by email.`,
-      evidence: { value: formatList(hits.map((h) => h.filename)) },
+      description: `The message carries ${files}. Files of this type run code when opened. Legitimate correspondence does not deliver programs by email.`,
+      evidence: { value: files },
     }),
   ];
 }
@@ -76,6 +86,7 @@ function executableAttachments(context: AnalysisContext): SecuritySignal[] {
 function diskImageAttachments(context: AnalysisContext): SecuritySignal[] {
   const hits = context.attachments.filter((a) => DISK_IMAGE_EXTENSIONS.has(a.extension));
   if (hits.length === 0) return [];
+  const files = formatList(hits.map((h) => h.filename));
 
   return [
     signal({
@@ -84,8 +95,8 @@ function diskImageAttachments(context: AnalysisContext): SecuritySignal[] {
       severity: 'high',
       score: 28,
       title: 'Attachment is a disk image',
-      description: `The message carries ${formatList(hits.map((h) => h.filename))}. Disk images mount as a drive and their contents do not inherit the operating system's "downloaded from the internet" warnings, which is why they are used to deliver executables.`,
-      evidence: { value: formatList(hits.map((h) => h.filename)) },
+      description: `The message carries ${files}. Disk images mount as a drive and their contents do not inherit the operating system's "downloaded from the internet" warnings, which is why they are used to deliver executables.`,
+      evidence: { value: files },
     }),
   ];
 }
@@ -98,6 +109,7 @@ function diskImageAttachments(context: AnalysisContext): SecuritySignal[] {
 function archiveAttachments(context: AnalysisContext): SecuritySignal[] {
   const hits = context.attachments.filter((a) => ARCHIVE_EXTENSIONS.has(a.extension));
   if (hits.length === 0) return [];
+  const files = formatList(hits.map((h) => h.filename));
 
   const passwordProtected = /\b(password|passcode|pin)\b[^.]{0,60}\b(attach|archive|zip|file|document|open)/u.test(
     context.matchText,
@@ -115,9 +127,9 @@ function archiveAttachments(context: AnalysisContext): SecuritySignal[] {
         ? 'Password-protected archive attached'
         : 'Archive attachment present',
       description: passwordProtected
-        ? `The message carries ${formatList(hits.map((h) => h.filename))} and supplies a password for it in the message text. A password stops mail-scanning systems from inspecting the contents, which is the reason to use one.`
-        : `The message carries ${formatList(hits.map((h) => h.filename))}. Archives are common and usually harmless, but their contents cannot be seen without opening them.`,
-      evidence: { value: formatList(hits.map((h) => h.filename)) },
+        ? `The message carries ${files} and supplies a password for it in the message text. A password stops mail-scanning systems from inspecting the contents, which is the reason to use one.`
+        : `The message carries ${files}. Archives are common and usually harmless, but their contents cannot be seen without opening them.`,
+      evidence: { value: files },
     }),
   ];
 }
@@ -126,6 +138,7 @@ function archiveAttachments(context: AnalysisContext): SecuritySignal[] {
 function macroCapableAttachments(context: AnalysisContext): SecuritySignal[] {
   const hits = context.attachments.filter((a) => MACRO_CAPABLE_EXTENSIONS.has(a.extension));
   if (hits.length === 0) return [];
+  const files = formatList(hits.map((h) => h.filename));
   const explicitlyMacro = hits.some((h) => h.extension.endsWith('m'));
 
   return [
@@ -138,9 +151,9 @@ function macroCapableAttachments(context: AnalysisContext): SecuritySignal[] {
         ? 'Attachment is a macro-enabled document'
         : 'Attachment uses a legacy Office format that can contain macros',
       description: explicitlyMacro
-        ? `The message carries ${formatList(hits.map((h) => h.filename))}. This format exists specifically to carry embedded code, and the code runs if macros are enabled.`
-        : `The message carries ${formatList(hits.map((h) => h.filename))}. Older Office formats can embed macros; modern equivalents (.docx, .xlsx) cannot.`,
-      evidence: { value: formatList(hits.map((h) => h.filename)) },
+        ? `The message carries ${files}. This format exists specifically to carry embedded code, and the code runs if macros are enabled.`
+        : `The message carries ${files}. Older Office formats can embed macros; modern equivalents (.docx, .xlsx) cannot.`,
+      evidence: { value: files },
     }),
   ];
 }
@@ -149,6 +162,7 @@ function macroCapableAttachments(context: AnalysisContext): SecuritySignal[] {
 function scriptContainerAttachments(context: AnalysisContext): SecuritySignal[] {
   const hits = context.attachments.filter((a) => SCRIPT_CONTAINER_EXTENSIONS.has(a.extension));
   if (hits.length === 0) return [];
+  const files = formatList(hits.map((h) => h.filename));
 
   return [
     signal({
@@ -157,8 +171,8 @@ function scriptContainerAttachments(context: AnalysisContext): SecuritySignal[] 
       severity: 'high',
       score: 26,
       title: 'Attachment is a web page rather than a document',
-      description: `The message carries ${formatList(hits.map((h) => h.filename))}. Opening it renders a page from a local file, which is used to present a convincing sign-in form without hosting it anywhere that could be blocked or taken down.`,
-      evidence: { value: formatList(hits.map((h) => h.filename)) },
+      description: `The message carries ${files}. Opening it renders a page from a local file, which is used to present a convincing sign-in form without hosting it anywhere that could be blocked or taken down.`,
+      evidence: { value: files },
     }),
   ];
 }
@@ -226,11 +240,7 @@ function benignAttachmentsNote(context: AnalysisContext): SecuritySignal[] {
   if (context.attachments.length === 0) return [];
   const risky = context.attachments.some(
     (a) =>
-      EXECUTABLE_EXTENSIONS.has(a.extension) ||
-      DISK_IMAGE_EXTENSIONS.has(a.extension) ||
-      ARCHIVE_EXTENSIONS.has(a.extension) ||
-      MACRO_CAPABLE_EXTENSIONS.has(a.extension) ||
-      SCRIPT_CONTAINER_EXTENSIONS.has(a.extension) ||
+      RISKY_EXTENSION_SETS.some((set) => set.has(a.extension)) ||
       a.hasDoubleExtension ||
       a.hasBidiTrick,
   );

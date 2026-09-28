@@ -40,9 +40,10 @@ suite happens to stay green.
 `src/ui/dom.ts`, which sets `textContent`. `innerHTML`, `outerHTML` and `insertAdjacentHTML` are ESLint
 errors project-wide. Do not add a "safe" exception; every string in a message is attacker-controlled.
 
-**Scoring numbers live in one file.** Weights, severity ceilings, thresholds, floors and tuning constants
-belong in `src/analysis/scoring/config.ts`. A number inside a detector is a bug, because the point of the
-file is that the model can be read off it in one place.
+**The scoring model lives in one file.** Category weights, severity ceilings, floors, the model's cap and
+tuning thresholds belong in `src/analysis/scoring/config.ts`, so how findings combine can be read off it
+in one place. A finding's own `score:` sits with its severity and wording in the detector, since that is
+what it is judged against; any other number in a detector is a bug.
 
 **`analysis/` is pure.** No `chrome.*`, no `document`, no `fetch`, no `Date.now()` outside an injected
 parameter. This is what lets the entire detection engine run under Vitest in plain Node, and it is the

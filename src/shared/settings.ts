@@ -19,9 +19,13 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
 
 export const STORAGE_KEY = 'phishlens.settings.v1';
 
+type BooleanSettingKey = {
+  [K in keyof Settings]: Settings[K] extends boolean ? K : never;
+}[keyof Settings];
+
 const AI_MODES: readonly AiMode[] = ['off', 'local', 'cloud', 'server'];
 
-function isAiMode(value: unknown): value is AiMode {
+export function isAiMode(value: unknown): value is AiMode {
   return typeof value === 'string' && (AI_MODES as readonly string[]).includes(value);
 }
 
@@ -34,25 +38,17 @@ function isAiMode(value: unknown): value is AiMode {
 export function normalizeSettings(raw: unknown): Settings {
   if (raw === null || typeof raw !== 'object') return { ...DEFAULT_SETTINGS };
   const source = raw as Record<string, unknown>;
+  const flag = (key: BooleanSettingKey): boolean => {
+    const value = source[key];
+    return typeof value === 'boolean' ? value : DEFAULT_SETTINGS[key];
+  };
 
   return {
     aiMode: isAiMode(source['aiMode']) ? source['aiMode'] : DEFAULT_SETTINGS.aiMode,
-    aiOnlyWhenFlagged:
-      typeof source['aiOnlyWhenFlagged'] === 'boolean'
-        ? source['aiOnlyWhenFlagged']
-        : DEFAULT_SETTINGS.aiOnlyWhenFlagged,
-    highlightEnabled:
-      typeof source['highlightEnabled'] === 'boolean'
-        ? source['highlightEnabled']
-        : DEFAULT_SETTINGS.highlightEnabled,
-    showBadgeWhenLow:
-      typeof source['showBadgeWhenLow'] === 'boolean'
-        ? source['showBadgeWhenLow']
-        : DEFAULT_SETTINGS.showBadgeWhenLow,
-    listMarksEnabled:
-      typeof source['listMarksEnabled'] === 'boolean'
-        ? source['listMarksEnabled']
-        : DEFAULT_SETTINGS.listMarksEnabled,
+    aiOnlyWhenFlagged: flag('aiOnlyWhenFlagged'),
+    highlightEnabled: flag('highlightEnabled'),
+    showBadgeWhenLow: flag('showBadgeWhenLow'),
+    listMarksEnabled: flag('listMarksEnabled'),
     backendBaseUrl: normalizeBackendUrl(source['backendBaseUrl']),
     modelBaseUrl: normalizeModelBaseUrl(source['modelBaseUrl']),
     modelName: normalizeModelName(source['modelName']),
@@ -271,9 +267,17 @@ function sameEntries(a: readonly string[], b: readonly string[]): boolean {
 
 /** True when a configured model server is off this machine, and message content crosses a network. */
 export function isModelServerRemote(settings: Settings): boolean {
-  if (settings.modelBaseUrl === '') return false;
+  return isRemoteAddress(settings.modelBaseUrl);
+}
+
+/**
+ * Whether an address, even one only half-typed, would send content off this machine. Deliberately
+ * lenient about the rest of the URL: an address that cannot be parsed is not yet worth warning about.
+ */
+export function isRemoteAddress(value: string): boolean {
+  if (value === '') return false;
   try {
-    return !isLoopbackHost(new URL(settings.modelBaseUrl).hostname);
+    return !isLoopbackHost(new URL(value).hostname);
   } catch {
     return false;
   }

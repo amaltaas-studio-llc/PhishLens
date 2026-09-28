@@ -15,6 +15,7 @@ import {
   countedFindings,
   refine,
   semanticCanScore,
+  stripContext,
   withSemanticStatus,
   type DeterministicResult,
 } from '../analysis/engine.js';
@@ -28,7 +29,7 @@ import {
 } from '../gmail/diagnostics.js';
 import { GmailObserver, type ObserverEvent } from '../gmail/observer.js';
 import { logger } from '../shared/logger.js';
-import { isTabRequest, sendMessage, type TabResponse, type TabStatus } from '../shared/messaging.js';
+import { isTabRequest, requestSettings, sendMessage, type TabResponse, type TabStatus } from '../shared/messaging.js';
 import { DEFAULT_SETTINGS, settingsImpact } from '../shared/settings.js';
 import { trustState, withTrustedSender, withoutTrustedSender } from '../shared/trust.js';
 import type {
@@ -118,7 +119,7 @@ export class Controller {
   }
 
   async start(): Promise<void> {
-    this.#settings = await loadSettings();
+    this.#settings = await requestSettings();
     logger.info('starting', { aiMode: this.#settings.aiMode, adapter: this.#adapter.id });
 
     chrome.storage.onChanged.addListener(this.#handleStorageChanged);
@@ -200,7 +201,7 @@ export class Controller {
     // is available, the score is then refined. This ordering means the user is never waiting on a
     // model for a verdict, and an unavailable model is invisible rather than a failure state.
     const deterministic = this.#runChecks(active);
-    const shown = withoutContext(deterministic);
+    const shown = stripContext(deterministic);
 
     if (aiMode === 'off') {
       this.#readings.cancelUnless(null);
@@ -225,7 +226,7 @@ export class Controller {
       return;
     }
 
-    await this.#refine(active, deterministic, token);
+    await this.#refine(active, deterministic, token, key);
   }
 
   /** The rule engine, timed. Measured here because `analysis/` is not allowed a clock. */
@@ -245,14 +246,18 @@ export class Controller {
    * the refined score is built on exactly the findings the first paint showed — the same trust list
    * included, without which the score would climb back up the moment the model answered.
    */
-  async #refine(active: ActiveView, deterministic: DeterministicResult, token: number): Promise<void> {
+  async #refine(
+    active: ActiveView,
+    deterministic: DeterministicResult,
+    token: number,
+    key: string,
+  ): Promise<void> {
     const signalIds = deterministic.signals.map((s) => s.id);
-    const key = readingKey(active.email, this.#settings.aiMode, signalIds);
     const lookup = this.#readings.lookup(key, () => resolveAnalyzer(this.#settings, signalIds));
     const timing = active.timing ?? { checksMs: 0, aiReused: false };
     const started = performance.now();
     active.timing = { ...timing, aiReused: lookup?.reused === true, aiStartedAt: started };
-    this.#applyResult(withoutContext(deterministic), token, 'pending');
+    this.#applyResult(stripContext(deterministic), token, 'pending');
 
     const settle = (): void => {
       if (token !== this.#analysisToken) return;
@@ -269,7 +274,7 @@ export class Controller {
       // It is still reported *as* a failure rather than left pending, or the card spins forever.
       logger.debug('semantic refinement failed', error);
       settle();
-      const failed = withSemanticStatus(withoutContext(deterministic), 'error');
+      const failed = withSemanticStatus(stripContext(deterministic), 'error');
       this.#applyResult(failed, token, 'error');
     }
   }
@@ -289,8 +294,9 @@ export class Controller {
 
     const token = this.#analysisToken;
     const deterministic = this.#runChecks(active);
-    this.#requestedReading = readingKey(active.email, this.#settings.aiMode, deterministic.signals.map((s) => s.id));
-    await this.#refine(active, deterministic, token);
+    const key = readingKey(active.email, this.#settings.aiMode, deterministic.signals.map((s) => s.id));
+    this.#requestedReading = key;
+    await this.#refine(active, deterministic, token, key);
   }
 
   /** Applies a result only if it belongs to the message currently in view. */
@@ -514,7 +520,7 @@ export class Controller {
 
   async #reloadSettings(): Promise<void> {
     const previous = this.#settings;
-    this.#settings = await loadSettings();
+    this.#settings = await requestSettings();
     logger.debug('settings reloaded', { aiMode: this.#settings.aiMode });
 
     const impact = settingsImpact(previous, this.#settings);
@@ -596,16 +602,4 @@ function viewOf(active: ActiveView, result: AnalysisResult, settings: Settings):
       result.classification,
     ),
   };
-}
-
-function withoutContext(result: DeterministicResult): AnalysisResult {
-  const { context: _context, ...rest } = result;
-  return rest;
-}
-
-/** Reads settings via the worker, falling back to defaults if it is mid-restart. */
-async function loadSettings(): Promise<Settings> {
-  const response = await sendMessage({ type: 'GET_SETTINGS' });
-  if (response !== null && response.ok && response.type === 'SETTINGS') return response.settings;
-  return { ...DEFAULT_SETTINGS };
 }

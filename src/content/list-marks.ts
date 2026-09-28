@@ -22,7 +22,7 @@
 import { triageSender, type TriageSeverity, type TriageVerdict } from '../analysis/triage.js';
 import type { ListPassCounts } from '../gmail/diagnostics.js';
 import { observeWithPath } from '../gmail/roots.js';
-import { OBSERVED_ATTRIBUTES, queryFirst, SELECTORS } from '../gmail/selectors.js';
+import { OBSERVED_ATTRIBUTES, queryAll, queryFirst, SELECTORS } from '../gmail/selectors.js';
 import { logger } from '../shared/logger.js';
 import { el } from '../ui/dom.js';
 
@@ -207,6 +207,9 @@ export class ListMarks {
       if (verdict === null) continue;
       if (addMark(row, verdict)) marked += 1;
     }
+    // The pass is synchronous and runs in its own task, so every record queued now is one of its own
+    // mark insertions or removals. Left in the queue, each would schedule a pass that changes nothing.
+    this.#observer?.takeRecords();
 
     /*
      * All three counts, every pass, and not just the marks.
@@ -245,15 +248,7 @@ export class ListMarks {
 }
 
 function rowsIn(root: Element): Element[] {
-  for (const selector of SELECTORS.listRow) {
-    try {
-      const found = root.querySelectorAll(selector);
-      if (found.length > 0) return [...found].slice(0, MAX_ROWS);
-    } catch {
-      // An invalid candidate is not a match, exactly as in `queryFirst`.
-    }
-  }
-  return [];
+  return queryAll(root, SELECTORS.listRow).slice(0, MAX_ROWS);
 }
 
 /**

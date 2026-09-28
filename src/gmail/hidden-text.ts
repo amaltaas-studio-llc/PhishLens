@@ -216,8 +216,9 @@ export function findHiddenSubtrees(root: Element): HiddenScan {
     if (scanned >= MAX_ELEMENTS_SCANNED) break;
     scanned += 1;
 
-    // Document order, so an ancestor is always seen before its descendants.
-    if (roots.some((found) => found.contains(element))) continue;
+    // Document order, so an ancestor is always seen before its descendants — and since no root is
+    // inside another, only the most recent one can contain this element.
+    if (roots.at(-1)?.contains(element) === true) continue;
 
     const technique =
       hidingTechnique(element.getAttribute('style') ?? '') ??

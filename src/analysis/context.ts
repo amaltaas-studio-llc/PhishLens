@@ -448,17 +448,28 @@ interface ClaimSource {
   wordStarts: ReadonlySet<number>;
   /** Folded word by word, so a short keyword can be required to be a word of its own. */
   words: readonly string[];
+  /** The same words as a set, since a short keyword is looked up once per brand. */
+  wordSet: ReadonlySet<string>;
 }
 
 function claimSource(origin: BrandClaim['source'], text: string): ClaimSource {
-  const words = text.split(/\s+/u).map((word) => skeleton(word));
+  // A body repeats its words heavily, and folding is the expensive part of reading one.
+  const folded = new Map<string, string>();
+  const words = text.split(/\s+/u).map((word) => {
+    let result = folded.get(word);
+    if (result === undefined) {
+      result = skeleton(word);
+      folded.set(word, result);
+    }
+    return result;
+  });
   const wordStarts = new Set<number>();
   let offset = 0;
   for (const word of words) {
     wordStarts.add(offset);
     offset += word.length;
   }
-  return { origin, joined: words.join(''), wordStarts, words };
+  return { origin, joined: words.join(''), wordStarts, words, wordSet: new Set(words) };
 }
 
 /** How many occurrences of one keyword to try before concluding none begins a word. */
@@ -535,6 +546,11 @@ function orderClaims(claims: BrandClaim[], senderRegistrable: string): BrandClai
   });
 }
 
+/** Each brand's keywords with their folded form, computed once rather than per message and source. */
+const FOLDED_KEYWORDS: ReadonlyMap<Brand, readonly (readonly [string, string])[]> = new Map(
+  BRANDS.map((brand) => [brand, brand.keywords.map((keyword) => [keyword, skeleton(keyword)] as const)]),
+);
+
 /**
  * The claim from the most authoritative source that names this brand.
  *
@@ -543,19 +559,19 @@ function orderClaims(claims: BrandClaim[], senderRegistrable: string): BrandClai
  * mentions receipts.
  */
 function strongestClaim(brand: Brand, sources: readonly ClaimSource[]): BrandClaim | undefined {
+  const keywords = FOLDED_KEYWORDS.get(brand) ?? [];
   for (const source of sources) {
     const standalone = standaloneName(brand, source);
     if (standalone !== undefined) {
       return { brand, source: source.origin, matchedKeyword: standalone, position: 0 };
     }
-    for (const keyword of brand.keywords) {
-      const folded = skeleton(keyword);
+    for (const [keyword, folded] of keywords) {
       if (folded.length < 3) continue;
 
       const found =
         folded.length >= MIN_UNANCHORED_KEYWORD
           ? containsKeyword(source, folded)
-          : source.words.includes(folded);
+          : source.wordSet.has(folded);
 
       if (found) {
         return {

@@ -16,31 +16,21 @@
  * permissions the README advertises.
  */
 import { logger } from '../shared/logger.js';
-import { sendMessage } from '../shared/messaging.js';
+import { requestSettings, sendMessage } from '../shared/messaging.js';
 import {
   DEFAULT_SETTINGS,
-  isLoopbackHost,
+  isAiMode,
+  isRemoteAddress,
   normalizeBackendUrl,
   normalizeModelBaseUrl,
 } from '../shared/settings.js';
 import { withoutTrustedSender } from '../shared/trust.js';
-import type { AiMode, Settings } from '../shared/types.js';
+import type { Settings } from '../shared/types.js';
+import { el, requireElement } from '../ui/dom.js';
 
 declare const __PHISHLENS_VERSION__: string;
 
 const STATUS_MS = 1600;
-
-function requireElement<T extends HTMLElement>(id: string, ctor: new () => T): T {
-  const element = document.getElementById(id);
-  if (!(element instanceof ctor)) throw new Error(`missing #${id}`);
-  return element;
-}
-
-function parseAiMode(value: string): AiMode | null {
-  return value === 'off' || value === 'local' || value === 'cloud' || value === 'server'
-    ? value
-    : null;
-}
 
 /**
  * The match pattern for a validated base URL, as narrow as Chrome allows: one scheme, one host, one
@@ -88,11 +78,7 @@ class OptionsPage {
   async init(): Promise<void> {
     this.#version.textContent = `Version ${typeof __PHISHLENS_VERSION__ === 'undefined' ? 'dev' : __PHISHLENS_VERSION__}`;
 
-    const response = await sendMessage({ type: 'GET_SETTINGS' });
-    const settings =
-      response !== null && response.ok && response.type === 'SETTINGS'
-        ? response.settings
-        : { ...DEFAULT_SETTINGS };
+    const settings = await requestSettings();
     // Access is checked before the first paint, since whether it is held is part of what the page has to
     // report: a configured address without a grant looks finished and silently fails.
     await this.#syncGrantedPattern(settings);
@@ -100,28 +86,22 @@ class OptionsPage {
 
     for (const input of this.#modeInputs) {
       input.addEventListener('change', () => {
-        if (!input.checked) return;
-        const mode = parseAiMode(input.value);
-        if (mode === null) return;
-        void this.#save({ aiMode: mode });
+        if (!input.checked || !isAiMode(input.value)) return;
+        void this.#save({ aiMode: input.value });
       });
     }
 
-    this.#aiOnlyWhenFlagged.addEventListener('change', () => {
-      void this.#save({ aiOnlyWhenFlagged: this.#aiOnlyWhenFlagged.checked });
-    });
-
-    this.#showBadgeWhenLow.addEventListener('change', () => {
-      void this.#save({ showBadgeWhenLow: this.#showBadgeWhenLow.checked });
-    });
-
-    this.#listMarksEnabled.addEventListener('change', () => {
-      void this.#save({ listMarksEnabled: this.#listMarksEnabled.checked });
-    });
-
-    this.#highlightEnabled.addEventListener('change', () => {
-      void this.#save({ highlightEnabled: this.#highlightEnabled.checked });
-    });
+    const toggles = [
+      [this.#aiOnlyWhenFlagged, 'aiOnlyWhenFlagged'],
+      [this.#showBadgeWhenLow, 'showBadgeWhenLow'],
+      [this.#listMarksEnabled, 'listMarksEnabled'],
+      [this.#highlightEnabled, 'highlightEnabled'],
+    ] as const;
+    for (const [input, key] of toggles) {
+      input.addEventListener('change', () => {
+        void this.#save({ [key]: input.checked });
+      });
+    }
 
     // Committed on blur/Enter rather than per keystroke: a partially-typed URL is not a valid one, and
     // `normalizeBackendUrl` would reject it and silently discard what was typed so far.
@@ -185,28 +165,29 @@ class OptionsPage {
   #renderTrusted(entries: readonly string[]): void {
     this.#trustedEmpty.hidden = entries.length > 0;
     this.#trusted.replaceChildren(
-      ...entries.map((entry) => {
-        const name = document.createElement('code');
-        name.textContent = entry;
-
-        const remove = document.createElement('button');
-        remove.type = 'button';
-        remove.textContent = 'Stop trusting';
-        remove.addEventListener('click', () => {
-          void this.#save({
-            trustedSenders: withoutTrustedSender(this.#current.trustedSenders, entry),
-          });
-        });
-
-        const row = document.createElement('li');
-        row.append(name, remove);
-        return row;
-      }),
+      ...entries.map((entry) =>
+        el('li', {
+          children: [
+            el('code', { text: entry }),
+            el('button', {
+              text: 'Stop trusting',
+              attrs: { type: 'button' },
+              on: {
+                click: () => {
+                  void this.#save({
+                    trustedSenders: withoutTrustedSender(this.#current.trustedSenders, entry),
+                  });
+                },
+              },
+            }),
+          ],
+        }),
+      ),
     );
   }
 
   #renderServerState(settings: Settings): void {
-    this.#serverRemoteWarning.hidden = !isOffMachine(settings.modelBaseUrl);
+    this.#serverRemoteWarning.hidden = !isRemoteAddress(settings.modelBaseUrl);
     this.#connect.disabled = settings.modelBaseUrl === '';
 
     if (settings.aiMode !== 'server') {
@@ -245,7 +226,7 @@ class OptionsPage {
     const normalized = normalizeModelBaseUrl(raw);
 
     if (raw !== '' && normalized === '') {
-      this.#serverError.textContent = isOffMachine(raw)
+      this.#serverError.textContent = isRemoteAddress(raw)
         ? 'Use https:// for a server that is not on this machine. Plain http:// is only accepted for localhost.'
         : 'Enter the full base URL including the scheme, for example http://localhost:11434/v1';
       return;
@@ -307,11 +288,7 @@ class OptionsPage {
       }
 
       this.#modelList.replaceChildren(
-        ...response.models.map((model) => {
-          const option = document.createElement('option');
-          option.value = model;
-          return option;
-        }),
+        ...response.models.map((model) => el('option', { attrs: { value: model } })),
       );
 
       if (response.models.length === 0) {
@@ -361,19 +338,6 @@ class OptionsPage {
     this.#statusTimer = setTimeout(() => {
       this.#status.dataset['visible'] = 'false';
     }, STATUS_MS);
-  }
-}
-
-/**
- * Whether an address as typed would send content off this machine. Deliberately lenient about the rest
- * of the URL: this only decides whether to show a warning, and a half-typed address that cannot be
- * parsed is not yet worth warning about.
- */
-function isOffMachine(value: string): boolean {
-  try {
-    return !isLoopbackHost(new URL(value).hostname);
-  } catch {
-    return false;
   }
 }
 

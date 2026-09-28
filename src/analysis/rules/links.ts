@@ -27,6 +27,17 @@ const CREDENTIAL_LINK_TERMS =
   /\b(sign\s?in|signon|log\s?in|logon|log-on|password|passwd|credential|authenticate|authentication|verify|verification|validate|confirm|secure\s?access|account\s?access|mfa|2fa|otp|sso|webmail|owa|unlock|reactivate|re-?activate)\b/u;
 
 /**
+ * The brand table's strings, confusable-folded once. They are constants, and folding them inside the
+ * per-link loops repeats the same work for every link × brand on a link-heavy newsletter.
+ */
+const FOLDED_BRANDS = BRANDS.map((brand) => ({
+  brand,
+  keywords: brand.keywords.map((keyword) => skeleton(keyword)),
+  domains: brand.domains.map((domain) => skeleton(domain)),
+  targetCores: brand.lookalikeTargets.map((target) => skeleton(target.split('.')[0] ?? '')),
+}));
+
+/**
  * Take only the first N of a repeated finding so one hostile message cannot flood the panel, after
  * saying how many links each finding applies to.
  *
@@ -112,7 +123,7 @@ function displayedUrlMismatch(context: AnalysisContext): SecuritySignal[] {
     );
   }
 
-  return limit(findings);
+  return findings;
 }
 
 /**
@@ -133,16 +144,10 @@ function anchorTextBrandMismatch(context: AnalysisContext): SecuritySignal[] {
     const folded = skeleton(link.anchorText);
     if (folded.length < 4) continue;
 
-    for (const brand of BRANDS) {
-      const hit = brand.keywords.find((k) => {
-        const f = skeleton(k);
-        return f.length >= 5 && folded.includes(f);
-      });
-      if (hit === undefined) continue;
+    for (const { brand, keywords } of FOLDED_BRANDS) {
+      if (!keywords.some((f) => f.length >= 5 && folded.includes(f))) continue;
       // Brand-scoped, because a domain two brands both list resolves to whichever the table names first.
       if (brandOwns(brand, link.registrable)) break;
-      // The destination is a lookalike of this brand — reported by the lookalike rule instead.
-      if (brandOwningDomain(link.registrable)?.id === brand.id) break;
       // Bulk senders rewrite every href through their own click-tracking host, so a footer that links
       // its social profiles by name — "LinkedIn", "Instagram", "YouTube" — has an anchor naming a brand
       // and a destination that is not that brand's. That is what a social footer *is*. The sender is
@@ -168,7 +173,7 @@ function anchorTextBrandMismatch(context: AnalysisContext): SecuritySignal[] {
       break;
     }
   }
-  return limit(findings);
+  return findings;
 }
 
 /**
@@ -271,20 +276,22 @@ function unicodeSpoofedLinks(context: AnalysisContext): SecuritySignal[] {
       }),
     );
   }
-  return limit(findings);
+  return findings;
 }
 
 /** A link destination that imitates a brand domain without being one. */
 function lookalikeLinkDomains(context: AnalysisContext): SecuritySignal[] {
   const findings: SecuritySignal[] = [];
-  const reported = new Set<string>();
+  // Every domain checked, not only those reported: a newsletter routes hundreds of links through one
+  // tracking host, and the answer for a domain does not change between its links.
+  const checked = new Set<string>();
 
   for (const link of context.webLinks) {
-    if (link.registrable === '' || reported.has(link.registrable)) continue;
+    if (link.registrable === '' || checked.has(link.registrable)) continue;
     if (link.isPunycode) continue; // reported by unicodeSpoofedLinks with better wording
+    checked.add(link.registrable);
     const match = findLookalike(link.registrable);
     if (match === null) continue;
-    reported.add(link.registrable);
 
     findings.push(
       signal({
@@ -298,7 +305,7 @@ function lookalikeLinkDomains(context: AnalysisContext): SecuritySignal[] {
       }),
     );
   }
-  return limit(findings);
+  return findings;
 }
 
 /**
@@ -320,7 +327,7 @@ function misleadingDomainComposition(context: AnalysisContext): SecuritySignal[]
     const foldedPrefix = skeleton(beforeRegistrable);
     const foldedTokens = beforeRegistrable.split(/[.\-_]+/u).map((token) => skeleton(token));
 
-    for (const brand of BRANDS) {
+    for (const { brand, domains, targetCores } of FOLDED_BRANDS) {
       // Match a full brand domain in the subdomain (`microsoft.com.evil.example`) or a distinctive
       // brand token (`paypal.security-login.example`). A short core has to *begin* a token, since an
       // English compound ends in one far more often than a phishing host does: `gmail` ends `bigmail`,
@@ -328,27 +335,22 @@ function misleadingDomainComposition(context: AnalysisContext): SecuritySignal[]
       // ordinary mail. What phishing hosts do is lead with the brand — `chasesecure.`, `apple7.` —
       // and that stays reported. The cost is a short brand fused after a word (`securechase.`); the
       // hyphenated form is still caught. A long core may appear anywhere (`securepaypal.example`).
-      const domainHit = brand.domains.find((d) => {
-        const f = skeleton(d);
-        return f.length >= 6 && foldedPrefix.includes(f);
-      });
+      const domainHit = domains.some((f) => f.length >= 6 && foldedPrefix.includes(f));
       const tokenHit =
-        domainHit === undefined
-          ? brand.lookalikeTargets.find((t) => {
-              const core = skeleton(t.split('.')[0] ?? '');
-              if (core.length < 5) return false;
-              return core.length >= 6
-                ? foldedPrefix.includes(core)
-                : foldedTokens.some((token) => token.startsWith(core));
-            })
-          : undefined;
+        !domainHit &&
+        targetCores.some((core) => {
+          if (core.length < 5) return false;
+          return core.length >= 6
+            ? foldedPrefix.includes(core)
+            : foldedTokens.some((token) => token.startsWith(core));
+        });
 
-      if (domainHit === undefined && tokenHit === undefined) continue;
+      if (!domainHit && !tokenHit) continue;
       // A section of the sender's own site named after a subject it covers — a news site's `apple.`
       // section — borrows nobody's reputation but its own, as a social footer on the sender's tracker
       // does in `anchorTextBrandMismatch`. It yields in the same place: a message presenting itself as
       // this brand, where a brand-named host on the sender's domain is the disguise.
-      if (domainHit === undefined && link.onSenderDomain && context.primaryClaim?.brand.id !== brand.id) break;
+      if (!domainHit && link.onSenderDomain && context.primaryClaim?.brand.id !== brand.id) break;
       reported.add(link.hostname);
 
       findings.push(
@@ -365,7 +367,7 @@ function misleadingDomainComposition(context: AnalysisContext): SecuritySignal[]
       break;
     }
   }
-  return limit(findings);
+  return findings;
 }
 
 /** URL shorteners hide the destination, so the mismatch checks above cannot run at all. */
@@ -435,7 +437,7 @@ function suspiciousRedirects(context: AnalysisContext): SecuritySignal[] {
       );
     }
   }
-  return limit(findings);
+  return findings;
 }
 
 /** Non-HTTPS destination for a page that will ask for credentials. */
@@ -464,7 +466,7 @@ function insecureCredentialLinks(context: AnalysisContext): SecuritySignal[] {
       }),
     );
   }
-  return limit(findings);
+  return findings;
 }
 
 /**
@@ -641,7 +643,7 @@ function credentialTermsOnUnrelatedDomain(context: AnalysisContext): SecuritySig
       );
     }
   }
-  return limit(findings);
+  return findings;
 }
 
 /**
@@ -706,7 +708,7 @@ function pageServedFromOpenStorage(context: AnalysisContext): SecuritySignal[] {
       }),
     );
   }
-  return limit(findings);
+  return findings;
 }
 
 /** A path whose last segment is an HTML document, i.e. a page rather than an asset or a download. */
@@ -793,6 +795,7 @@ const linkDetectors: Detect[] = [
   linkOnlyBody,
 ] as const;
 
+/** Capped here, once, so no per-link rule can flood the panel by forgetting to cap itself. */
 export function detectLinkSignals(context: AnalysisContext): SecuritySignal[] {
-  return linkDetectors.flatMap((detect) => detect(context));
+  return linkDetectors.flatMap((detect) => limit(detect(context)));
 }

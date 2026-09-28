@@ -68,7 +68,7 @@ function signingDomainMismatch(context: AnalysisContext): SecuritySignal[] {
   if (sameRegistrableDomain(signedBy, context.senderDomain)) return [];
 
   const signerRegistrable = registrableDomain(signedBy);
-  const fromOwner = brandOwningDomain(context.senderRegistrable);
+  const fromOwner = context.senderOwnedByBrand;
   const signerOwner = brandOwningDomain(signerRegistrable);
   if (fromOwner !== undefined && fromOwner.id === signerOwner?.id) return [];
 

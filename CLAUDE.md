@@ -9,8 +9,8 @@ Quick orientation, all of it expanded in `AGENTS.md`:
 
 - `npm run verify` (lint, typecheck, test, build, dist check) is the definition of done.
 - Never put message content into the DOM as HTML; use `el({ text })` from `src/ui/dom.ts`.
-- All scoring numbers belong in `src/analysis/scoring/config.ts`; all Gmail selectors in
-  `src/gmail/selectors.ts`.
+- The scoring model (weights, ceilings, floors, thresholds) belongs in `src/analysis/scoring/config.ts`,
+  a finding's own points beside its wording; all Gmail selectors in `src/gmail/selectors.ts`.
 - `src/analysis/` must stay free of browser and Chrome APIs so it runs under Vitest in Node.
 - The language model is capped at 15 of 100 points and cannot originate a score.
 - New detection behaviour needs a fixture asserted in both directions.

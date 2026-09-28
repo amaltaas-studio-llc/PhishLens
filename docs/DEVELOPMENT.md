@@ -222,7 +222,8 @@ no longer runs the next time the floor moves. Add an aggregate job with a stable
 
 - `npm run verify` must pass before a commit. It is what CI runs. It ends with a build and `check:dist`
   because a suite that never loads the extension cannot tell you that the extension no longer loads.
-- All scoring numbers live in `src/analysis/scoring/config.ts`. A magic number elsewhere is a bug.
+- The scoring model — weights, ceilings, floors, thresholds — lives in `src/analysis/scoring/config.ts`.
+  A finding's own `score:` sits beside its severity and wording; any other magic number is a bug.
 - All Gmail selectors live in `src/gmail/selectors.ts`.
 - New detection behaviour comes with a fixture and assertions in both directions — that it fires when it
   should, and that legitimate fixtures stay low.

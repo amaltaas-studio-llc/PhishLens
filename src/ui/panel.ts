@@ -17,7 +17,12 @@
  * All geometry is in `PANEL_CSS`; this file positions nothing. See docs/ARCHITECTURE.md §5.1.
  */
 import { assessmentSignals, observedSignals } from '../analysis/engine.js';
-import { distinctForDisplay, scoreFloor } from '../analysis/scoring/aggregate.js';
+import {
+  addedUp,
+  contributions,
+  distinctForDisplay,
+  scoreFloor,
+} from '../analysis/scoring/aggregate.js';
 import { ALL_CATEGORIES, CATEGORY_WEIGHTS } from '../analysis/scoring/config.js';
 import { truncate } from '../shared/text.js';
 import type {
@@ -35,10 +40,8 @@ import type { TrustState } from '../shared/trust.js';
 import { createShadowHost, el, svg } from './dom.js';
 import {
   AI_DISCLAIMER,
-  addedUp,
   aiAbsenceNote,
   assessmentExplanation,
-  contributions,
   evidenceOf,
   formatDuration,
   isLocatable,

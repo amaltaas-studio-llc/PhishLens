@@ -15,7 +15,7 @@ import type { SecuritySignal, Severity } from '../../shared/types.js';
 import { excerpt, firstMatch, formatList } from '../../shared/text.js';
 import { hasStyledLetterforms } from '../../shared/unicode.js';
 import type { AnalysisContext } from '../context.js';
-import { DETECTION_TUNING } from '../scoring/config.js';
+import { DAMPENING, DETECTION_TUNING } from '../scoring/config.js';
 import { signal } from './types.js';
 
 /**
@@ -43,6 +43,8 @@ interface ContentPattern {
    * worse than the false positive this exists to remove.
    */
   negationReverses?: boolean;
+  /** Dropped for bulk-shaped mail, because legitimate marketing routinely trips it. */
+  suppressedInBulk?: boolean;
 }
 
 /**
@@ -117,6 +119,7 @@ function isNegated(text: string, index: number): boolean {
 const CONTENT_PATTERNS: readonly ContentPattern[] = [
   {
     id: 'urgency',
+    suppressedInBulk: true,
     title: 'Message creates time pressure',
     description:
       'The wording pushes for an immediate response. Urgency is used to stop the recipient pausing to check whether the request is genuine.',
@@ -158,6 +161,7 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
   },
   {
     id: 'password_reset_pressure',
+    suppressedInBulk: true,
     title: 'Unrequested password reset or expiry notice',
     description:
       'The message announces a password change, reset, or expiry. This is a normal notification from a real provider, and also the most common pretext for a credential-harvesting page.',
@@ -292,6 +296,7 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
   },
   {
     id: 'invoice_fraud',
+    suppressedInBulk: true,
     title: 'Message presents an unexpected invoice or payment demand',
     description:
       'The message asserts an outstanding invoice, overdue balance, or pending charge. Fabricated invoices are used both to extract payment and to get an attachment opened.',
@@ -392,6 +397,7 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
   },
   {
     id: 'prize_lure',
+    suppressedInBulk: true,
     title: 'Message announces an unexpected prize or refund',
     description:
       'The message claims the recipient has won something or is owed money. An unsolicited windfall is a lure for either payment details or an advance fee.',
@@ -588,13 +594,7 @@ function themeSignals(context: AnalysisContext, themes: ThemeMatch[]): SecurityS
   const bulk = looksLikeBulkMail(context);
 
   return themes
-    .filter((theme) => {
-      // Themes that legitimate marketing mail routinely trips are dropped for bulk-shaped messages.
-      if (!bulk) return true;
-      return !['urgency', 'invoice_fraud', 'prize_lure', 'password_reset_pressure'].includes(
-        theme.pattern.id,
-      );
-    })
+    .filter((theme) => !(bulk && theme.pattern.suppressedInBulk === true))
     .map((theme) =>
       signal({
         id: `content.${theme.pattern.id}`,
@@ -612,7 +612,7 @@ function combinationSignals(themes: ThemeMatch[]): SecuritySignal[] {
   const present = new Set(themes.map((t) => t.pattern.id));
   return COMBINATIONS.filter((combo) => combo.requires.every((r) => present.has(r))).map((combo) =>
     signal({
-      id: `content.combo.${combo.id}`,
+      id: `content.${DAMPENING.combinationIdPrefix}${combo.id}`,
       category: 'content',
       severity: combo.severity,
       score: combo.score,

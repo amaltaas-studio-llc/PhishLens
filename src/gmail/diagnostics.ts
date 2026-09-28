@@ -28,6 +28,7 @@ import type {
   Severity,
   SignalCategory,
 } from '../shared/types.js';
+import { addedUp, contributions } from '../analysis/scoring/aggregate.js';
 import type { TabHealth } from '../shared/messaging.js';
 import type { MessageHandle } from './adapter.js';
 import { PAGE_SCOPED, SELECTORS } from './selectors.js';
@@ -198,10 +199,6 @@ export function summarizeScoring(
   timing: AnalysisTiming | null = null,
 ): ScoringSummary {
   const hidden = email.hiddenText;
-  const contributions = (Object.entries(result.categoryScores) as [SignalCategory, number][])
-    .filter(([, points]) => points > 0)
-    .sort((a, b) => b[1] - a[1]);
-  const added = contributions.reduce((sum, [, points]) => sum + points, 0);
   return {
     score: result.score,
     classification: result.classification,
@@ -217,8 +214,8 @@ export function summarizeScoring(
       score: signal.score,
       dampened: signal.dampened === true,
     })),
-    contributions,
-    floorPoints: Math.max(0, result.score - added),
+    contributions: contributions(result),
+    floorPoints: Math.max(0, result.score - addedUp(result)),
     timing:
       timing === null
         ? null

@@ -19,6 +19,7 @@
 import { collapseWhitespace } from '../shared/text.js';
 import type { SecuritySignal } from '../shared/types.js';
 import { normalizeDomain, parseUrl, unwrapRedirects } from '../shared/url.js';
+import { MIN_LOCATABLE_TEXT } from './format.js';
 import { HIGHLIGHT_CSS } from './styles.js';
 
 const HIGHLIGHT_CLASS = 'phishlens-highlight';
@@ -65,7 +66,7 @@ export class Highlighter {
     }
 
     const byText = signal.evidence?.text;
-    if (byText !== undefined && byText.length >= 12) {
+    if (byText !== undefined && byText.length >= MIN_LOCATABLE_TEXT) {
       const element = findSmallestElementContaining(bodyElement, byText);
       if (element !== null) {
         this.#mark(element, SUBTLE_CLASS);

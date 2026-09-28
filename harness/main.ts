@@ -12,7 +12,7 @@
  *
  * Development-only. Not bundled into the extension, and it never reaches a network or a real message.
  */
-import { analyzeDeterministic, analyze, withSemanticStatus } from '../src/analysis/engine.js';
+import { analyzeDeterministic, analyze, stripContext, withSemanticStatus } from '../src/analysis/engine.js';
 import { ListMarks } from '../src/content/list-marks.js';
 import { isScorable } from '../src/gmail/adapter.js';
 import { formatDiagnostic } from '../src/gmail/diagnostics.js';
@@ -176,8 +176,7 @@ async function resultFor(
   aiMode: AiMode,
 ): Promise<AnalysisResult> {
   if (semantic === 'ready') return analyze(email, cannedAnalyzer(email, aiMode));
-  const { context: _context, ...deterministic } = analyzeDeterministic(email);
-  return withSemanticStatus(deterministic, semantic);
+  return withSemanticStatus(stripContext(analyzeDeterministic(email)), semantic);
 }
 
 // ---------------------------------------------------------------------------

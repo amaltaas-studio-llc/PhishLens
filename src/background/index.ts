@@ -99,25 +99,17 @@ async function cloudAnalyze(request: CloudAnalyzeRequest): Promise<ExtensionResp
   }
 
   const endpoint = `${settings.backendBaseUrl}/api/analyze`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => {
-    controller.abort();
-  }, CLOUD_TIMEOUT_MS);
 
   try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-      // No cookies or cached credentials are attached: this is an anonymous call to our own API, and
-      // it must not become a way to correlate a browsing identity with mailbox content.
-      credentials: 'omit',
-      cache: 'no-store',
-      referrerPolicy: 'no-referrer',
-      // A cross-origin redirect would move the payload to an origin the user never approved.
-      redirect: 'error',
-    });
+    const response = await privateFetch(
+      endpoint,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      AbortSignal.timeout(CLOUD_TIMEOUT_MS),
+    );
 
     if (!response.ok) {
       return { ok: false, error: `analysis service returned ${String(response.status)}` };
@@ -129,9 +121,26 @@ async function cloudAnalyze(request: CloudAnalyzeRequest): Promise<ExtensionResp
   } catch (error) {
     logger.debug('cloud analysis request failed', error);
     return { ok: false, error: 'analysis service unreachable' };
-  } finally {
-    clearTimeout(timer);
   }
+}
+
+/**
+ * Every egress request goes through here, so none can be written without these options.
+ *
+ * No cookies or cached credentials are attached: these are anonymous calls, and must not become a way
+ * to correlate a browsing identity with mailbox content. A redirect would move message content to an
+ * origin the user never approved — and, for a loopback server, potentially off the machine entirely.
+ * The signal stays attached while the body is read, so the timeout covers the whole exchange.
+ */
+function privateFetch(url: string, init: RequestInit, signal: AbortSignal): Promise<Response> {
+  return fetch(url, {
+    ...init,
+    signal,
+    credentials: 'omit',
+    cache: 'no-store',
+    referrerPolicy: 'no-referrer',
+    redirect: 'error',
+  });
 }
 
 /**
@@ -186,32 +195,26 @@ async function postCompletion(
   messages: readonly { role: string; content: string }[],
   extras: Record<string, unknown>,
 ): Promise<{ response: ExtensionResponse; retryable: boolean }> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => {
-    controller.abort();
-  }, MODEL_SERVER_TIMEOUT_MS);
+  const signal = AbortSignal.timeout(MODEL_SERVER_TIMEOUT_MS);
 
   try {
-    const response = await fetch(`${settings.modelBaseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify({
-        model: settings.modelName,
-        messages,
-        // Deterministic: the same message should not score differently on a second reading.
-        temperature: 0,
-        max_tokens: MAX_TOKENS,
-        stream: false,
-        ...extras,
-      }),
-      signal: controller.signal,
-      credentials: 'omit',
-      cache: 'no-store',
-      referrerPolicy: 'no-referrer',
-      // A redirect would move message content to an origin the user never approved — and, for a
-      // loopback server, potentially off the machine entirely.
-      redirect: 'error',
-    });
+    const response = await privateFetch(
+      `${settings.modelBaseUrl}/chat/completions`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({
+          model: settings.modelName,
+          messages,
+          // Deterministic: the same message should not score differently on a second reading.
+          temperature: 0,
+          max_tokens: MAX_TOKENS,
+          stream: false,
+          ...extras,
+        }),
+      },
+      signal,
+    );
 
     if (!response.ok) {
       return {
@@ -239,12 +242,10 @@ async function postCompletion(
     return {
       response: {
         ok: false,
-        error: controller.signal.aborted ? 'model server timed out' : 'model server unreachable',
+        error: signal.aborted ? 'model server timed out' : 'model server unreachable',
       },
       retryable: false,
     };
-  } finally {
-    clearTimeout(timer);
   }
 }
 
@@ -257,20 +258,12 @@ async function listModels(): Promise<ExtensionResponse> {
   const settings = await readSettings();
   if (settings.modelBaseUrl === '') return { ok: false, error: 'no model server URL is set' };
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => {
-    controller.abort();
-  }, MODEL_LIST_TIMEOUT_MS);
-
   try {
-    const response = await fetch(`${settings.modelBaseUrl}/models`, {
-      headers: { accept: 'application/json' },
-      signal: controller.signal,
-      credentials: 'omit',
-      cache: 'no-store',
-      referrerPolicy: 'no-referrer',
-      redirect: 'error',
-    });
+    const response = await privateFetch(
+      `${settings.modelBaseUrl}/models`,
+      { headers: { accept: 'application/json' } },
+      AbortSignal.timeout(MODEL_LIST_TIMEOUT_MS),
+    );
     if (!response.ok) return { ok: false, error: describeHttpFailure(response.status) };
 
     const body: unknown = await response.json();
@@ -289,8 +282,6 @@ async function listModels(): Promise<ExtensionResponse> {
       error:
         'could not reach the model server: it may not be running, the address may be wrong, or it may be refusing requests from browser extensions (for Ollama, OLLAMA_ORIGINS must include chrome-extension://*)',
     };
-  } finally {
-    clearTimeout(timer);
   }
 }
 

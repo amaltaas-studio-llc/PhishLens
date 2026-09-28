@@ -11,6 +11,7 @@
  *   3. sum the capped subtotals and clamp to `[0, 100]`
  */
 import type {
+  AnalysisResult,
   Classification,
   SecuritySignal,
   Severity,
@@ -115,6 +116,23 @@ export function scoreSignals(
   config: ScoringConfig = DEFAULT_SCORING_CONFIG,
 ): TotalScore {
   return computeTotalScore(groupByCategory(signals), config.categoryWeights, config.severityCeilings);
+}
+
+/**
+ * Categories that added to the score, largest first — the order the card's ring and breakdown share,
+ * and the one the diagnostic report prints, so the two can never disagree.
+ */
+export function contributions(
+  result: Pick<AnalysisResult, 'categoryScores'>,
+): [SignalCategory, number][] {
+  return (Object.entries(result.categoryScores) as [SignalCategory, number][])
+    .filter(([, value]) => value > 0)
+    .sort((a, b) => b[1] - a[1]);
+}
+
+/** What the categories sum to, which is below the score only when a floor applied. */
+export function addedUp(result: Pick<AnalysisResult, 'categoryScores'>): number {
+  return contributions(result).reduce((sum, [, value]) => sum + value, 0);
 }
 
 export interface ScoreFloor {

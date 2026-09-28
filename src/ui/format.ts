@@ -6,7 +6,7 @@
  * a model's guess never looks like a proven fact.
  */
 import { REASONING_PREFIX } from '../analysis/llm/semantic-signals.js';
-import { scoreFloor } from '../analysis/scoring/aggregate.js';
+import { addedUp, contributions, scoreFloor } from '../analysis/scoring/aggregate.js';
 import type {
   AiMode,
   AnalysisResult,
@@ -18,6 +18,7 @@ import type {
   SemanticStatus,
   SignalCategory,
 } from '../shared/types.js';
+import { formatList } from '../shared/text.js';
 import { normalizeDomain } from '../shared/url.js';
 import { CATEGORY_LABELS, CLASSIFICATION_LABELS } from './labels.js';
 
@@ -102,12 +103,18 @@ export function messageReference(email: EmailMessage): { sender: string; subject
   };
 }
 
+/**
+ * Text evidence shorter than this is too likely to match somewhere it was not meant to. Shared with the
+ * highlighter, since a finding offered as locatable that the highlighter then declines points at nothing.
+ */
+export const MIN_LOCATABLE_TEXT = 12;
+
 /** A signal is locatable when the UI can point at the thing in the message it refers to. */
 export function isLocatable(signal: SecuritySignal): boolean {
   if (signal.category === 'llm') return false;
   return (
     (signal.evidence?.url !== undefined && signal.evidence.url !== '') ||
-    (signal.evidence?.text !== undefined && signal.evidence.text.length >= 12)
+    (signal.evidence?.text !== undefined && signal.evidence.text.length >= MIN_LOCATABLE_TEXT)
   );
 }
 
@@ -146,21 +153,12 @@ export function evidenceOf(signal: SecuritySignal): Evidence | null {
 // The score, summarised
 // ---------------------------------------------------------------------------
 
-/** Categories that added to the score, largest first — the order the ring and the breakdown share. */
-export function contributions(
-  result: Pick<AnalysisResult, 'categoryScores'>,
-): [SignalCategory, number][] {
-  return (Object.entries(result.categoryScores) as [SignalCategory, number][])
-    .filter(([, value]) => value > 0)
-    .sort((a, b) => b[1] - a[1]);
-}
-
 /** "Links", "Links and Sender", "Links, Sender and Wording". */
 export function joinCategories(categories: readonly SignalCategory[]): string {
-  const names = categories.map((c) => CATEGORY_LABELS[c]);
-  const last = names.pop();
-  if (last === undefined) return '';
-  return names.length === 0 ? last : `${names.join(', ')} and ${last}`;
+  return formatList(
+    categories.map((c) => CATEGORY_LABELS[c]),
+    categories.length,
+  );
 }
 
 /**
@@ -185,11 +183,6 @@ export function scoreSummary(
   const leading = parts.slice(0, 2).map(([category]) => category);
   if (parts.length === 1) return `All from ${joinCategories(leading)}.`;
   return `Mostly from ${joinCategories(leading)}.`;
-}
-
-/** What the categories sum to, which is below the score only when a floor applied. */
-export function addedUp(result: Pick<AnalysisResult, 'categoryScores'>): number {
-  return contributions(result).reduce((sum, [, value]) => sum + value, 0);
 }
 
 // ---------------------------------------------------------------------------

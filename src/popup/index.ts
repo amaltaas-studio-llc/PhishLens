@@ -12,10 +12,9 @@
  * Wording lives in `present.ts`, which is pure and tested. This file is the wiring.
  */
 import { logger } from '../shared/logger.js';
-import { sendMessage, sendTabMessage, type TabHealth } from '../shared/messaging.js';
-import { DEFAULT_SETTINGS } from '../shared/settings.js';
+import { requestSettings, sendMessage, sendTabMessage, type TabHealth } from '../shared/messaging.js';
 import type { Settings } from '../shared/types.js';
-import { el } from '../ui/dom.js';
+import { el, requireElement } from '../ui/dom.js';
 import {
   aiRow,
   cardButtonLabel,
@@ -30,12 +29,6 @@ declare const __PHISHLENS_VERSION__: string;
 
 /** The one site the content script runs on, and so the only tab that can have an answer. */
 const GMAIL_ORIGIN = 'https://mail.google.com/';
-
-function requireElement<T extends HTMLElement>(id: string, ctor: new () => T): T {
-  const element = document.getElementById(id);
-  if (!(element instanceof ctor)) throw new Error(`missing #${id}`);
-  return element;
-}
 
 /**
  * The active tab's id, if it is a Gmail tab.
@@ -119,7 +112,7 @@ class Popup {
       void this.#copyReport();
     });
 
-    const [settings, tab] = await Promise.all([readSettings(), this.#readState()]);
+    const [settings, tab] = await Promise.all([requestSettings(), this.#readState()]);
     this.#render(settings, tab.state, tab.health);
   }
 
@@ -268,12 +261,6 @@ class Popup {
     // tell the tab and nothing to re-render here beyond the checkbox the user just clicked.
     logger.debug('settings saved from the popup');
   }
-}
-
-async function readSettings(): Promise<Settings> {
-  const response = await sendMessage({ type: 'GET_SETTINGS' });
-  if (response !== null && response.ok && response.type === 'SETTINGS') return response.settings;
-  return { ...DEFAULT_SETTINGS };
 }
 
 void new Popup().init();

@@ -4,6 +4,7 @@
  * All body text is truncated before any regex touches it: an attacker controls both the pattern
  * subject and its length, and unbounded input is the precondition for pathological matching.
  */
+import { stripBidiAndInvisible } from './unicode.js';
 
 /** Hard ceiling on how much body text the engine will ever consider. */
 export const MAX_BODY_CHARS = 200_000;
@@ -141,9 +142,13 @@ export function fileExtensionChain(filename: string): string[] {
     .filter((p) => /^[a-z0-9]{1,8}$/u.test(p));
 }
 
-/** Drops direction-override characters and trailing dots/spaces, both used to disguise extensions. */
+/**
+ * Drops invisible characters and trailing dots/spaces, both used to disguise extensions. The same set
+ * `hasBidiOrInvisible` detects: a character it reports but this keeps would split `.exe` past the
+ * executable check while the direction-override finding quoted the split extension as the real one.
+ */
 function stripFilenameNoise(filename: string): string {
-  return filename.replace(/[\u200b-\u200f\u202a-\u202e\u2066-\u2069]/gu, '').replace(/[.\s]+$/u, '');
+  return stripBidiAndInvisible(filename).replace(/[.\s]+$/u, '');
 }
 
 /** Finds the first match and returns it with its index, or `null`. */

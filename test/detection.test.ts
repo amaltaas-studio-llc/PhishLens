@@ -21,6 +21,7 @@ import {
 import { distinctForDisplay, scoreFloor, severityFloor } from '../src/analysis/scoring/aggregate.js';
 import { triageSender } from '../src/analysis/triage.js';
 import { BRANDS, brandOwningDomain } from '../src/shared/brands.js';
+import { fileExtension, fileExtensionChain } from '../src/shared/text.js';
 import { hasUnknownTld } from '../src/shared/url.js';
 import type {
   AnalysisResult,
@@ -881,6 +882,21 @@ describe('executable attachments', () => {
 
   it('does not emit the "nothing suspicious" note', () => {
     expect(hasSignal(result, 'attachment.none_suspicious')).toBe(false);
+  });
+});
+
+describe('an extension split by an invisible character', () => {
+  it('reads it as the extension it displays as', () => {
+    const result = analyzeFixture('soft-hyphen-executable');
+    expect(hasSignal(result, 'attachment.executable')).toBe(true);
+    expect(signalFor(result, 'attachment.filename_direction_override')?.description).toContain(
+      'Its actual type is .exe.',
+    );
+  });
+
+  it('does not turn a document into a program', () => {
+    expect(fileExtension('annual\u00ad_report.pdf')).toBe('pdf');
+    expect(fileExtensionChain('annual_report\u00ad.pdf')).toEqual(['pdf']);
   });
 });
 

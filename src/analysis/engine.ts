@@ -26,8 +26,7 @@ import { runRuleEngine } from './rules/index.js';
 import {
   applyFloor,
   classify,
-  groupByCategory,
-  computeTotalScore,
+  scoreSignals,
   sortSignalsForDisplay,
 } from './scoring/aggregate.js';
 import { DEFAULT_SCORING_CONFIG, type ScoringConfig } from './scoring/config.js';
@@ -192,11 +191,7 @@ function buildResult(
   now: number,
   semanticSource: SemanticSource,
 ): AnalysisResult {
-  const { total, byCategory } = computeTotalScore(
-    groupByCategory(signals),
-    config.categoryWeights,
-    config.severityCeilings,
-  );
+  const { total, byCategory } = scoreSignals(signals, config);
   // A conclusive deterministic finding establishes a minimum, so a single-dimension attack is not
   // diluted by the categories it happens not to touch. See scoring/config.ts `SCORE_FLOORS`.
   const score = applyFloor(total, signals);
@@ -214,7 +209,8 @@ function buildResult(
   };
 }
 
-function stripContext(result: DeterministicResult): AnalysisResult {
+/** Drops the analysis context, which exists for the semantic stage and is never rendered or cached. */
+export function stripContext(result: DeterministicResult): AnalysisResult {
   const { context: _context, ...rest } = result;
   return rest;
 }
