@@ -82,9 +82,8 @@ describe('settingsImpact', () => {
   });
 
   /**
-   * A skipped reading is cached as settled, so switching the gate off must drop it — otherwise every
-   * message already opened keeps saying the model was not asked, under a setting that says it always is.
-   * It is not a new judge, though: the readings the model has already made are still its readings.
+   * The view on screen must be re-gated, or it keeps saying the model was not asked under a setting that
+   * says it always is. It is not a new judge, though: the model's finished readings are still its own.
    */
   it('re-scores, without discarding the model, when the gate on asking it changes', () => {
     expect(changed({ aiOnlyWhenFlagged: false })).toMatchObject({ rescore: true, remodel: false });

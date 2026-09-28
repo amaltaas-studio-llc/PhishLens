@@ -128,7 +128,7 @@ UI change is one command away from being reflected in the README instead of sile
 
 ## Testing
 
-1310 tests, all in plain Node — no Chrome, no Gmail, no network. Five files ask for a DOM and get it from
+1325 tests, all in plain Node — no Chrome, no Gmail, no network. Five files ask for a DOM and get it from
 `jsdom`, which is why that is the only dev dependency here that is not a build or lint tool; see the note
 below the table.
 
@@ -136,7 +136,7 @@ below the table.
 | --- | --- |
 | `test/aggregate.test.ts` | The scoring functions in isolation: per-severity ceilings, category caps, `[0, 100]` clamping, and zero contribution from an empty category, which is the "no local model" path. |
 | `test/detection.test.ts` | The full pipeline against 28 fixtures, invariants across all of them, and which message in a thread gets picked — including the forged-from-yourself cases that must *not* be skipped. |
-| `test/semantic.test.ts` | The containment guarantees, the calibration limits, and the unavailable / throwing / hanging / cancelled analyzer paths — including which status each reports and which may be cached. |
+| `test/semantic.test.ts` | The containment guarantees, the calibration limits, and the unavailable / throwing / hanging / cancelled analyzer paths — including which status each reports. |
 | `test/chrome-prompt.test.ts` | The on-device adapter against fakes for every API shape Chrome has shipped and every malformed shape it might, plus concurrency: a session fake that rejects overlapping prompts the way the real one does. |
 | `test/url.test.ts` | Obfuscated IP forms, forged suffix boundaries, redirect chains, hostnames `new URL()` accepts but that cannot exist. |
 | `test/unicode.test.ts` | Punycode decoding, script mixing, bidi tricks, confusable folding, bounded edit distance. |
@@ -152,7 +152,8 @@ below the table.
 | `test/observer-dom.test.ts` | The observer and adapter over a real `MutationObserver`: in-place collapse and evidence changes, visibility before the first readable extraction, nested message IDs, heading-only navigation, and debounce-first reconciliation. Needs a DOM. |
 | `test/list-marks.test.ts` | The list marker against inbox-shaped rows: that ordinary mail is left alone, that a recycled row is re-evaluated rather than trusted, that rows already on screen are re-triaged once Gmail exposes the signed-in address — which arrives after they do, and without which the check for a domain imitating the reader's own cannot run — that a mark Gmail discards when it redraws a row as read comes back, and that marking survives Gmail replacing the region being watched. Needs a DOM. |
 | `test/settings.test.ts` | What each setting asks of a view already on screen, with a guard that fails until a newly added setting is classified — "changes nothing" being the one answer that cannot be right for something offered as a choice. |
-| `test/controller.test.ts` | The orchestration's timing, with the model's answer held as a promise this file resolves by hand: that a settings change abandons the inference it supersedes, that the superseded answer reaches neither the screen nor the cache, that a presentation-only change leaves the inference running, and that a header Gmail redraws gets its badge back from the cache rather than from the model. Also that a redraw joins or reuses a reading rather than asking twice, that clean mail is not sent to the model by default while flagged mail is, and that a reading asked for from the card is kept. Needs a DOM. |
+| `test/readings.test.ts` | Availability waits and late answers cannot survive cancellation or a model change into the reading cache. |
+| `test/controller.test.ts` | The orchestration's timing, with the model's answer held as a promise this file resolves by hand: that a settings change abandons the inference it supersedes, that the superseded answer reaches neither the screen nor the cache, that a presentation-only change leaves the inference running, and that a header Gmail redraws gets its badge back without another inference. Also that a redraw joins or reuses a reading rather than asking twice, that clean mail is not sent to the model by default while flagged mail is, and that a reading asked for from the card is kept. Needs a DOM. |
 | `test/card.test.ts` | The rendered card: message text set as text even when it looks like markup, findings and the model's reading in separate sections, every ring segment named by a row beside it, the floor shown when a severe finding raised the score, and a skipped reading never worded as an all-clear. Also the card's wording helpers — durations, timing lines, quoted excerpts, score summaries. Needs a DOM. |
 
 **What the DOM tests prove, and what they cannot.** They prove the adapter's logic — that a details table

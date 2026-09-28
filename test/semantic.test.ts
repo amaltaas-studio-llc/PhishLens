@@ -15,7 +15,6 @@ import { describe, expect, it } from 'vitest';
 import {
   analyze,
   analyzeDeterministic,
-  isSemanticSettled,
   refine,
   semanticCanScore,
 } from '../src/analysis/engine.js';
@@ -171,9 +170,8 @@ describe('semantic layer: unavailable', () => {
      *
      * This was a real bug with a confusing symptom: opening a message and leaving before the model
      * answered cancelled the attempt, the engine reported it as "the model returned no usable
-     * assessment", and the controller cached that. Every later visit to that message was then served
-     * from the cache, so the card claimed the model had declined to assess it and nothing retried —
-     * until Gmail was reloaded, which emptied the cache and made it work again.
+     * assessment", and that non-answer stuck: the card claimed the model had declined to assess the
+     * message, and nothing retried it until Gmail was reloaded.
      */
     it.each([
       ['an attempt that resolves to nothing after being cancelled', cancelledSilently],
@@ -191,29 +189,6 @@ describe('semantic layer: unavailable', () => {
     it('reports an unasked-for silence as no-output when nothing was cancelled', async () => {
       const result = await analyze(PHISH, cancelledSilently, { now: 0 });
       expect(result.meta.semanticStatus).toBe('no-output');
-    });
-  });
-
-  /**
-   * Which outcomes may be cached, which is what decides whether a transient condition becomes permanent
-   * for the life of the tab.
-   */
-  describe('deciding what is worth keeping', () => {
-    it.each([
-      ['ready', true],
-      ['off', true],
-      ['skipped', true],
-      ['cancelled', false],
-      ['error', false],
-      ['no-output', false],
-      ['unavailable', false],
-      ['pending', false],
-    ] as const)('%s → settled: %s', (status, expected) => {
-      expect(isSemanticSettled(status)).toBe(expected);
-    });
-
-    it('does not treat a result with no semantic stage at all as settled', () => {
-      expect(isSemanticSettled(undefined)).toBe(false);
     });
   });
 

@@ -62,6 +62,7 @@ const UNVERIFIABLE_FIXTURES = ['legitimate-brand-country-domain'];
 const HONEST_FIXTURES = [...LEGITIMATE_FIXTURES, ...UNVERIFIABLE_FIXTURES];
 
 const MALICIOUS_FIXTURES = [
+  'sender-host-brand-domain',
   'paypal-phish',
   'microsoft-phish',
   'bec-gift-card',
@@ -738,6 +739,12 @@ describe('link rules against the harmless links that share their shape', () => {
         { now: FIXED_NOW },
       );
       expect(hasSignal(result, 'link.misleading_domain')).toBe(true);
+    });
+
+    it("still reports a whole brand domain embedded in the sender's own", () => {
+      const result = analyzeFixture('sender-host-brand-domain');
+      expect(ids(result)).toContain('link.misleading_domain.0');
+      expect(result.classification).toBe('high-risk');
     });
   });
 

@@ -133,9 +133,8 @@ background service worker holds no analysis state at all.**
   `src/background/`, and this is asserted by a unit test over the module's source shape.
 - **No use of `chrome.storage.session`** for analysis state. Analysis results are deliberately *not*
   persisted anywhere (see §7 — privacy). Re-analysis of a re-opened thread is cheap (single-digit
-  ms for the rule engine), so there is nothing worth caching to disk. The only in-memory cache is a
-  small per-tab `Map<viewSignature, AnalysisResult>` in the content script, bounded to 20 entries
-  and destroyed on tab close.
+  ms for the rule engine). Only model readings are cached: up to 50 prompt-keyed answers per tab.
+  Each view recomputes its checks and combines them with the reading, so late evidence always counts.
 
 ### 2.2 One session, one prompt at a time
 
@@ -167,31 +166,13 @@ Three mechanisms, each addressing a different part of it:
 
 #### 2.2.1 A cancelled attempt is not an answer
 
-Cancellation introduces a distinction the pipeline has to preserve: *a conclusion* versus *a moment*. An
-abort resolves the analyzer to `null`, which is indistinguishable from the model declining to answer
-unless something records why. Two rules keep them apart:
+Only successful model answers are retained. Unavailable, cancelled, failed and empty attempts can
+be retried on a later view. Skipped and off statuses are recomputed from current settings and evidence.
 
-- `cancelled` is its own `SemanticStatus`, set whenever the signal is aborted, whether the adapter
-  reported it by resolving to nothing or by rejecting.
-- `isSemanticSettled()` gates what may be cached: only `ready` (the model answered), `off` (it was
-  deliberately not asked) and `skipped` (below). `cancelled`, `error`, `no-output` and `unavailable` are
-  not kept.
-
-The second rule matters because the cache short-circuits before the semantic stage runs, so a cached
-non-answer can never be retried and would stand for the life of the tab. With it, a one-off timeout does
-not mark a message permanently unassessable, and a message read while Chrome was still downloading the
-model is re-assessed once the model is there. The cost is a re-run of the rule engine (single-digit
-milliseconds) and one more inference attempt per visit.
-
-**A cache write is fenced by the generation it belongs to**, for the same reason and one step further out.
-Changing which model is asked, or the trust list, invalidates every cached verdict — and an inference
-already in flight belongs to the settings that have just been replaced. Clearing the cache does not reach
-it: the answer arrives a moment later, writes itself into the cache that was just emptied, and the
-re-evaluation the settings change asked for reads it straight back as a hit, so the reader who changed the
-setting watches the previous model's verdict reappear with nothing short of a reload able to shift it. The
-work is therefore abandoned and its generation invalidated before the clear, and the token is checked where
-a result is *cached* as well as where it is shown — an entry outlives the moment it was written, which is
-exactly what makes it worth more care than a repaint.
+`Readings` owns inference cancellation and cache writes. A generation captured at lookup creation is
+checked after availability, before inference and before storing an answer. This includes work that has
+not yet started inference when navigation, teardown or a model change invalidates it. The controller
+separately checks its view token before painting; advisory cancellation alone cannot prevent stale paints.
 
 #### 2.2.2 Not asking, and not asking twice
 
@@ -202,15 +183,15 @@ seconds and a noticeable share of the machine. Two rules remove most of it witho
 (`uncorroboratedFactor`), so on mail where no deterministic signal corroborates, the answer the reader
 waits for cannot change the number. With `aiOnlyWhenFlagged` on — the default — the controller runs the
 checks, and when `semanticCanScore()` says no reading could count it records `skipped` instead of asking.
-That is a *settled* status, since asking again on the next visit would find the same nothing, and the card
-says what it means: not asked, the reason, *not a judgement that the message is safe*, and a button that
-asks now. The gate and the scoring rule are one predicate (`isCorroborated`), and a test asserts across
+The gate is re-evaluated on every view, so evidence that arrives late can open it, and the card says what
+`skipped` means: not asked, the reason, *not a judgement that the message is safe*, and a button that
+asks now. That request holds for as long as the prompt is unchanged, and a reading already finished for
+the prompt is replayed rather than hidden behind the gate. The gate and the scoring rule are one predicate (`isCorroborated`), and a test asserts across
 every fixture that the gate never skips a message on which a reading could have scored — if the scoring
 rule moves, the gate moves with it rather than silently discarding points.
 
 **A reading is keyed by what the model was shown.** Gmail redraws a message when its authentication
-summary or attachment chips arrive late, which changes the view signature the result cache is keyed by and
-used to cost a whole second inference of an identical prompt. `content/readings.ts` keys readings by the
+summary or attachment chips arrive late. `content/readings.ts` keys readings by the
 prompt text itself (plus the signal ids, for the one source that is sent them): a redraw joins the
 inference in flight or replays the settled one, while a message whose visible text changed is asked
 afresh. It lives in the content script for the reason in §2.1, holds at most 50 entries, and is emptied
@@ -220,8 +201,7 @@ in-flight work explicitly when the reader has really left.
 
 The deterministic pass runs once per view either way: `refine()` takes the checks already computed for
 the badge rather than recomputing them under `analyze()`, and a test asserts the two paths produce the
-same result on every fixture. What each view cost — checks, reading, reused, or replayed from the result
-cache — is measured in the controller, not the engine, so `analysis/` stays free of clocks.
+same result on every fixture. What each view cost — checks, and a reading either run or reused — is measured in the controller, not the engine, so `analysis/` stays free of clocks.
 
 ---
 
@@ -281,7 +261,7 @@ every repaint into a re-analysis.
   identical, so suppressing it as redundant left the message on screen with no badge and nothing to say one
   was ever due — indistinguishable, on a `showBadgeWhenLow: false` install, from a clean message. The
   elements from the last emit are compared by reference, and a replacement re-emits; the verdict then comes
-  back from the cache, because a redraw is not new evidence.
+  from fresh checks and a reused model reading, without another inference.
 - The same observer watches the child lists of the container's **ancestors**, because a `MutationObserver`
   holds the node it was given. Gmail replaces the conversation container on some in-place actions, and the
   observer is then attached to an element outside the document, reporting nothing again for the lifetime of
@@ -801,6 +781,8 @@ into markup**; a hand-written `el()` helper in `src/ui/dom.ts` that only ever as
 makes "attacker-controlled email content is never parsed as HTML" a structural property of the code
 rather than a code-review rule. `src/ui/` contains zero uses of `innerHTML`,
 `insertAdjacentHTML`, or `outerHTML`, and a unit test greps the built bundles to keep it that way.
+Styles are CSS strings in `ui/styles.ts`; the production build minifies them with esbuild's CSS parser,
+so no stylesheet file and no runtime parser ship.
 
 Isolation: badge and panel live inside `attachShadow({ mode: 'open' })`, so Gmail's CSS cannot
 distort them and our CSS cannot distort Gmail. The only mutations to Gmail's own DOM are

@@ -35,7 +35,7 @@ import { loadFixture } from './fixtures/load.js';
 const PHISH = loadFixture('microsoft-phish').email;
 const LEGITIMATE = loadFixture('legitimate').email;
 
-const TIMING: AnalysisTiming = { checksMs: 12, aiMs: 4800, aiReused: false, cached: false };
+const TIMING: AnalysisTiming = { checksMs: 12, aiMs: 4800, aiReused: false };
 
 function reading(over: Partial<SemanticAnalysis> = {}): SemanticAnalysis {
   return {
@@ -171,11 +171,10 @@ describe('card wording', () => {
 
   it('describes each way a view can have been timed', () => {
     expect(timingLine(null, 'ready', 'local')).toBeNull();
-    expect(timingLine({ ...TIMING, cached: true }, 'ready', 'local')).toMatch(/earlier in this session/u);
-    expect(timingLine({ checksMs: 3, aiReused: false, cached: false }, 'skipped', 'local')).toBe(
+    expect(timingLine({ checksMs: 3, aiReused: false }, 'skipped', 'local')).toBe(
       'Checks 3 ms · AI not asked',
     );
-    expect(timingLine({ checksMs: 3, aiReused: false, cached: false }, 'off', 'off')).toBe(
+    expect(timingLine({ checksMs: 3, aiReused: false }, 'off', 'off')).toBe(
       'Checks 3 ms · AI off',
     );
     expect(timingLine({ ...TIMING, aiReused: true }, 'ready', 'local')).toBe(

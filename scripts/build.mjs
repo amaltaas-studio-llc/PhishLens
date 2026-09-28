@@ -21,9 +21,28 @@ const cleanOnly = args.has('--clean-only');
 
 const pkg = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
 
+/** CSS inside JS strings needs its own minifier; JavaScript minification preserves those bytes. */
+const inlineCss = {
+  name: 'inline-css',
+  setup(build) {
+    build.onLoad({ filter: /[/\\]ui[/\\]styles\.ts$/ }, async ({ path: filename }) => {
+      const source = await readFile(filename, 'utf8');
+      const module = await esbuild.transform(source, { loader: 'ts' });
+      const styles = await import(`data:text/javascript;base64,${Buffer.from(module.code).toString('base64')}`);
+      const declarations = await Promise.all(Object.entries(styles).map(async ([name, css]) => {
+        if (typeof css !== 'string') throw new Error('Inline CSS exports must be strings');
+        const result = await esbuild.transform(css, { loader: 'css', minify: true, target: 'chrome120' });
+        return `export const ${name} = ${JSON.stringify(result.code)};`;
+      }));
+      return { contents: declarations.join('\n'), loader: 'ts' };
+    });
+  },
+};
+
 /** @type {esbuild.BuildOptions} */
 const common = {
   bundle: true,
+  plugins: dev ? [] : [inlineCss],
   target: ['chrome120'],
   platform: 'browser',
   sourcemap: dev ? 'inline' : false,

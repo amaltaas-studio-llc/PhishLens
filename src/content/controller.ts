@@ -4,7 +4,7 @@
  * This is where the MV3 statefulness decision lands (docs/ARCHITECTURE.md §2). Everything stateful
  * lives here, in the content script, because this context lives as long as the Gmail tab:
  *   - the on-device model session (via `localAnalyzer()`)
- *   - the small bounded result cache
+ *   - the bounded model-reading cache
  *   - the badge and panel instances
  *
  * The service worker holds none of it and is only asked for settings, so it can be terminated at any
@@ -13,7 +13,6 @@
 import {
   analyzeDeterministic,
   countedFindings,
-  isSemanticSettled,
   refine,
   semanticCanScore,
   withSemanticStatus,
@@ -48,20 +47,10 @@ import { HealthLog } from './health.js';
 import { ListMarks } from './list-marks.js';
 import { Readings, readingKey } from './readings.js';
 
-/**
- * Bounded in-memory cache so revisiting a thread does not re-run the model.
- *
- * Small on purpose: results are never persisted (they contain findings derived from message content),
- * and the rule engine takes single-digit milliseconds, so there is nothing worth keeping beyond
- * avoiding repeat inference within a browsing session.
- */
-const MAX_CACHED_RESULTS = 20;
-
 /** Findings named in the popup. Enough to recognise the verdict; the card is where the reasoning is. */
 const POPUP_HEADLINES = 3;
 
 interface ActiveView {
-  signature: string;
   handle: MessageHandle;
   email: EmailMessage;
   /** Parts the adapter could not read. Non-empty in a load-bearing part means nothing was scored. */
@@ -82,7 +71,7 @@ export class Controller {
   readonly #badge: Badge;
   readonly #panel: Panel;
   readonly #highlighter = new Highlighter();
-  readonly #cache = new Map<string, AnalysisResult>();
+  #requestedReading: string | null = null;
   readonly #health = new HealthLog();
   readonly #listMarks = new ListMarks();
   /**
@@ -140,6 +129,8 @@ export class Controller {
   }
 
   stop(): void {
+    this.#requestedReading = null;
+    this.#analysisToken++;
     this.#readings.clear();
     this.#observer.stop();
     this.#listMarks.stop();
@@ -148,7 +139,6 @@ export class Controller {
     this.#panel.close();
     this.#badge.remove();
     this.#highlighter.dispose();
-    this.#cache.clear();
     this.#active = null;
   }
 
@@ -166,7 +156,6 @@ export class Controller {
     const token = ++this.#analysisToken;
     const aiMode = this.#settings.aiMode;
     const active: ActiveView = {
-      signature: event.signature,
       handle: event.handle,
       email: event.email,
       missing: event.missing,
@@ -205,15 +194,6 @@ export class Controller {
       return;
     }
 
-    const cached = this.#cache.get(event.signature);
-    if (cached !== undefined) {
-      this.#readings.cancelUnless(null);
-      active.timing = { checksMs: 0, aiReused: false, cached: true };
-      // Only settled results are cached, so this status is a conclusion rather than a moment in time.
-      this.#applyResult(cached, token, cached.meta.semanticStatus ?? 'unavailable');
-      return;
-    }
-
     this.#badge.setPending();
 
     // The deterministic result is rendered first and is complete on its own. If a semantic analyzer
@@ -231,13 +211,16 @@ export class Controller {
     /*
      * Nothing any check found, so nothing the model says can count: an uncorroborated reading scores
      * zero. Asking anyway costs the reader seconds of inference per message for a sentence that cannot
-     * change the verdict, so by default the card offers the reading instead of running it. Cached as
-     * settled — it is a decision about this message under these settings, not a passing condition.
+     * change the verdict, so by default the card offers the reading instead of running it — unless the
+     * reader already asked for this prompt, or a finished reading for it can be replayed for free.
      */
-    if (this.#settings.aiOnlyWhenFlagged && !semanticCanScore(deterministic)) {
+    const key = readingKey(active.email, aiMode, deterministic.signals.map((s) => s.id));
+    if (
+      this.#settings.aiOnlyWhenFlagged && !semanticCanScore(deterministic) &&
+      this.#requestedReading !== key && !this.#readings.has(key)
+    ) {
       this.#readings.cancelUnless(null);
       const skipped = withSemanticStatus(shown, 'skipped');
-      this.#remember(event.signature, skipped, token);
       this.#applyResult(skipped, token, 'skipped');
       return;
     }
@@ -251,7 +234,7 @@ export class Controller {
     const deterministic = analyzeDeterministic(active.email, {
       trustedSenders: this.#settings.trustedSenders,
     });
-    active.timing = { checksMs: performance.now() - started, aiReused: false, cached: false };
+    active.timing = { checksMs: performance.now() - started, aiReused: false };
     return deterministic;
   }
 
@@ -265,11 +248,8 @@ export class Controller {
   async #refine(active: ActiveView, deterministic: DeterministicResult, token: number): Promise<void> {
     const signalIds = deterministic.signals.map((s) => s.id);
     const key = readingKey(active.email, this.#settings.aiMode, signalIds);
-    // Any other inference belongs to a view being replaced; one for this same text is about to be joined.
-    this.#readings.cancelUnless(key);
-
     const lookup = this.#readings.lookup(key, () => resolveAnalyzer(this.#settings, signalIds));
-    const timing = active.timing ?? { checksMs: 0, aiReused: false, cached: false };
+    const timing = active.timing ?? { checksMs: 0, aiReused: false };
     const started = performance.now();
     active.timing = { ...timing, aiReused: lookup?.reused === true, aiStartedAt: started };
     this.#applyResult(withoutContext(deterministic), token, 'pending');
@@ -283,7 +263,6 @@ export class Controller {
     try {
       const refined = await refine(active.email, deterministic, lookup?.analyzer ?? null);
       settle();
-      this.#remember(active.signature, refined, token);
       this.#applyResult(refined, token, refined.meta.semanticStatus ?? 'no-output');
     } catch (error) {
       // The deterministic result is already on screen; a semantic failure is not a user-facing error.
@@ -291,7 +270,6 @@ export class Controller {
       logger.debug('semantic refinement failed', error);
       settle();
       const failed = withSemanticStatus(withoutContext(deterministic), 'error');
-      this.#remember(active.signature, failed, token);
       this.#applyResult(failed, token, 'error');
     }
   }
@@ -310,9 +288,8 @@ export class Controller {
     if (this.#settings.aiMode === 'off') return;
 
     const token = this.#analysisToken;
-    // The skipped result was cached for this signature; it is about to stop being true.
-    this.#cache.delete(active.signature);
     const deterministic = this.#runChecks(active);
+    this.#requestedReading = readingKey(active.email, this.#settings.aiMode, deterministic.signals.map((s) => s.id));
     await this.#refine(active, deterministic, token);
   }
 
@@ -370,7 +347,7 @@ export class Controller {
    *
    * Stopping the work and invalidating its results are one action, never two: the abort is advisory — a
    * round trip already made cannot be recalled, and the adapters can only decline to use what comes back —
-   * so the token is what actually keeps a superseded answer off the screen and out of the cache.
+   * so the token is what actually keeps a superseded answer off the screen.
    */
   #supersedeAnalysis(): void {
     this.#readings.cancelUnless(null);
@@ -378,48 +355,12 @@ export class Controller {
   }
 
   #teardownView(): void {
+    this.#requestedReading = null;
     this.#supersedeAnalysis();
     this.#panel.close();
     this.#highlighter.clear();
     this.#badge.remove();
     this.#active = null;
-  }
-
-  /**
-   * Caches a result, but only if it is still wanted and the semantic stage concluded something (see
-   * `isSemanticSettled`).
-   *
-   * The token is checked here and not only where the result is displayed, because a cache entry outlives
-   * the moment it was written: an answer arriving after its generation was superseded would be served to
-   * every later visit to that message, and the clear that superseded it has already happened. A settings
-   * change is the case that made this reachable — the settings that produced the answer are gone, and the
-   * work was started under them.
-   *
-   * Caching an unsettled result makes a passing condition permanent for the life of the tab: a
-   * cancelled or timed-out attempt would be replayed from the cache on every later visit, and only a
-   * reload would clear it. Not keeping it costs one more inference attempt next time.
-   */
-  #remember(signature: string, result: AnalysisResult, token: number): void {
-    if (token !== this.#analysisToken) {
-      logger.debug('not caching a result from superseded work');
-      return;
-    }
-    if (!isSemanticSettled(result.meta.semanticStatus)) {
-      logger.debug('not caching an unsettled result', {
-        status: result.meta.semanticStatus ?? 'none',
-      });
-      return;
-    }
-    this.#cache.set(signature, result);
-    this.#trimCache();
-  }
-
-  #trimCache(): void {
-    while (this.#cache.size > MAX_CACHED_RESULTS) {
-      const oldest = this.#cache.keys().next();
-      if (oldest.done === true) break;
-      this.#cache.delete(oldest.value);
-    }
   }
 
   // -------------------------------------------------------------------------
@@ -579,19 +520,12 @@ export class Controller {
     const impact = settingsImpact(previous, this.#settings);
 
     if (impact.rescore) {
-      /*
-       * Work in flight is abandoned before the cache is cleared, because it was started under settings
-       * that no longer exist — a different model, or a trust list that changes what the engine does. The
-       * clear alone left a window: an inference that finished a moment later wrote its answer into the
-       * cache that had just been emptied and painted it on screen, and the re-evaluation below then read
-       * that answer back as a cache hit. The reader watched the score they had just changed a setting to
-       * affect stay exactly as it was, with no way to reach it again short of reloading the tab.
-       */
+      // A late answer must not repaint a view assessed under different settings.
       this.#supersedeAnalysis();
-      this.#cache.clear();
       // Readings survive a trust change, which alters the score around them and not what the model
       // was shown. A different model is a different judge, so its predecessor's answers go.
       if (impact.remodel) {
+        this.#requestedReading = null;
         this.#readings.clear();
         this.#warmModel();
       }

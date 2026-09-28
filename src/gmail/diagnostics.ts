@@ -225,7 +225,6 @@ export function summarizeScoring(
         : {
             checksMs: timing.checksMs,
             aiReused: timing.aiReused,
-            cached: timing.cached,
             ...(timing.aiMs === undefined ? {} : { aiMs: timing.aiMs }),
           },
   };
@@ -353,7 +352,6 @@ function describeContributions(scoring: ScoringSummary): string {
 
 function describeTiming(timing: AnalysisTiming | null): string {
   if (timing === null) return 'not measured';
-  if (timing.cached) return 'replayed from this session';
   const checks = `checks ${String(Math.round(timing.checksMs))}ms`;
   if (timing.aiMs === undefined) return checks;
   const ai = `ai ${String(Math.round(timing.aiMs))}ms`;

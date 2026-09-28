@@ -273,7 +273,7 @@ describe('a message opened with a model configured', () => {
    * badge back was suppressed as redundant. The message then spent the rest of its time on screen with no
    * badge — and on a `showBadgeWhenLow: false` install, no badge is also what a clean message looks like.
    *
-   * The verdict must come back from the cache rather than from the model. Redrawing a header is not new
+   * The model answer must be reused while the checks are recomputed. Redrawing a header is not new
    * evidence, and a round trip per redraw would be one per scroll on a slow connection.
    */
   it('puts the badge back when Gmail redraws the header, without asking the model again', async () => {
@@ -414,10 +414,34 @@ describe('with the default gate on asking the model', () => {
     expect(tabStatus()).toMatchObject({ semantic: 'ready' });
   });
 
-  /**
-   * The on-demand reading replaces the skipped result in the cache. Were the skip still cached, the
-   * reader's next visit to the message would show the reading they asked for as never having happened.
-   */
+  it.each(['header', 'evidence'])('keeps a requested reading pending across %s changes', async (change) => {
+    await restart(EMAIL);
+    askButton()?.click();
+    await flush();
+    if (change === 'header') {
+      adapter.replaceHeader();
+      await vi.advanceTimersByTimeAsync(500);
+    } else {
+      await gmailFinishes(AUTHENTICATED);
+    }
+    expect(tabStatus()).toMatchObject({ semantic: 'pending' });
+    expect(inferences).toHaveLength(1);
+    inferences[0]?.resolve(semantic());
+    await flush();
+    expect(tabStatus()).toMatchObject({ semantic: 'ready' });
+  });
+
+  it('reuses a requested answer after technical evidence changes', async () => {
+    await restart(EMAIL);
+    askButton()?.click();
+    await flush();
+    inferences[0]?.resolve(semantic());
+    await flush();
+    await gmailFinishes(AUTHENTICATED);
+    expect(tabStatus()).toMatchObject({ semantic: 'ready' });
+    expect(inferences).toHaveLength(1);
+  });
+
   it('keeps the requested reading for the next visit', async () => {
     await restart(EMAIL);
     askButton()?.click();
@@ -434,11 +458,8 @@ describe('with the default gate on asking the model', () => {
 });
 
 /**
- * Changing which model is asked invalidates every cached verdict, and the clear alone was not enough: an
- * inference already in flight belongs to the settings that have just been replaced. Its answer arrived
- * after the cache was emptied, wrote itself back in, and the re-evaluation that the same settings change
- * had asked for then read it as a cache hit — so the reader who changed the model watched the previous
- * model's verdict reappear, with nothing short of a tab reload able to shift it.
+ * An inference already in flight belongs to the settings that have just been replaced. Its late answer
+ * must neither repaint the view nor be kept as the new model's reading.
  */
 describe('when a settings change supersedes work in flight', () => {
   it('asks the new model instead of caching the old one’s answer', async () => {

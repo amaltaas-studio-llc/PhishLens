@@ -282,19 +282,12 @@ export type SemanticStatus =
   | 'no-output'
   /** The model is present but this attempt failed — a timeout, or a rejected session. */
   | 'error'
-  /**
-   * The attempt was abandoned because the reader moved on. The only status that says nothing about
-   * either the message or the browser, and so the only one that must never be cached — see
-   * `isSemanticSettled`.
-   */
+  /** The attempt was abandoned because the reader moved on; it says nothing about message or browser. */
   | 'cancelled';
 
 /**
- * How long a view's analysis took, as the reader is shown it.
- *
- * Belongs to the view rather than to `AnalysisResult`: a result replayed from the session cache took
- * no time at all the second time, and stamping the first visit's timings on it would report work that
- * did not happen.
+ * How long a view's analysis took, as the reader is shown it. Belongs to the view rather than to
+ * `AnalysisResult`, because a replayed reading took no model time on this view.
  */
 export interface AnalysisTiming {
   /** Milliseconds the technical checks took. */
@@ -305,8 +298,6 @@ export interface AnalysisTiming {
   aiStartedAt?: number;
   /** The AI reading was one already made for identical text, rather than a new inference. */
   aiReused: boolean;
-  /** The whole result was replayed from earlier in the session; nothing ran for this view. */
-  cached: boolean;
 }
 
 export interface SemanticAnalyzeOptions {

@@ -281,7 +281,7 @@ const panel = new Panel({
  * reading can be previewed without a slow model.
  */
 function cannedTiming(semantic: SemanticStatus, aiMs: number): AnalysisTiming {
-  const base = { checksMs: 11.6, aiReused: false, cached: false };
+  const base = { checksMs: 11.6, aiReused: false };
   if (semantic === 'pending') return { ...base, aiStartedAt: performance.now() - aiMs };
   if (semantic === 'ready') return { ...base, aiMs };
   return base;

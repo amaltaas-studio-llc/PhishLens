@@ -182,10 +182,10 @@ seconds, during which the deterministic score is already complete and on screen.
 this browser" and then replacing it with a verdict seconds later would teach a reader to disbelieve that
 message in the case where it is true, so the card shows a progress indicator for that window instead.
 
-**An interrupted assessment is retried, not remembered.** Only `ready`, `skipped` and `off` may be cached
-(`isSemanticSettled`), because a cache hit short-circuits before the model is ever asked — so caching a
-non-answer would make it permanent for the life of the tab. A cancelled attempt, a one-off timeout, and a
-message read while Chrome was still downloading the model are all re-assessed on the next visit.
+**An interrupted assessment is retried, not remembered.** Only successful model answers enter the
+reading cache. Each view recomputes checks and the automatic gate; errors, unavailable models and empty
+responses remain retryable. Explicit requests survive redraws with the same prompt, and completed
+readings are reused even if newly available technical evidence would otherwise close the gate.
 
 ### Asked only when it could count
 

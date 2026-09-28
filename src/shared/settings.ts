@@ -253,8 +253,7 @@ export function settingsImpact(previous: Settings, next: Settings): SettingsImpa
 
   return {
     remodel,
-    // The gate counts because a skipped reading is cached as settled: without it, switching the model
-    // on for all mail would leave every message already opened saying it was skipped.
+    // The gate counts because the view on screen was gated under the old setting and still says so.
     rescore:
       remodel ||
       previous.aiOnlyWhenFlagged !== next.aiOnlyWhenFlagged ||

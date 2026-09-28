@@ -1,0 +1,17 @@
+{
+  "name": "sender-host-brand-domain",
+  "description": "A complete brand domain embedded under the sending domain remains misleading.",
+  "email": {
+    "senderName": "Northwind Tools",
+    "senderEmail": "notifications@northwind-tools.com",
+    "subject": "Your document is available",
+    "bodyText": "Open your secure inbox to read your document.",
+    "links": [
+      {
+        "text": "Open secure inbox",
+        "href": "https://paypal.com.northwind-tools.com/login"
+      }
+    ],
+    "attachments": []
+  }
+}

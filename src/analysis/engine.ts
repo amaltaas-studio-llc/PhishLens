@@ -141,8 +141,8 @@ interface SemanticOutcome {
  *
  * The statuses are kept apart because they mean different things downstream: `unavailable` describes
  * the browser and is permanent, `no-output` and `error` describe this one message, and `cancelled`
- * describes only the reader navigating away. The card words them differently and only some may be
- * cached, so collapsing them here would make both impossible.
+ * describes only the reader navigating away. The card words them differently, so collapsing them here
+ * would make that impossible.
  */
 async function runSemanticSafely(
   analyzer: SemanticAnalyzer,
@@ -159,8 +159,7 @@ async function runSemanticSafely(
   try {
     const analysis = await analyzer.analyze(email, signal === undefined ? {} : { signal });
     if (analysis !== null) return { analysis, status: 'ready' };
-    // A cancelled attempt also resolves to null. Calling that "the model declined to answer" is both
-    // untrue and sticky, since the caller keeps settled outcomes for the session.
+    // A cancelled attempt also resolves to null, and calling that "the model declined to answer" is untrue.
     return { analysis: null, status: isAborted(signal) ? 'cancelled' : 'no-output' };
   } catch (error) {
     // An abort surfaces as a rejection in most adapters, and is not a failure of the model.
@@ -168,17 +167,6 @@ async function runSemanticSafely(
     logger.debug('semantic analysis threw', error);
     return { analysis: null, status: 'error' };
   }
-}
-
-/**
- * Whether the semantic stage reached an answer worth keeping for the rest of the session.
- *
- * The guard on what callers may cache. Only `ready` (the model answered), `off` and `skipped` (it was
- * deliberately not asked) are conclusions about the message; the rest describe a moment — a model still
- * downloading, a timeout, an attempt cut short by navigation — and caching a moment makes it permanent.
- */
-export function isSemanticSettled(status: SemanticStatus | undefined): boolean {
-  return status === 'ready' || status === 'off' || status === 'skipped';
 }
 
 /**

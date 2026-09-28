@@ -43,8 +43,8 @@ content script for as long as the message is on screen, then is dropped. It is n
 `chrome.storage`, never sent to the service worker, and never logged in a release build.
 
 **Analysed locally** — all of it. Every deterministic detector, the whole scoring engine, and in the
-default configuration the semantic layer run inside the tab. Nothing touches the network. Results are
-cached in the tab, capped at 20 entries, and discarded when the tab closes.
+default configuration the semantic layer run inside the tab. Nothing touches the network. Only the
+model's readings are kept, in the tab, capped at 50, and discarded when the tab closes.
 
 **Written to `chrome.storage`** — the settings you choose, and one list that comes from a message: the
 addresses and domains you mark as trusted. That is the deliberate exception to "nothing is stored", since

@@ -1,18 +1,7 @@
 /**
- * The model's readings for this tab, keyed by exactly what the model was shown.
- *
- * The result cache in the controller is keyed by the view signature, which changes whenever Gmail
- * finishes drawing part of a message: the authentication summary and the attachment strip routinely
- * arrive a moment after the body. Each of those is a new view, and each one used to cancel the inference
- * in flight and start the same one again — on the on-device model, seconds of work thrown away per
- * message, for a question whose text had not changed. The model never sees authentication or
- * attachments (`llm/prompt.ts`), so its reading of the new view is the reading already under way.
- *
- * So a reading is found by its prompt: a settled one is replayed, and one in flight is joined rather
- * than restarted. The score around it is still rebuilt from the new view's checks every time; only the
- * model's answer is shared.
- *
- * Stateful, and therefore content-script only, for the same reason as the model session itself.
+ * Per-tab model answers, keyed by prompt. Gmail redraws a message as its authentication and attachments
+ * arrive, which the model is never shown, so a redraw joins or replays the reading instead of asking
+ * again. Technical evidence is rescored on every view.
  */
 import { buildUserPrompt } from '../analysis/llm/prompt.js';
 import type {
@@ -23,9 +12,8 @@ import type {
 } from '../shared/types.js';
 
 /**
- * Bounded like the result cache. Keys are the full prompt rather than a hash of it: a collision would
- * put one message's reading on another, and fifty prompts of a few kilobytes is not memory worth a risk
- * of that shape.
+ * Keys are the full prompt rather than a hash of it: a collision would put one message's reading on
+ * another, and fifty prompts of a few kilobytes is not memory worth a risk of that shape.
  */
 const MAX_READINGS = 50;
 
@@ -60,6 +48,13 @@ export interface Lookup {
 export class Readings {
   readonly #settled = new Map<string, SemanticAnalysis>();
   #inFlight: InFlight | null = null;
+  #generation = 0;
+  #key: string | null = null;
+
+  /** A completed reading remains useful even when new evidence no longer calls for inference. */
+  has(key: string): boolean {
+    return this.#settled.has(key);
+  }
 
   /**
    * An analyzer for `key` that answers from a settled reading, joins the one in flight, or asks
@@ -71,6 +66,7 @@ export class Readings {
    * superseded view's answer off the screen; cancelling the inference itself is `cancelUnless`'s job.
    */
   lookup(key: string, resolve: () => SemanticAnalyzer | null): Lookup | null {
+    this.cancelUnless(key);
     const settled = this.#settled.get(key);
     if (settled !== undefined) {
       return { analyzer: replay(Promise.resolve(settled)), reused: true };
@@ -86,9 +82,10 @@ export class Readings {
 
   /** Stops an inference in flight unless it is the one `key` would join. */
   cancelUnless(key: string | null): void {
-    const current = this.#inFlight;
-    if (current === null || current.key === key) return;
-    current.abort.abort();
+    if (this.#key === key) return;
+    this.#key = key;
+    this.#generation++;
+    this.#inFlight?.abort.abort();
     this.#inFlight = null;
   }
 
@@ -101,20 +98,23 @@ export class Readings {
   /**
    * Wraps `inner` so its first `analyze()` becomes the shared inference for `key`.
    *
-   * `isAvailable()` passes straight through, since the engine asks it before analysing and an
-   * unavailable model must still be reported as one.
+   * The generation is checked around `isAvailable()` as well as the inference, because the reader can
+   * leave while a model is still loading; an unavailable model is still reported as one.
    */
   #starting(key: string, inner: SemanticAnalyzer): SemanticAnalyzer {
+    const generation = this.#generation;
+    const valid = (): boolean => generation === this.#generation;
     return {
       id: inner.id,
-      isAvailable: () => inner.isAvailable(),
+      isAvailable: async () => valid() && await inner.isAvailable() && valid(),
       analyze: (email) => {
+        if (!valid()) return Promise.resolve(null);
         const current = this.#inFlight;
         if (current?.key === key) return current.promise;
 
         const abort = new AbortController();
         const promise = inner.analyze(email, { signal: abort.signal }).then((analysis) => {
-          if (analysis !== null && !abort.signal.aborted) this.#remember(key, analysis);
+          if (analysis !== null && valid() && !abort.signal.aborted) this.#remember(key, analysis);
           return analysis;
         });
         const entry: InFlight = { key, abort, promise };

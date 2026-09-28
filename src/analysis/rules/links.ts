@@ -348,7 +348,7 @@ function misleadingDomainComposition(context: AnalysisContext): SecuritySignal[]
       // section — borrows nobody's reputation but its own, as a social footer on the sender's tracker
       // does in `anchorTextBrandMismatch`. It yields in the same place: a message presenting itself as
       // this brand, where a brand-named host on the sender's domain is the disguise.
-      if (link.onSenderDomain && context.primaryClaim?.brand.id !== brand.id) break;
+      if (domainHit === undefined && link.onSenderDomain && context.primaryClaim?.brand.id !== brand.id) break;
       reported.add(link.hostname);
 
       findings.push(

@@ -232,7 +232,8 @@ mechanisms exist purely to keep legitimate mail at zero.
   `javascript:`, because opening one can leak Windows credentials. A short brand core in a subdomain has to
   *begin* a word: `bigmail.`, `purchase.` and `pineapple.` end with one, whereas phishing hosts lead
   with the brand (`chasesecure.`). A brand-named section of the sender's own site (`apple.` on a news site)
-  is exempt unless the message claims to be that brand. And a sender on the recipient's own name under
+  is exempt unless the message claims to be that brand — but a whole brand domain in front of it
+  (`paypal.com.northwind-tools.com`) never is. And a sender on the recipient's own name under
   another suffix — `.net` beside `.com`, `.fr` beside `.de`, `.com.au` — is the same organisation in
   another market. It is not a lookalike, but a typo suffix (`.co`, `.cm`) still is. "Portal" no longer
   counts as sign-in wording, because it names every intranet home page. The reverse case is a host named
@@ -368,8 +369,8 @@ it is the marker that gets the feature switched off.
 
 ## Confidence in the numbers
 
-1310 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
-`test/fixtures/` holds 26 messages: a plain legitimate message, a legitimate password reset, a legitimate
+1325 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
+`test/fixtures/` holds 29 messages: a plain legitimate message, a legitimate password reset, a legitimate
 one-time code being delivered, a legitimate reply into an existing thread, a newsletter with many links, a
 newsletter whose links are all rewritten through its platform's click tracker, an institutional newsletter
 whose social footer names each network it links to, an invoice, a developer notice whose display name

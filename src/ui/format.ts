@@ -259,8 +259,6 @@ export function timingLine(
   aiMode: AiMode,
 ): string | null {
   if (timing === null) return null;
-  if (timing.cached) return 'Shown from earlier in this session.';
-
   const parts = [`Checks ${formatDuration(timing.checksMs)}`];
   if (aiMode === 'off' || status === 'off') parts.push('AI off');
   else if (status === 'skipped') parts.push('AI not asked');
