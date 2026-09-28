@@ -77,7 +77,7 @@ require an explicit choice *and* an address, neither of which has a default valu
   [LOCAL-AI.md](LOCAL-AI.md#your-own-model-server).
 - *Cloud-assisted* is designed and inert, with no default backend, and the options page no longer offers
   it — the radio appears only for someone who already had it selected. What such a payload would contain,
-  and what it would strip, is in [LOCAL-AI.md](LOCAL-AI.md#the-cloud-design-which-is-not-built).
+  and what it would strip, is in [adr/0009](adr/0009-model-server-and-inert-cloud.md).
 
 Nothing else ever leaves, in any configuration.
 
@@ -116,7 +116,7 @@ the sender.** Nearly every high-severity check reasons about the sending domain,
 cannot be read produces no findings, and no findings scores as Low Risk — a confident all-clear on a
 message nobody checked. The extension declines to score at all in that case, shows **Not checked**, and
 says on the card that nothing having been found is not a finding of nothing. See
-[ARCHITECTURE §3.3](ARCHITECTURE.md#33-a-gap-is-reported-not-absorbed).
+[adr/0003](adr/0003-gmail-two-signals.md).
 
 That card offers a **diagnostic report** to paste into a bug report, because the project has no telemetry
 and a broken selector is otherwise unknowable. It contains selector strings from this repository, the
@@ -135,7 +135,7 @@ because models weight the end of the context heavily.
 But the real control is architectural. A fully successful injection can only zero the `llm` category's 15
 points. It cannot delete a deterministic finding, cannot lower the score below a deterministic floor, and
 cannot change the classification of a message that failed a technical check. See
-[LOCAL-AI.md](LOCAL-AI.md#three-containment-guarantees).
+[LOCAL-AI.md](LOCAL-AI.md#three-guarantees).
 
 ### Malicious external URLs
 

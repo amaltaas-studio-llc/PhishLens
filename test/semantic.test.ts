@@ -794,6 +794,12 @@ describe('prompt construction', () => {
     // guessing that withholding link data closed — unless the excerpt itself excludes them.
     expect(SYSTEM_PROMPT).toMatch(/never use a URL, email address, or filename/iu);
   });
+
+  it('asks for excerpts in the email language and reasons in English', () => {
+    expect(SYSTEM_PROMPT).toMatch(/any language/iu);
+    expect(SYSTEM_PROMPT).toMatch(/quote excerpts exactly/iu);
+    expect(SYSTEM_PROMPT).toMatch(/rest of each reason in English/iu);
+  });
 });
 
 /**

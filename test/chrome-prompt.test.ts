@@ -711,7 +711,7 @@ describe('on-device adapter: cancellation', () => {
 
 /**
  * The welcome page's view of the model. It needs the states the analyzer collapses, because each has
- * different advice: an old Chrome is fixed by updating it, a switched-off setting in chrome://settings/ai.
+ * different advice: an old Chrome is fixed by updating it, a switched-off setting in chrome://settings/system.
  */
 describe('on-device model state, for the welcome page', () => {
   it('distinguishes a Chrome without the API from one without the model', async () => {
@@ -744,9 +744,31 @@ describe('on-device model state, for the welcome page', () => {
     install({ LanguageModel: factory });
 
     const progress: number[] = [];
-    await expect(downloadOnDeviceModel((fraction) => progress.push(fraction))).resolves.toBe(true);
+    await expect(downloadOnDeviceModel((fraction) => progress.push(fraction))).resolves.toEqual({
+      ok: true,
+    });
     expect(progress).toEqual([0.5]);
     expect(destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not call create when On-device AI is unavailable, so Chrome never logs a bad message', async () => {
+    const { factory, create } = modernFactory({ availability: 'unavailable' });
+    install({ LanguageModel: factory });
+    await expect(downloadOnDeviceModel(() => undefined)).resolves.toEqual({
+      ok: false,
+      reason: 'unavailable',
+    });
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('treats Chrome’s feature-flag rejection as the setting being off', async () => {
+    const { factory, create } = modernFactory({ availability: 'downloadable' });
+    create.mockRejectedValue(new Error('The feature flag gating model execution was disabled.'));
+    install({ LanguageModel: factory });
+    await expect(downloadOnDeviceModel(() => undefined)).resolves.toEqual({
+      ok: false,
+      reason: 'unavailable',
+    });
   });
 
   /** Chrome logs a warning on every request that does not name its output language. */
@@ -769,11 +791,44 @@ describe('on-device model state, for the welcome page', () => {
     }
   });
 
+  it('declares the supported input languages on analysis sessions', async () => {
+    const { factory, create } = modernFactory();
+    install({ LanguageModel: factory });
+    await new ChromePromptAnalyzer().analyze(EMAIL);
+
+    const first = create.mock.calls[0]?.[0] as Record<string, unknown> | undefined;
+    expect(first?.['expectedInputs']).toEqual([
+      { type: 'text', languages: ['en', 'de', 'es', 'fr', 'ja'] },
+    ]);
+  });
+
+  it('falls back when a build rejects expectedInputs', async () => {
+    const prompt = vi.fn(() => Promise.resolve(VALID_JSON));
+    const create = vi.fn((options: unknown) => {
+      const record = options as Record<string, unknown>;
+      if ('expectedInputs' in record) throw new TypeError('unrecognised option');
+      return Promise.resolve({ prompt });
+    });
+    install({ LanguageModel: { availability: () => Promise.resolve('available'), create } });
+
+    const analysis = await new ChromePromptAnalyzer().analyze(EMAIL);
+    expect(analysis?.risk).toBe(78);
+    expect(create.mock.calls.some(([options]) => !('expectedInputs' in (options as object)))).toBe(
+      true,
+    );
+  });
+
   it('reports a download that could not start rather than throwing', async () => {
-    await expect(downloadOnDeviceModel(() => undefined)).resolves.toBe(false);
+    await expect(downloadOnDeviceModel(() => undefined)).resolves.toEqual({
+      ok: false,
+      reason: 'unsupported',
+    });
     const { factory, create } = modernFactory();
     create.mockRejectedValue(new Error('NotAllowedError'));
     install({ LanguageModel: factory });
-    await expect(downloadOnDeviceModel(() => undefined)).resolves.toBe(false);
+    await expect(downloadOnDeviceModel(() => undefined)).resolves.toEqual({
+      ok: false,
+      reason: 'failed',
+    });
   });
 });

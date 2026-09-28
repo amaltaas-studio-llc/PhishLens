@@ -1,0 +1,38 @@
+{
+  "name": "northwind-es-newsletter",
+  "description": "Invented Spanish marketing newsletter with urgency language and an unsubscribe line. Must stay low: bulk-mail suppression in the es pack has to recognise the local unsubscribe vocabulary.",
+  "email": {
+    "senderName": "Northwind Roasters",
+    "senderEmail": "hello@northwind-roasters.example",
+    "recipientEmail": "sam.sales@northwind-logistics.com",
+    "subject": "Ultima oportunidad: 20% de descuento termina esta noche",
+    "bodyText": "La venta de origen unico termina a medianoche. Actue ahora para obtener un 20% de descuento en toda la gama.\n\nTambien nuevo este mes: latas reutilizables y envio gratis.\n\nRecibe este correo porque se registro en northwind-roasters.example. Darse de baja o administrar sus preferencias en cualquier momento. Ver este correo en su navegador.\n\nNorthwind Roasters",
+    "links": [
+      {
+        "text": "Shop the sale",
+        "href": "https://northwind-roasters.example/sale"
+      },
+      {
+        "text": "New arrivals",
+        "href": "https://northwind-roasters.example/new"
+      },
+      {
+        "text": "Unsubscribe",
+        "href": "https://northwind-roasters.example/unsubscribe?c=8f21ab"
+      },
+      {
+        "text": "preferences",
+        "href": "https://northwind-roasters.example/preferences?c=8f21ab"
+      }
+    ],
+    "attachments": [],
+    "auth": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass",
+      "signedBy": "northwind-roasters.example",
+      "mailedBy": "northwind-roasters.example",
+      "via": "sendgrid.net"
+    }
+  }
+}

@@ -13,9 +13,10 @@ of that score. Two properties matter more than any feature:
 2. **It is trustworthy with mail.** Zero runtime dependencies, two permissions, no network calls in the
    default configuration.
 
-Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before changing anything structural. It is a design
-record, not a tour: most of it explains why an obvious alternative was rejected, which is the part you
-cannot infer from the code.
+Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before changing anything structural — it is a short
+map of where code runs and where to edit. When the change touches a past decision (bundler, scoring
+floors, trust list, model cap, …), open the matching file under [docs/adr/](docs/adr/); those records
+are why the obvious alternative was rejected.
 
 ## Definition of done
 

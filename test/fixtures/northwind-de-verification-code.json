@@ -1,0 +1,20 @@
+{
+  "name": "northwind-de-verification-code",
+  "description": "Invented German one-time-code delivery with the local never-share warning. Must stay low: negation in the de pack has to reverse the MFA/credential wording the warning shares with a real request.",
+  "email": {
+    "senderName": "Northwind Tools",
+    "senderEmail": "notifications@northwind-tools.com",
+    "recipientEmail": "sam.sales@northwind-logistics.com",
+    "subject": "Ihr Bestatigungscode",
+    "bodyText": "Ihr Bestatigungscode lautet 482915.\n\nGeben Sie ihn auf dem Anmeldebildschirm ein. Der Code lauft in zehn Minuten ab.\n\nTeilen Sie Ihren Bestatigungscode niemals mit anderen. Mitarbeiter von Northwind Tools werden Sie niemals bitten uns Ihren Bestatigungscode per E-Mail Telefon oder Chat zu senden.\n\nWenn Sie sich nicht anmelden wollten ignorieren Sie diese Nachricht.\n\nNorthwind Tools",
+    "links": [],
+    "attachments": [],
+    "auth": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass",
+      "signedBy": "northwind-tools.com",
+      "mailedBy": "northwind-tools.com"
+    }
+  }
+}

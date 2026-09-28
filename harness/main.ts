@@ -2,7 +2,7 @@
  * UI harness: the real `Badge` and `Panel`, driven by the real engine, over the `test/fixtures/` corpus.
  *
  * Why this exists: the components only have meaning inside a mail message, so there is nothing a dev
- * server can preview (docs/ARCHITECTURE.md §1.1) and every UI state otherwise has to be reached by
+ * server can preview (docs/adr/0001-esbuild-not-vite.md) and every UI state otherwise has to be reached by
  * finding an email that produces it. Here each state is a URL.
  *
  * Every control is also a query parameter, which is what lets `scripts/screenshots.mjs` regenerate

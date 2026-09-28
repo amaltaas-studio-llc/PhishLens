@@ -1,0 +1,20 @@
+{
+  "name": "northwind-nl-verification-code",
+  "description": "Invented Dutch one-time-code delivery with the local never-share warning. Must stay low: negation in the nl pack has to reverse the MFA/credential wording the warning shares with a real request.",
+  "email": {
+    "senderName": "Northwind Tools",
+    "senderEmail": "notifications@northwind-tools.com",
+    "recipientEmail": "sam.sales@northwind-logistics.com",
+    "subject": "Uw verificatiecode",
+    "bodyText": "Uw verificatiecode is 482915.\n\nVoer deze in op het aanmeldscherm. De code verloopt over tien minuten.\n\nDeel uw verificatiecode nooit met anderen. Medewerkers van Northwind Tools zullen u nooit vragen om ons uw verificatiecode per e-mail telefoon of chat te sturen.\n\nAls u niet heeft geprobeerd in te loggen kunt u dit bericht negeren.\n\nNorthwind Tools",
+    "links": [],
+    "attachments": [],
+    "auth": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass",
+      "signedBy": "northwind-tools.com",
+      "mailedBy": "northwind-tools.com"
+    }
+  }
+}

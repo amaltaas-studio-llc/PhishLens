@@ -18,9 +18,10 @@ describe('welcome page guidance for the on-device model', () => {
     expect(guidance.steps).toEqual([]);
   });
 
-  it('walks a reader with the setting off through chrome://settings/ai', () => {
+  it('walks a reader with the setting off through chrome://settings/system', () => {
     const guidance = onDeviceGuidance('unavailable');
     expect(guidance.action).toBe('open-ai-settings');
+    expect(AI_SETTINGS_URL).toBe('chrome://settings/system');
     expect(guidance.steps.join(' ')).toContain(AI_SETTINGS_URL);
     expect(guidance.steps.join(' ')).toMatch(/On-device AI/u);
     expect(guidance.steps.join(' ')).toMatch(/20 GB/u);

@@ -4,7 +4,7 @@
  * **This file is intentionally stateless.** MV3 terminates the worker after ~30 s idle, so any
  * module-level cache here would be a correctness bug that only shows up under real usage. There is no
  * `let cache = …`, no model session, no analysis state; every handler re-reads `chrome.storage` from
- * scratch and every message is self-contained. See docs/ARCHITECTURE.md §2.
+ * scratch and every message is self-contained. See docs/adr/0002-mv3-state-in-content-script.md.
  *
  * It does exactly three things, all of which are safe to lose at any instant:
  *   1. settings read/write

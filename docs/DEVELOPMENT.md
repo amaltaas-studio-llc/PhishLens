@@ -51,6 +51,7 @@ src/
   gmail/        DOM adapter + SPA observer. The only place that knows Gmail's markup.
   analysis/
     rules/      deterministic detectors: identity, link, attachment, content, authentication
+                (wording packs under rules/languages/)
     scoring/    weights, ceilings, thresholds, and the pure aggregation function
     llm/        semantic layer: prompt, strict output parsing, on-device + cloud adapters
     triage.ts   the sender-only subset, for what an inbox row can honestly support
@@ -60,21 +61,23 @@ src/
   welcome/      the page shown once on install
   shared/       types, URL/Unicode/brand primitives, settings, trust list, logging
 harness/        development-only UI harness. Not shipped.
+docs/           product and contributor docs; design history in docs/adr/
 ```
 
 Data flows one way. `gmail/` produces an `EmailMessage`, `analysis/` turns it into an `AnalysisResult`,
 `ui/` renders it. `analysis/` imports nothing from `gmail/` or `ui/` and touches no browser API, which is
-why the whole detection engine runs under `vitest` in plain Node.
+why the whole detection engine runs under `vitest` in plain Node. Where to change what:
+[ARCHITECTURE.md](ARCHITECTURE.md). Why not the obvious alternative: [adr/](adr/).
 
 ## Toolchain choices
 
 | Choice | Why |
 | --- | --- |
 | TypeScript ES2022, `strict` | Plus `noUncheckedIndexedAccess` and `noPropertyAccessFromIndexSignature`, because most of this code indexes into structures derived from hostile input. |
-| **esbuild**, not Vite | Three entry points with three different output contracts: the content script must be an IIFE, since MV3 declared content scripts are classic scripts, while the worker and options page are ESM. Vite's main advantage is a dev server, which is worth little when the primary UI only exists injected into Gmail's DOM. esbuild also keeps the dependency tree small, which matters for a security tool that asks to read your mail. Full build is ~50 ms. |
+| **esbuild**, not Vite | IIFE content script + ESM worker/options; no useful app-style HMR for Gmail-injected UI. See [adr/0001](adr/0001-esbuild-not-vite.md). |
 | Vitest | ESM-native, no transform config, and fast enough that the fixture suite is usable as an inner-loop tool. |
 | ESLint + `typescript-eslint` (`strictTypeChecked`) | Flags `any`, unused vars and floating promises, plus `no-innerHTML` / `no-eval` house rules that make the XSS posture mechanical rather than aspirational. |
-| Zero runtime dependencies | `"dependencies": {}`. Everything shipped into the browser is in `src/` and can be read end to end. `jsdom` is a dev dependency and reaches four test files: the alternative was leaving the layer that reads Gmail's markup asserted only through helpers, which is where two production bugs came from. |
+| Zero runtime dependencies | `"dependencies": {}`. Everything shipped into the browser is in `src/` and can be read end to end. `jsdom` is a dev dependency for the few DOM tests. |
 
 ## The UI harness
 
@@ -128,16 +131,17 @@ UI change is one command away from being reflected in the README instead of sile
 
 ## Testing
 
-1325 tests, all in plain Node — no Chrome, no Gmail, no network. Five files ask for a DOM and get it from
+Tests run in plain Node — no Chrome, no Gmail, no network. A handful of files ask for a DOM and get it from
 `jsdom`, which is why that is the only dev dependency here that is not a build or lint tool; see the note
 below the table.
 
 | File | Covers |
 | --- | --- |
 | `test/aggregate.test.ts` | The scoring functions in isolation: per-severity ceilings, category caps, `[0, 100]` clamping, and zero contribution from an empty category, which is the "no local model" path. |
-| `test/detection.test.ts` | The full pipeline against 28 fixtures, invariants across all of them, and which message in a thread gets picked — including the forged-from-yourself cases that must *not* be skipped. |
+| `test/detection.test.ts` | The full pipeline against the fixture corpus (including multilingual `northwind-*` lures, code deliveries and newsletters), invariants across all of them, and which message in a thread gets picked — including the forged-from-yourself cases that must *not* be skipped. |
+| `test/languages.test.ts` | Language-pack structure: every theme id exists, patterns use Unicode boundaries and bounded gaps, diacritic folding keeps indices, gating stays off ordinary English, and after-verb negation reverses a solicitation. |
 | `test/semantic.test.ts` | The containment guarantees, the calibration limits, and the unavailable / throwing / hanging / cancelled analyzer paths — including which status each reports. |
-| `test/chrome-prompt.test.ts` | The on-device adapter against fakes for every API shape Chrome has shipped and every malformed shape it might, plus concurrency: a session fake that rejects overlapping prompts the way the real one does. Also the welcome page's state probe and its click-started download. |
+| `test/chrome-prompt.test.ts` | The on-device adapter against fakes for every API shape Chrome has shipped and every malformed shape it might, plus concurrency: a session fake that rejects overlapping prompts the way the real one does. Also the welcome page's state probe, its click-started download, and the input/output language declarations. |
 | `test/url.test.ts` | Obfuscated IP forms, forged suffix boundaries, redirect chains, hostnames `new URL()` accepts but that cannot exist. |
 | `test/unicode.test.ts` | Punycode decoding, script mixing, bidi tricks, confusable folding, bounded edit distance. |
 | `test/privacy.test.ts` | Settings validation, the model-server URL policy from both directions (loopback `http:` yes, anything else no), and what `buildCloudPayload` **drops** as well as what it keeps — then the same contract again against payloads the builder could not have produced, because the worker is what actually sends. |
@@ -148,7 +152,7 @@ below the table.
 | `test/trust.test.ts` | Each of the four limits on trusted senders, from both sides: that trust dampens what it should, and that it does nothing at all when authentication did not prove the sender, against an identity finding, or against a `high` finding. |
 | `test/triage.test.ts` | The sender-only verdicts, that none of them can read as an all-clear, that no low-scoring fixture is marked, and the allowlist guard that fails when a new identity rule is classified as neither safe nor unsafe for a list row. |
 | `test/popup.test.ts` | The popup's wording for every state — in particular that "nothing was found" and "nothing was checked" never share a phrasing — and the health line for each shape of extraction failure. |
-| `test/welcome.test.ts` | The welcome page's guidance for each on-device model state: the `chrome://settings/ai` steps when the model is unavailable, an update when Chrome has no Prompt API, a download only from a button, and that every state says the checks work without the model. |
+| `test/welcome.test.ts` | The welcome page's guidance for each on-device model state: the `chrome://settings/system` steps when the model is unavailable, an update when Chrome has no Prompt API, a download only from a button, and that every state says the checks work without the model. |
 | `test/gmail-dom.test.ts` | The adapter against Gmail-shaped markup: sender, subject, body, links and attachment chips read out of a rendered page, authentication read from the details table, a warning banner distinguished from an unrelated live region, an unreadable sender reported as unread rather than empty, and which message is chosen when the candidate selectors disagree about which element is a message. Needs a DOM. |
 | `test/observer-dom.test.ts` | The observer and adapter over a real `MutationObserver`: in-place collapse and evidence changes, visibility before the first readable extraction, nested message IDs, heading-only navigation, and debounce-first reconciliation. Needs a DOM. |
 | `test/list-marks.test.ts` | The list marker against inbox-shaped rows: that ordinary mail is left alone, that a recycled row is re-evaluated rather than trusted, that rows already on screen are re-triaged once Gmail exposes the signed-in address — which arrives after they do, and without which the check for a domain imitating the reader's own cannot run — that a mark Gmail discards when it redraws a row as read comes back, and that marking survives Gmail replacing the region being watched. Needs a DOM. |
@@ -167,7 +171,7 @@ read rather than against a hand-written `auth` block — which is precisely how 
 in production while passing in CI.
 
 Fixture philosophy and the both-directions assertion are described in
-[DETECTION.md](DETECTION.md#confidence-in-the-numbers).
+[DETECTION.md](DETECTION.md#the-score) and [AGENTS.md](../AGENTS.md).
 
 ## Continuous integration
 
@@ -221,14 +225,9 @@ no longer runs the next time the floor moves. Add an aggregate job with a stable
 
 ## Conventions
 
-- `npm run verify` must pass before a commit. It is what CI runs. It ends with a build and `check:dist`
-  because a suite that never loads the extension cannot tell you that the extension no longer loads.
-- The scoring model — weights, ceilings, floors, thresholds — lives in `src/analysis/scoring/config.ts`.
-  A finding's own `score:` sits beside its severity and wording; any other magic number is a bug.
-- All Gmail selectors live in `src/gmail/selectors.ts`.
-- New detection behaviour comes with a fixture and assertions in both directions — that it fires when it
-  should, and that legitimate fixtures stay low.
+- `npm run verify` must pass before a commit (lint, typecheck, test, build, `check:dist`).
+- Scoring numbers live in `src/analysis/scoring/config.ts`; Gmail selectors in `src/gmail/selectors.ts`.
+- New detection behaviour needs a fixture asserted in both directions.
 - Commit messages describe why, not what. Do not add co-author trailers.
 
-See [AGENTS.md](../AGENTS.md) for the same ground rules written for AI coding agents, including the
-invariants that must not be broken.
+Invariants agents break most often are listed in [AGENTS.md](../AGENTS.md). Design history: [adr/](adr/).

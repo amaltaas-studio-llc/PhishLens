@@ -1,0 +1,20 @@
+{
+  "name": "northwind-es-verification-code",
+  "description": "Invented Spanish one-time-code delivery with the local never-share warning. Must stay low: negation in the es pack has to reverse the MFA/credential wording the warning shares with a real request.",
+  "email": {
+    "senderName": "Northwind Tools",
+    "senderEmail": "notifications@northwind-tools.com",
+    "recipientEmail": "sam.sales@northwind-logistics.com",
+    "subject": "Su codigo de verificacion",
+    "bodyText": "Su codigo de verificacion es 482915.\n\nIntroduzcalo en la pantalla de inicio de sesion. El codigo caduca en diez minutos.\n\nNunca comparta su codigo de verificacion con nadie. El personal de Northwind Tools nunca le pedira que nos envie su codigo de verificacion por correo, telefono o chat.\n\nSi usted no intento iniciar sesion, ignore este mensaje. Gracias.\n\nNorthwind Tools",
+    "links": [],
+    "attachments": [],
+    "auth": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass",
+      "signedBy": "northwind-tools.com",
+      "mailedBy": "northwind-tools.com"
+    }
+  }
+}

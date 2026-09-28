@@ -1,0 +1,38 @@
+{
+  "name": "northwind-hi-newsletter",
+  "description": "Invented Hindi marketing newsletter with urgency language and an unsubscribe line. Must stay low: bulk-mail suppression in the hi pack has to recognise the local unsubscribe vocabulary.",
+  "email": {
+    "senderName": "Northwind Roasters",
+    "senderEmail": "hello@northwind-roasters.example",
+    "recipientEmail": "sam.sales@northwind-logistics.com",
+    "subject": "अंतिम अवसर: 20% छूट आज रात समाप्त",
+    "bodyText": "सेल आधी रात को समाप्त होती है। पूरी रेंज पर 20% छूट पाने के लिए अभी कार्रवाई करें।\n\nइस महीने नया: रिफिल टिन और मुफ्त डिलीवरी।\n\nआप यह ईमेल इसलिए प्राप्त कर रहे हैं क्योंकि आपने northwind-roasters.example पर साइन अप किया। अनसब्सक्राइब या ईमेल प्राथमिकताएं प्रबंधित करें। ब्राउज़र में देखें।\n\nNorthwind Roasters",
+    "links": [
+      {
+        "text": "Shop the sale",
+        "href": "https://northwind-roasters.example/sale"
+      },
+      {
+        "text": "New arrivals",
+        "href": "https://northwind-roasters.example/new"
+      },
+      {
+        "text": "Unsubscribe",
+        "href": "https://northwind-roasters.example/unsubscribe?c=8f21ab"
+      },
+      {
+        "text": "preferences",
+        "href": "https://northwind-roasters.example/preferences?c=8f21ab"
+      }
+    ],
+    "attachments": [],
+    "auth": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass",
+      "signedBy": "northwind-roasters.example",
+      "mailedBy": "northwind-roasters.example",
+      "via": "sendgrid.net"
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "northwind-fr-verification-code",
+  "description": "Invented French one-time-code delivery with the local never-share warning. Must stay low: negation in the fr pack has to reverse the MFA/credential wording the warning shares with a real request.",
+  "email": {
+    "senderName": "Northwind Tools",
+    "senderEmail": "notifications@northwind-tools.com",
+    "recipientEmail": "sam.sales@northwind-logistics.com",
+    "subject": "Votre code de verification",
+    "bodyText": "Votre code de verification est 482915.\n\nSaisissez-le sur l ecran de connexion. Le code expire dans dix minutes.\n\nNe partagez jamais votre code de verification avec personne. Le personnel de Northwind Tools ne vous demandera jamais de nous envoyer votre code de verification par e-mail, telephone ou chat.\n\nSi vous n avez pas essaye de vous connecter, ignorez ce message.\n\nNorthwind Tools",
+    "links": [],
+    "attachments": [],
+    "auth": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass",
+      "signedBy": "northwind-tools.com",
+      "mailedBy": "northwind-tools.com"
+    }
+  }
+}

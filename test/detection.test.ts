@@ -32,6 +32,8 @@ import type {
 } from '../src/shared/types.js';
 import { loadFixture, loadAllFixtures, toEmailLink } from './fixtures/load.js';
 
+const LANGUAGE_IDS = ['es', 'fr', 'de', 'pt', 'it', 'nl', 'hi', 'hinglish'] as const;
+
 const LEGITIMATE_FIXTURES = [
   'legitimate',
   'legitimate-password-reset',
@@ -44,6 +46,10 @@ const LEGITIMATE_FIXTURES = [
   'legitimate-brand-product-name',
   'legitimate-brand-tld',
   'legitimate-settlement-notice',
+  ...LANGUAGE_IDS.flatMap((id) => [
+    `northwind-${id}-verification-code`,
+    `northwind-${id}-newsletter`,
+  ]),
 ];
 
 /**
@@ -80,6 +86,7 @@ const MALICIOUS_FIXTURES = [
   'storage-quota-bucket-page',
   'storage-payment-bucket-page',
   'settlement-credential-phish',
+  ...LANGUAGE_IDS.map((id) => `northwind-${id}-credential-phish`),
 ];
 
 const FIXED_NOW = 1_760_000_000_000;
@@ -2860,4 +2867,37 @@ describe('severity floor safety', () => {
     expect(result.signals.some((s) => s.severity === 'info')).toBe(true);
     expect(severityFloor(result.signals)).toBe(0);
   });
+});
+
+/**
+ * Language packs feed the existing content themes. Each language has a credential lure that must fire,
+ * and a code-delivery and newsletter that must stay honest — the same both-directions contract as the
+ * English fixtures, so a pack cannot buy coverage by over-firing on ordinary mail.
+ */
+describe('multilingual wording packs', () => {
+  for (const id of LANGUAGE_IDS) {
+    describe(id, () => {
+      it('reports a credential ask on the phishing lure', () => {
+        const result = analyzeFixture(`northwind-${id}-credential-phish`);
+        expect(hasSignal(result, 'content.credential_verification')).toBe(true);
+        expect(result.classification === 'low').toBe(false);
+      });
+
+      it('keeps a one-time-code delivery low', () => {
+        const result = analyzeFixture(`northwind-${id}-verification-code`);
+        expect(result.classification).toBe('low');
+        expect(hasSignal(result, 'content.mfa_request')).toBe(false);
+      });
+
+      it('keeps a newsletter low despite urgency language', () => {
+        const result = analyzeFixture(`northwind-${id}-newsletter`);
+        expect(result.classification).toBe('low');
+        expect(
+          result.signals.some(
+            (s) => s.category === 'content' && (s.severity === 'high' || s.severity === 'critical'),
+          ),
+        ).toBe(false);
+      });
+    });
+  }
 });

@@ -251,7 +251,9 @@
         <legend><h2>AI analysis</h2></legend>
         <p class="hint">
           Technical checks — sender domains, links, attachments, wording patterns — always run on this
-          device and need no AI. This setting only controls the optional semantic layer.
+          device and need no AI. Wording patterns cover English plus Spanish, French, German,
+          Portuguese, Italian, Dutch, Hindi and Hinglish. This setting only controls the optional
+          semantic layer.
         </p>
 
         <label class="option">
@@ -335,7 +337,7 @@
 
         <!--
           Hidden unless it is already the stored choice: the cloud path is designed and inert
-          (docs/ARCHITECTURE.md §6.1), so offering it invites someone to select it and conclude the AI
+          (docs/adr/0009-model-server-and-inert-cloud.md), so offering it invites someone to select it and conclude the AI
           section is broken. Kept in the markup rather than deleted, because the adapter it configures is
           real and this becomes a one-line change when a backend exists.
         -->

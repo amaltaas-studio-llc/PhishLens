@@ -14,7 +14,7 @@
  * cannot be confused — PhishLens's own statements in plain prose, words from the email as quotations,
  * and measured values (domains, destinations, filenames) as code.
  *
- * All geometry is in `PANEL_CSS`; this file positions nothing. See docs/ARCHITECTURE.md §5.1.
+ * All geometry is in `PANEL_CSS`; this file positions nothing. See docs/adr/0008-no-ui-framework-shadow-dom.md.
  */
 import { assessmentSignals, observedSignals } from '../analysis/engine.js';
 import {

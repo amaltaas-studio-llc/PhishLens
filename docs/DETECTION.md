@@ -1,419 +1,90 @@
 # Detection and scoring
 
-How a message becomes a number, and why the number is shaped the way it is. For the reasoning behind
-individual design decisions, see [ARCHITECTURE.md](ARCHITECTURE.md); this document describes what the
-system does.
+How a message becomes a 0–100 score. Design history:
+[ARCHITECTURE.md](ARCHITECTURE.md) and [adr/](adr/) (especially
+[0004](adr/0004-scoring-floors-and-weights.md),
+[0005](adr/0005-false-positive-resistance.md)).
 
-## The design principle
+## Principle
 
-> Use deterministic security signals for the things a computer can know, and use a language model only
-> for the things that require semantic judgement.
+> Use deterministic checks for what a computer can know; use a language model only for intent and tone.
 
-Whether `rnicrosoft-online.com` is Microsoft-owned is a fact — code decides it, and it is right every
-time. Whether "please confirm the wire details before Friday" is a business email compromise attempt is a
-reading — a model can help, and it is sometimes wrong. Mixing the two produces a number nobody can argue
-with. PhishLens keeps them apart the whole way through: separate detectors, a separate scoring category,
-a separate section of the card, and different wording in each.
+Facts (lookalike domains, mismatched links, executable filenames) are decided in code. Readings of
+wording may use a model, capped so they cannot reverse a check. Separate detectors, a separate scoring
+category, and a separate card section keep the two apart.
 
-![A message is read from the page, its fields extracted, checked by deterministic rules, and scored before
-the badge and card are drawn. An optional on-device model adjusts the score but cannot originate one. Every
-stage runs inside the browser.](assets/pipeline.svg)
+![Pipeline from extract through checks and optional model to badge and card](assets/pipeline.svg)
 
 ## What is checked
 
-Six groups of deterministic detectors, under `src/analysis/rules/`.
+Detectors live under `src/analysis/rules/`. Each emits `SecuritySignal`s (id, category, severity,
+explanation, evidence); none computes the final score.
 
-**Identity** (`identity.ts`) — impersonation of an organisation. Lookalike domains within a bounded edit
-distance of a real one, homoglyph and mixed-script spellings, punycode, brand names placed in a subdomain
-or local part rather than the registrable domain, and display names claiming an organisation the sending
-domain has nothing to do with. The last of these needs no brand table, which is what keeps the category
-working for the insurer or council that no curated list contains.
+| Category | File | Looks for |
+| --- | --- | --- |
+| Identity | `identity.ts`, `thread.ts` | Lookalikes, homoglyphs, brand-in-wrong-place, display names that do not match the domain, reply-chain impersonation |
+| Links | `links.ts` | Anchor ≠ destination, brand-prefix hosts, IPs, punycode, shorteners, credential wording to unrelated hosts, public object-storage pages |
+| Content | `content.ts`, `languages/` | Credential asks, OTP solicitation, payment changes, gift cards, urgency, secrecy, process bypass, … |
+| Attachments | `attachments.ts` | Executables, macros, archives, double extensions, RTLO tricks (filename only) |
+| Authentication | `authentication.ts` | SPF/DKIM/DMARC and Gmail’s warning as shown in the page — no raw headers |
 
-Two further identity checks are about the sender being *unaccountable* rather than imitating anyone. A From
-domain whose top-level domain IANA has never delegated cannot resolve, cannot receive a reply, and cannot
-have been registered by anybody, so the address was constructed rather than mistyped. Reserved names
-(`.local`, `.internal`, `.corp`) are excluded from that and reported as misconfiguration, since an internal
-appliance sending mail under its own hostname is common and innocent. Separately, a display name spelled in
-Unicode's mathematical alphabets — `𝗣aym𝗲nt` rather than `Payment` — renders normally to a reader while
-matching nothing that checks it against a list, and there is no other reason to address mail that way. Such
-a name is also folded to plain letters before the content rules read it, so the substitution stops hiding
-what the name claims.
+**Wording languages.** English patterns always run. Packs add patterns to the **same themes** for Spanish,
+French, German, Portuguese, Italian, Dutch, Hindi and Hinglish (gated detection; per-language negation and
+bulk vocabulary). Details: `src/analysis/rules/languages/`.
 
-**Links** (`links.ts`) — anchor text that names one destination while the href goes to another, the
-registrable domain buried behind a convincing prefix (`login.microsoftonline.com.session-verify.net`),
-raw and obfuscated IP addresses and hosts named after one, punycode hosts, shorteners, redirect chains and redirect parameters
-carrying a second URL, credential-related wording pointing at an unrelated domain, and non-web schemes.
-
-Also here: a page served out of public object storage. `https://storage.googleapis.com/…/renew.html` has a
-genuine Google hostname and a flawless certificate, and every part of the URL a reader is taught to check
-is correct — but the bucket belongs to whoever paid for it, so the domain vouches for the storage provider
-and not for the page. Only documents count. Object storage exists to serve images, PDFs and downloads, and
-reporting those would fire on a large share of ordinary mail.
-
-**Attachments** (`attachments.ts`) — executable and script types, macro-enabled documents, archives,
-double extensions, and right-to-left override characters used to make `invoice⁧fdp.exe` read as a PDF.
-
-**Conversation** (`thread.ts`) — whether a reply came from a party already in the thread. Reply-chain
-hijacking is the one attack that is invisible to every rule above: the attacker answers into a real
-conversation, so the quoted history is genuine, the subject is a legitimate `Re:`, authentication passes
-because they own the domain they send from, and the party being imitated is nobody's brand — it is
-whoever this reader happens to do business with. Two things are reported: a sending domain that is a
-homoglyph or near-miss of one already in the conversation, and a display name belonging to an existing
-participant arriving from an unrelated domain. Signals are filed under `identity`.
-
-What is deliberately *not* reported is a merely unfamiliar sender. People join threads constantly — a
-colleague is looped in, a vendor hands over to another rep, a ticket system answers from a new address —
-so "new domain in this thread" would fire on ordinary correspondence daily. Only resemblance to an
-established party counts, because resemblance is the part with no innocent explanation. For the same
-reason an identical name under a different suffix (`example.de` alongside `example.com`) is treated as one
-organisation: unlike the brand rules, nothing here enumerates which domains a company really owns.
-
-**Content** (`content.ts`) — requests to sign in or confirm credentials, payment and bank-detail changes,
-gift cards, manufactured urgency and consequence, and the structural tells of a lure (a body that is
-nothing but a link, a subject padded to hide its real text).
-
-One distinction inside this category carries more weight than its size suggests: **asking for a one-time
-code is the attack, and supplying one is the most ordinary mail there is.** The wording of the two barely
-differs, so the rule keys on the verb — share, send, forward, reply with — and never on the presence of a
-code. Matching "your verification code is 123456" scored every OTP notification ever sent at 50/100, and
-because such mail usually comes from a domain no brand table contains, nothing downstream was going to
-rescue it.
-
-Keying on the verb is only half of it, because the advice beside every genuine code uses the same verb:
-"never share your verification code with anyone" is a warning against the request, written in the words of
-the request. So a match preceded by a negation does not count. Three bounds keep that from becoming an
-evasion. The negation must attach to the matched verb itself — either directly, or through the one
-construction that reaches across a verb, "will never *ask you to* share" — so "do not hesitate to send me
-your verification code" and "never share your code, and send me a screenshot" both still report. It cannot
-be a conditional, so "if you do not send us the code your account will be closed" still reports. And each
-occurrence is judged on its own, so quoting the provider's warning above a demand — one sentence an
-attacker gets for free — suppresses nothing. `legitimate-verification-code` in the fixture corpus is the
-honest message, carrying the advice in the phrasing that names the code.
-
-Two further tells are about a message manipulating its own reading rather than what it asks for. A body that
-vouches for itself — "this message was sent from a trusted sender" — is forging a verdict, because that
-sentence belongs to a mail provider and no real sender writes it. And a body carrying hundreds of
-characters of unrelated prose hidden with CSS is diluting the ratio of suspicious wording to innocent
-wording that a statistical filter measures. The threshold sits far above the preheader line nearly every
-bulk sender hides, so ordinary marketing does not reach it.
-
-**Authentication** (`authentication.ts`) — SPF, DKIM and DMARC results, and Gmail's own warning banner,
-as far as Gmail exposes them in the page. There is no access to raw headers.
-
-Gmail's `via` annotation is reported here but **scores nothing**, because it appears whenever the
-authenticated sending domain differs from the From domain — the ordinary consequence of sending through a
-notification platform, a helpdesk or a mailing list, and true of a large share of legitimate commercial
-mail. A signal equally present in the honest and the dishonest population is not evidence, and telling a
-disreputable relay from a small legitimate one would need reputation data this project does not have. It
-scores in one configuration only: when the message claims to be a brand and the relay is not one that
-brand's own domains, where it contradicts a specific claim rather than merely existing.
-
-Every detector emits `SecuritySignal`s carrying an id, a category, a severity, a human explanation, and
-where applicable the evidence and a locator the UI can highlight. A detector never computes a score.
+**OTP vs code delivery.** Asking the reader to share a one-time code is the attack; delivering a code is
+ordinary mail. Rules key on solicitation verbs, and a surrounding negation (“never share…”, including
+after-verb forms in other languages) reverses a match. Conditionals like “if you do not send…” stay
+reportable. Fixtures: `legitimate-verification-code`, `northwind-*-verification-code`.
 
 ## The score
 
-A 0–100 integer assembled from capped per-category subtotals. **Every number lives in
-`src/analysis/scoring/config.ts` and nowhere else**, so the model's behaviour can be read off one file.
+Every weight, ceiling, floor and band threshold lives in `src/analysis/scoring/config.ts`.
 
 | Category | Weight |
 | --- | --- |
 | Links | 25 |
-| Identity (impersonation, lookalikes, homoglyphs) | 21 |
-| Content / social engineering | 15 |
-| Semantic (the AI model) | 15 |
-| Authentication (SPF/DKIM/DMARC as exposed by Gmail) | 14 |
+| Identity | 21 |
+| Content | 15 |
+| Semantic (AI) | 15 |
+| Authentication | 14 |
 | Attachments | 10 |
 
-Aggregation is pure functions in `src/analysis/scoring/aggregate.ts`, tested in isolation from the
-detectors:
+Aggregation (`scoring/aggregate.ts`):
 
-1. Each signal's score is capped at a per-severity ceiling — `info` 5, `low` 15, `medium` 35, `high` 65,
-   `critical` 100.
-2. Signals within a category are summed, and the subtotal is capped at the category's weight.
-3. The total is the sum of subtotals, clamped to `[0, 100]`.
-4. A single **deterministic** finding of `high` or `critical` severity establishes a score *floor* of 50
-   or 75 respectively, and `high` findings in two or more different categories establish a floor of 75
-   together.
+1. Cap each finding by severity (`info` 5 … `critical` 100).
+2. Sum per category; cap at the category weight.
+3. Sum categories; clamp to `[0, 100]`.
+4. **Floors (deterministic only):** one `high` → ≥50; one `critical` → ≥75; `high` in two or more
+   categories → ≥75. Never from `llm` or `authentication.gmail_warning`.
 
-The weights sum to exactly 100. If they summed to more, the final clamp would fire on ordinary
-suspicious mail and compress the top of the scale until 80 and 100 meant the same thing.
+Bands: low &lt; 25 ≤ caution &lt; 50 ≤ suspicious &lt; 75 ≤ high-risk.
 
-### Why there is a floor
-
-Step 4 is the one departure from a purely additive model, and it exists because additive scoring has a
-structural blind spot: an attack that is malicious in only one dimension can never exceed that
-dimension's weight. A gift-card or payroll-diversion email is plain text from a real mailbox with no
-links, no attachments and passing authentication. It is *entirely* a content finding, so it would top out
-at 15/100 and be reported as low risk. The floor stops a single-dimension attack from being diluted by
-the categories it happens not to touch.
-
-The same blind spot has a second shape: an attack that avoids *some* dimensions on purpose. A phish that
-names no brand has nothing for the impersonation rules to compare, and one sent from a throwaway domain
-passes that domain's own SPF and DKIM, so Gmail shows nothing for authentication to report. That leaves
-identity and authentication — 35 points — empty by design. What remains lands in links and wording,
-worth 40 together, so a message with a page in a storage bucket, a demand to update payment details and
-a threat to delete the account, all `high`, stopped at 55 even with the AI's 15 on top. The findings are
-independent, though — each category is a different way of being wrong — and severe findings in two
-categories at once are what an attack looks like and what ordinary mail does not produce. So they floor
-the score at 75. Categories are counted, not findings, so three links to the same page cannot converge
-with themselves.
-
-Both floors are restricted to deterministic signals, so the AI can neither trigger one nor count towards
-convergence. They also exclude `authentication.gmail_warning` by id: Gmail shows that banner
-conditionally on the folder being viewed, so letting it set the verdict would make a message's score
-change when you moved it to Spam. And both rest on the same tested assumption — no legitimate fixture
-produces a `high` or `critical` deterministic finding in any category.
-
-When a floor is what produced the score, the card labels it, and says which kind: "minimum for this
-finding", or the categories whose severe findings converged. A breakdown whose categories add up to less
-than the total looks like broken arithmetic otherwise.
+Floors exist so single-dimension attacks (plain-text gift-card BEC) cannot top out at the content weight
+alone. Legitimate fixtures must not produce `high`/`critical` deterministic findings — that assumption is
+tested.
 
 ## Holding down false positives
 
-A security indicator that cries wolf gets ignored, at which point it is worse than nothing. Several
-mechanisms exist purely to keep legitimate mail at zero.
+Full reasoning: [adr/0005](adr/0005-false-positive-resistance.md). In short:
 
-- **Dampening.** Content findings are softened when the sender is on a brand-owned domain, is not
-  impersonating anyone, and Gmail's own surfaces **prove the message came from that domain** — a real
-  password-reset email says all the same alarming things a fake one does. The signals are still reported;
-  they carry a `dampened` flag and are excluded from corroborating the AI verdict, so a softened finding
-  cannot be used to license a score elsewhere.
-  **Proof is required, not assumed.** A From header is a claim, and forging a famous one is the attack this
-  is all for, so dampening on the domain alone rewarded the mail it should punish: "send me your
-  verification code" from a `paypal.com` address that nothing tied to PayPal came out at 8/100 and Low Risk.
-  The gate is the same `isSenderProven` that trust uses, satisfied by an aligned `signed-by` row on its own,
-  since that is the only authentication evidence most Gmail builds actually render.
-  **Consumer mailboxes are excluded**, because a brand owning a domain is not the same as a mailbox
-  speaking for the brand: `gmail.com` is Google's, so reading ownership as authority quietly handed
-  dampening to every personal account at every consumer provider — "please send me your verification code"
-  from a stranger's Gmail scored 13/100 and Low Risk, where the identical sentence from an unfamiliar
-  domain scored 50. The brand table is right to list those domains, since that is what makes `gmai1.com` a
-  lookalike; the ownership-as-authority reading is what was wrong.
-- **Bulk-mail shape.** Newsletters have many links across many domains and would otherwise trip
-  link-heavy heuristics. Recognising the shape suppresses the heuristics that assume person-to-person
-  mail. The suppression is withdrawn when the body conceals prose with CSS: bulk shape is cheap to forge —
-  an unsubscribe line buys it — and concealed filler is not something a real newsletter does, so a message
-  that pads itself no longer gets the benefit of the doubt it was engineering to claim.
-- **Sender-domain redirects.** Newsletter platforms rewrite every link through their own redirector while
-  the anchor text names the real destination, which is exactly the pattern the strongest link rule looks
-  for. Links whose host is on the *sender's own registrable domain* are exempt from the mismatch and
-  redirect rules, which covers every such platform without needing a list of them. The same exemption
-  applies when the anchor is prose rather than a URL: a social footer links the networks it has profiles
-  on *by name*, so "LinkedIn" pointing at the sender's own click tracker is a profile link, not a brand
-  claim. Both exemptions yield when the message claims to *be* the brand in question, which is where
-  reputation is genuinely being borrowed.
-- **Word-boundary brand matching.** Short brand keywords (`irs`, `aws`) must match as whole folded words,
-  or "first" and "lawsuit" become brand claims once separators are stripped for comparison. A long keyword
-  may sit inside a word (`SecurePayPal`) or be spread across several (`P a y P a l`), but may only span
-  words if it begins at one: folding turns `rn` into `m`, so "Miriam Stearns" runs together as
-  `mlrlamsteams`, which contains Microsoft's `msteams`.
-- **A brand named with an ordinary word.** "Ledger" and "Exodus" are wallet makers phished for the recovery
-  phrase, and also words an accounting subject or a news headline uses. As keywords they would make that
-  mail claim a brand, so they match only in qualified forms (`Ledger Live`, `Exodus Wallet`) or as a
-  *standalone name*: a display name that is the brand alone, optionally followed by a generic word from a
-  fixed list ("Ledger Support"). "Ledger Accounting Group" and "Sam Ledger" claim nothing. Neither brand
-  has a lookalike target, because a six-letter core is matched anywhere in a link's subdomain and a
-  `general-ledger.` host is not a disguise.
-- **Severe wording needs its object.** The `high` content rules set a severity floor alone, so each pattern
-  has to describe the attack rather than share its vocabulary. A sextortion claim is "I have recorded
-  *you*", not "I have captured the trace"; a payroll diversion is *my* salary, not payroll's own
-  announcement about "your payroll information"; a gift-card request is addressed to the reader or asks
-  for several cards, not "spend $50 and get a gift certificate"; a wallet address carries a letter past
-  `f` and no `0`, which no hex checksum or Message-ID does. Each boundary came from running the rules over
-  a public corpus of genuine mailing-list, corporate and newsletter mail, and each is tested with the
-  ordinary sentence it used to misread.
-- **A link's shape is not its harm.** The same kind of corpus, run through the link and identity rules,
-  showed several `critical` findings describing something harmless as often as an attack. An IP address on
-  a private network (`192.168.…`, `10.…`) is an intranet link a colleague pasted, unreachable from outside,
-  so it is `low` (`link.private_ip_url`); a public IP stays `critical`. `ftp:` is a file download, so it is
-  `medium`; a `file:` link to the reader's own disk (`file:///…`) is `low`, since it can only open
-  something already there. A `file:` link to a remote host or a UNC path still reads as `critical`, like
-  `javascript:`, because opening one can leak Windows credentials. A short brand core in a subdomain has to
-  *begin* a word: `bigmail.`, `purchase.` and `pineapple.` end with one, whereas phishing hosts lead
-  with the brand (`chasesecure.`). A brand-named section of the sender's own site (`apple.` on a news site)
-  is exempt unless the message claims to be that brand — but a whole brand domain in front of it
-  (`paypal.com.northwind-tools.com`) never is. And a sender on the recipient's own name under
-  another suffix — `.net` beside `.com`, `.fr` beside `.de`, `.com.au` — is the same organisation in
-  another market. It is not a lookalike, but a typo suffix (`.co`, `.cm`) still is. "Portal" no longer
-  counts as sign-in wording, because it names every intranet home page. The reverse case is a host named
-  after its address (`203-0-113-7.cloud.example.net`), the name a hosting provider gives a rented server:
-  a bare IP with a domain in front, so it is reported (`link.ip_named_host`), at `medium` because a
-  developer's notice about their own cloud instance links to one too, and never on the sender's own domain.
-- **Destinations inside a tracker's path.** The click trackers of the large sending platforms put the real
-  destination in the path with its separators percent-encoded — `…/L0/https:%2F%2Fexample.com%2Fpath` —
-  and `URL` leaves `%2F` encoded in a pathname, correctly, since decoding it would change the path's
-  structure. Unwrapping therefore reads the encoded form as well as the literal one. Without that, every
-  rule asking where a link goes answers with the tracker: a brand's own verification button read as a
-  sign-in link sent to a domain the brand does not own, once per link, which saturates the link category
-  on ordinary commercial mail. Reading the destination is better than exempting the tracker, because the
-  same wrapper around a domain the brand does not own is still reported, and the finding then names the
-  destination rather than the platform that carried it.
-- **Names claiming two brands.** A product name can contain another brand's word — `Amazon Appstore Team`
-  names Amazon and, through the `appstore` keyword, Apple — so the impersonation rules need to know which
-  brand the message is *presenting itself as*, not merely which brands it mentions. Among claims from
-  equally authoritative places, the brand owning the sending domain wins, and otherwise the earliest
-  mention does. Using the order of the entries in `src/shared/brands.ts` instead, as the first version did,
-  decides the question with a fact about the table rather than one about the message: Apple is written
-  before Amazon, so authenticated mail from a domain Amazon owns was read as Apple impersonation and
-  correlated with its own verification wording into High Risk.
-- **Concealment judged per element, applied to a subtree.** The hidden-text scan reads inline styles, and
-  what it finds is *removed* from the body before scoring, so an over-eager rule deletes the evidence
-  instead of finding it. Two declarations do not survive being applied to everything underneath them: a zero
-  font size is inherited and any descendant naming its own size is drawn at it — which is the whole purpose
-  of `font-size:0` on a container, since it collapses the whitespace between tags — and a zero height or
-  width hides nothing without `overflow:hidden`, because content in a box with no room overflows and is
-  drawn anyway. A genuine newsletter wrapping its cells in `font-size:0` therefore had its entire body
-  removed, and an empty body was not a *missing* body: the element was there, so the message was scored on
-  its subject and sender alone, every content and link check reading an empty string, with nothing on the
-  card to say so. Underneath both fixes is a floor, since no rule reading inline styles can be exact enough
-  to earn the right to decide a message has no words: a body pruned to nothing is now reported as a part
-  that could not be read, so the message is not scored at all. Substituting the removed text instead was the
-  first attempt and is worse — Gmail renders a body hidden while it is still building the view, so every
-  message caught mid-render would be accused of concealing every word it contains.
-- **A brand's own name under a suffix the table does not list.** The most expensive form of the same
-  problem, because the rule it tripped was `critical`. A multinational runs one name across every market it
-  sells in; the table lists a handful of those domains per brand, so `paypal.it`, `hsbc.fr` and
-  `netflix.com.br` were domains those brands do not own, and the lookalike rule — which deliberately treats
-  the same name under a different suffix as an imitation — reported them at 45 points with a severity floor.
-  Authentic mail, High Risk. Thirty-odd brands against two hundred country suffixes is not a list anyone
-  finishes, so the split is structural. A name that is only *confusably* the brand's (`pаypal.it` with a
-  Cyrillic а) is a homoglyph domain and stays an imitation. A suffix that is the brand's own with characters
-  dropped (`.co`, `.cm`, `.om` against `.com`) is a typo trap and stays an imitation — those are the reason
-  anyone registers them. What is left is a name that is literally the brand's under a suffix that misspells
-  nothing, which is either the brand's market or somebody who registered the brand's name in it, and no
-  string in the message tells those apart. That is reported as what it is — `identity.unverified_brand_domain`,
-  `medium`, no floor, naming the domain and telling the reader to compare it with the one the brand's mail
-  normally arrives from — and the links to that domain are left to it rather than each restating the
-  uncertainty as a certainty. `legitimate-brand-country-domain` is held to `caution`: never an all-clear,
-  never an accusation.
-- **A legal notice that names the defendant.** Class-action and settlement notices are titled after the
-  case, so the sender line reads "*Brand* … Settlement Administrator" and the mail comes from a claims
-  administrator's own domain. The display-name rule read that as the brand claiming to send it, at `high`,
-  and its floor put genuine notices at Suspicious. When the name spells out a legal role in full — class
-  action, settlement, claims, litigation or notice *administrator* — the finding becomes
-  `identity.brand_named_in_legal_notice`: `medium`, no floor, saying the brand did not send it and telling
-  the reader to find the settlement's site through the court rather than the message, since fake notices
-  copy the shape exactly. It buys an attacker nothing: it still counts as impersonation for the credential
-  correlation, so `settlement-credential-phish` asking for a password is critical and High Risk, a bare
-  "Claims" (how a dispute phish names itself) is not a legal role, and a freemail sender is not softened.
-- **Brands that run their own top-level domain.** Ownership is a question about a name's TLD as well as its
-  second level. ICANN's Specification 13 restricts registrations in a brand TLD to the operator, its
-  affiliates and its trademark licensees, so every name under `.apple` or `.microsoft` is the brand's by the
-  registry agreement — a stronger guarantee than a curated list of `.com` names, and one no such list can
-  keep up with, since the brand may create names under it at will. Only strings ICANN records as granted a
-  Specification 13 exemption belong in a brand's `tlds`, and a TLD anyone can register under must never:
-  `.me` and `.live` appear in brand `domains` as `me.com` and `live.com`, and treating the TLDs as owned
-  would hand those identities to every registrant. Without this, an authenticated notice from a brand's own
-  TLD whose display name named the brand was brand impersonation at `high` — half the score, and a marker on
-  the inbox row, for mail whose provenance is better established than most. The same question is asked of a
-  link's *destination*, and getting that wrong cost more, because the rule it tripped is the most confident
-  one there is. A brand's footer shows its `.com` address and links to a short name under its own TLD, so a
-  displayed address leading to the brand's own redirector read as an address leading somewhere the brand was
-  not: `critical`, 45 points, 75/100 High Risk on a genuine card issuer's refund notice — earned by the line
-  telling the reader where to report a phishing email. The exemption is scoped to the brand the *displayed*
-  address names rather than to any brand, so showing one brand's address while linking to another's is still
-  reported; otherwise every brand in the table would be a usable disguise for every other.
-- **The AI dead zone.** Verdicts below 45/100, and any verdict no deterministic check corroborates, score
-  zero. See [LOCAL-AI.md](LOCAL-AI.md).
-- **Trusted senders.** The user's own answer to a false positive, and the only one on this list that is
-  not automatic. See below.
+- **Dampening** — soften `content` when a claimed brand’s domain is proven by Gmail; never dampen
+  identity/link; never high/critical.
+- **Bulk mail** — suppress marketing-prone content themes when unsubscribe language is present and there
+  is no credential ask (per language).
+- **Sender click-trackers** — mismatch rules skip the sender’s own domain unless the anchor impersonates a brand.
+- **Trust list** — same proof gate; dampens only content/authentication; findings stay visible.
+- **Brand-independent identity** — shared-name / institutional checks that need no brand table.
 
-The fixture suite enforces this: legitimate fixtures must score low **and** produce no `high` or
-`critical` deterministic signal, which is what makes the severity floors safe rather than merely
-plausible.
+## List rows
 
-### Trusted senders
+Inbox marks use an allowlist of sender-only identity rules; unmarked means unchecked, never “looks fine.”
+See [adr/0007](adr/0007-list-row-sender-only.md).
 
-Some senders are legitimately odd in a way no heuristic will ever like — a supplier that bills from a
-different domain than its website, a platform sending on a brand's behalf. `src/shared/trust.ts` lets the
-user say so, per address or per registrable domain, from the card.
+## Limitations
 
-The whole design is about the fact that this is the most attractive setting in the extension to an
-attacker. Four constraints, each with a test:
-
-- **Authentication-gated.** Trust applies only when Gmail's own summary says the message passed
-  authentication for that domain (`isSenderProven`): DMARC passing, or a `signed-by` domain that aligns
-  with the sender. SPF alone is refused, and the unverified-sender avatar overrides everything. A spoofed
-  message from a trusted domain is scored as though the list were empty, and the card says the trust was
-  not applied.
-- **Identity findings are never dampened.** Only `content` and `authentication` findings can soften.
-  Trusting `paypal.com` has no effect on a lookalike of it, which is the attack trust would otherwise
-  enable.
-- **Severity-bounded.** A `high` or `critical` finding is never dampened by user trust alone, so trust can
-  lower a score within a band but cannot talk a message down from High Risk.
-- **Visible and reversible.** A dampened finding stays in the list with its flag, and the card states the
-  sender is trusted with an undo. Nothing is silently removed; the list is also editable in the options
-  page.
-
-## What a list row can support
-
-`src/analysis/triage.ts` runs a subset of the identity rules against a sender line alone, for markers on
-inbox rows. A row has no body, no links, and no authentication result, so the rule set is an explicit
-allowlist of checks that need nothing else: brand-name-versus-domain claims, lookalikes of a brand or of
-the reader's own domain, punycode, and malformed or nonexistent TLDs. A test enumerates every identity
-rule the corpus produces and fails if one is in neither the allowlist nor the recorded exclusions, so a
-new rule cannot be assumed safe here by omission.
-
-Two properties are asserted over the whole corpus:
-
-- **No marker can read as an all-clear.** Every possible output is a warning or nothing. An unmarked row
-  is an unchecked row.
-- **No fixture that scores low is marked.**
-
-The floor for marking is `high`, deliberately above the floor for reporting a finding in the card. At
-`medium` the generous half of `unsupported_org_claim` marks rows like
-`"Accounts Receivable" <ar@a-supplier.example>` — a departmental name sharing no word with its own
-company's domain. Beside a full score that is a reasonable remark; as the only thing said about a message
-it is the marker that gets the feature switched off.
-
-## Confidence in the numbers
-
-1325 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
-`test/fixtures/` holds 29 messages: a plain legitimate message, a legitimate password reset, a legitimate
-one-time code being delivered, a legitimate reply into an existing thread, a newsletter with many links, a
-newsletter whose links are all rewritten through its platform's click tracker, an institutional newsletter
-whose social footer names each network it links to, an invoice, a developer notice whose display name
-honestly names two brands at once because one brand's product shares the other's keyword, a brand's own
-mail from its own top-level domain, the same brand's mail from a country domain the table does not list,
-PayPal phishing, a Microsoft lookalike
-domain, a brand spoof from an unlisted lead-generation sender, an anchor-URL mismatch, a punycode link, an
-IP-address URL,
-a ZIP attachment, an executable attachment, a gift-card scam, a fake payroll change, an MFA-code request,
-two reply-chain hijacks — one by a lookalike domain, one reusing a participant's name — a storage-quota
-lure built so that every field has an innocent answer, which is the fixture that documents the most about
-how the categories interact, and a storage-bucket payment lure that names no brand and passes its own
-authentication, which is the one the convergence floor exists for.
-
-Fixtures store what a human would write down — anchor text, href, filename — and the loader derives
-`normalizedDomain` and `extension` using the same helpers the Gmail adapter uses. If fixtures hard-coded
-those, a bug in normalisation would be invisible, because the fixture would carry the correct answer that
-production code failed to compute.
-
-See [DEVELOPMENT.md](DEVELOPMENT.md) for what each test file covers and how to run them.
-
-## Limitations of the approach
-
-- **The brand list is curated, not exhaustive** (`src/shared/brands.ts`). Impersonation of an unlisted
-  brand is caught by the brand-independent signals, which ask whether the display name shares any name
-  with the sending domain, but the precise findings — lookalike distance, "not a Microsoft-owned domain" —
-  only apply to listed brands.
-- **The public suffix list is a pragmatic subset** (`src/shared/public-suffix.ts`), not the full PSL. It
-  covers common multi-label suffixes; an unusual one may be misparsed at the registrable boundary.
-- **The TLD list is a snapshot** (`src/shared/tlds.ts`, refreshed with `node scripts/gen-tlds.mjs`), because
-  nothing here may perform DNS on data from a message. A top-level domain delegated after the snapshot
-  reads as nonexistent. Delegations are rare and the consequence is bounded: that finding can raise a
-  message to suspicious, never to high risk on its own.
-- **English-centric content heuristics.** Social-engineering patterns are English. Non-English phishing is
-  caught by identity, link and attachment signals but not content ones.
-- **Callback scams are mostly out of reach.** A fake antivirus renewal asking the reader to phone a number
-  has no link to inspect and reads, word for word, like the genuine receipt it copies; a bank's real fraud
-  alert asks for the same call. What gives it away is usually the sender, so it scores on identity alone.
-- **Authentication is second-hand.** No raw headers means no Received chain analysis and reliance on
-  Gmail's summary where it is rendered at all.
-- **The body is truncated** — 200,000 characters for analysis, 4,000 for the model. A lure buried past the
-  cut in a very long message can be missed.
-- **No reputation or intelligence feeds**, by design. A phishing page on a freshly registered but
-  otherwise unremarkable domain scores on its structure alone.
-- **Highlighting is coarse for text.** To avoid restructuring Gmail's DOM, the smallest existing element
-  containing the evidence is outlined rather than the exact character range.
+- Brand and public-suffix tables are curated subsets.
+- No raw mail headers; authentication is best-effort from Gmail’s UI.
+- Body is `textContent` only (no OCR).
+- Wording packs cover eight languages besides English; others lean on identity, links and attachments.
+- No reputation feeds; analysis is textual only ([adr/0010](adr/0010-hostile-input-posture.md)).

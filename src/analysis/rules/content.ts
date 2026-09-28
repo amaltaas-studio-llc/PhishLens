@@ -16,6 +16,12 @@ import { excerpt, firstMatch, formatList } from '../../shared/text.js';
 import { hasStyledLetterforms } from '../../shared/unicode.js';
 import type { AnalysisContext } from '../context.js';
 import { DAMPENING, DETECTION_TUNING } from '../scoring/config.js';
+import {
+  detectLanguages,
+  foldLatinDiacritics,
+  type LanguagePack,
+  type ThemeId,
+} from './languages/index.js';
 import { signal } from './types.js';
 
 /**
@@ -25,7 +31,7 @@ import { signal } from './types.js';
  * body that an attacker controls. `src/shared/text.ts` also truncates the body first.
  */
 interface ContentPattern {
-  id: string;
+  id: ThemeId;
   title: string;
   /** Describes the *observation*, in neutral language. */
   description: string;
@@ -35,7 +41,7 @@ interface ContentPattern {
   /** How many distinct patterns must match before the theme is reported. */
   minMatches?: number;
   /**
-   * Whether a negation in front of a match reverses its meaning, so the match should not count.
+   * Whether a negation in front of (or, in some languages, after) a match reverses its meaning.
    *
    * Opt-in per theme rather than applied to all of them, because negation only reverses a theme whose
    * patterns match a *request*. "If you do not verify your account it will be closed" is a demand with
@@ -85,20 +91,29 @@ const MAX_SENTENCE_LOOKBACK = 320;
 const MAX_OCCURRENCES = 12;
 
 /**
- * Finds the first occurrence of `regex` that a preceding negation does not reverse.
+ * Finds the first occurrence of `regex` that a surrounding negation does not reverse.
  *
  * Scanning *past* a negated occurrence matters as much as recognising one. "Never share your verification
  * code with anyone. Reply to this email with the verification code." has to be reported, and it is the
  * shape an attacker gets for free by quoting the warning the real provider sends. Suppression is therefore
  * per occurrence and within one sentence; a theme suppressed by a negation appearing anywhere in the body
  * would be an off switch that whoever wants the finding gone gets to write.
+ *
+ * `packs` carry languages that put the negation after the verb ("Teilen Sie den Code niemals", "OTP
+ * share na karein"); English alone is not enough for those.
  */
-function firstUnnegatedMatch(text: string, regex: RegExp): { match: string; index: number } | null {
+function firstUnnegatedMatch(
+  text: string,
+  regex: RegExp,
+  packs: readonly LanguagePack[],
+): { match: string; index: number } | null {
   const scan = new RegExp(regex.source, `${regex.flags.replace('g', '')}g`);
   for (let seen = 0; seen < MAX_OCCURRENCES; seen += 1) {
     const found = scan.exec(text);
     if (found === null) return null;
-    if (!isNegated(text, found.index)) return { match: found[0], index: found.index };
+    if (!isNegated(text, found.index, found[0].length, packs)) {
+      return { match: found[0], index: found.index };
+    }
     // A zero-length match would otherwise loop on one position forever. No pattern here can produce one
     // today; the guard costs nothing and what it prevents is a hung tab.
     if (scan.lastIndex === found.index) scan.lastIndex += 1;
@@ -106,14 +121,53 @@ function firstUnnegatedMatch(text: string, regex: RegExp): { match: string; inde
   return null;
 }
 
-function isNegated(text: string, index: number): boolean {
+function isNegated(
+  text: string,
+  index: number,
+  matchLength: number,
+  packs: readonly LanguagePack[],
+): boolean {
   const from = Math.max(0, index - MAX_SENTENCE_LOOKBACK);
   const preceding = text.slice(from, index);
   // No line breaks to look for: `matchText` is whitespace-collapsed. Bullets and semicolons end a
   // sentence here because advice is as often listed or joined as it is punctuated.
   const boundary = /[.!?;\u2022][^.!?;\u2022]*$/u.exec(preceding);
   const start = boundary === null ? 0 : boundary.index + 1;
-  return NEGATED_UP_TO_HERE.test(preceding.slice(start));
+  const sentenceBefore = preceding.slice(start);
+
+  // A conditional that wraps the negation ("if you do not…", "si usted no…") is a demand, not advice.
+  if (NEGATED_UP_TO_HERE.test(sentenceBefore) && !isConditionalNegation(sentenceBefore, packs)) {
+    return true;
+  }
+
+  for (const pack of packs) {
+    const negation = pack.negation;
+    if (negation === undefined) continue;
+    if (
+      negation.before !== undefined &&
+      negation.before.test(sentenceBefore) &&
+      !isConditionalNegation(sentenceBefore, [pack])
+    ) {
+      return true;
+    }
+  }
+
+  const afterFrom = index + matchLength;
+  const afterWindow = text.slice(afterFrom, afterFrom + MAX_SENTENCE_LOOKBACK);
+  const afterBoundary = /^[^.!?;\u2022]*/u.exec(afterWindow);
+  const sentenceAfter = afterBoundary === null ? '' : afterBoundary[0];
+  for (const pack of packs) {
+    if (pack.negation?.after?.test(sentenceAfter) === true) return true;
+  }
+  return false;
+}
+
+function isConditionalNegation(sentenceBefore: string, packs: readonly LanguagePack[]): boolean {
+  // English conditionals are already excluded by lookbehinds on NEGATED_UP_TO_HERE; packs declare theirs.
+  for (const pack of packs) {
+    if (pack.negation?.conditional?.test(sentenceBefore) === true) return true;
+  }
+  return false;
 }
 
 const CONTENT_PATTERNS: readonly ContentPattern[] = [
@@ -142,14 +196,17 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
     severity: 'medium',
     score: 24,
     patterns: [
-      /\b(verify|confirm|validate|update|re-?enter|re-?confirm)\b[^.!?]{0,40}\b(your )?(account|identity|password|credentials?|login|sign[- ]?in)\b/u,
+      /\b(verify|confirm|validate|update|re-?enter|re-?confirm)\b[^.!?]{0,40}\b(your )?(account|identity|password|credentials?|login|sign[- ]?in|kyc)\b/u,
       // `details` and `information` need a qualifier naming what kind. Unqualified, they cover most of
       // ordinary business correspondence — "confirm the delivery details", "once the payment details
       // are updated", "we have updated our contact information" — none of which asks for a credential,
       // and all of which would be reported under a title claiming it did. Payment and bank wording is
       // deliberately not a qualifier here: that is a funds request, which `payment_transfer` reports
       // with the right explanation.
-      /\b(verify|confirm|validate|update|re-?enter|re-?confirm)\b[^.!?]{0,40}\b(your )?(account|login|sign[- ]?in|security|password|identity|personal)\s+(details|information|info)\b/u,
+      /\b(verify|confirm|validate|update|re-?enter|re-?confirm)\b[^.!?]{0,40}\b(your )?(account|login|sign[- ]?in|security|password|identity|personal|kyc)\s+(details|information|info)\b/u,
+      // Indian scam mail in English uses KYC the way credential phishing elsewhere uses "verify your
+      // account". Kept here rather than only in the Hinglish pack so a fully-English KYC lure still fires.
+      /\b(complete|submit|update|verify)\b[^.!?]{0,30}\b(your )?kyc\b/u,
       /\b(sign|log)[- ]?in\b[^.!?]{0,40}\b(to (verify|confirm|continue|avoid|restore|unlock|reactivate)|immediately|now)\b/u,
       /\b(click|tap|follow|use)\b[^.!?]{0,30}\b(link|button|here)\b[^.!?]{0,40}\b(sign|log)[- ]?in\b/u,
       /\b(your )?(password|credentials?) (will|must|needs? to) (be )?(expire|expired|expiring|updated?|changed?|reset|confirmed?|verified?)\b/u,
@@ -205,9 +262,9 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
     score: 30,
     negationReverses: true,
     patterns: [
-      /\b(share|send|provide|forward|enter|give|tell (me|us)|read (me|us))\b[^.!?]{0,40}\b(otp|one[- ]time (code|password|passcode|pin)|verification code|security code|authentication code|2fa code|mfa code|sms code|access code)\b/u,
+      /\b(share|send|provide|forward|enter|give|tell (me|us)|read (me|us))\b[^.!?]{0,40}\b(otp|one[- ]time (code|password|passcode|pin)|verification code|security code|authentication code|2fa code|mfa code|sms code|access code|upi pin)\b/u,
       // "reply to this email with the verification code" — the verb and the preposition are separated.
-      /\b(reply|respond|get back)\b[^.!?]{0,40}\bwith\b[^.!?]{0,40}\b(otp|one[- ]time (code|password|passcode|pin)|verification code|security code|authentication code|2fa code|mfa code|sms code|access code|code)\b/u,
+      /\b(reply|respond|get back)\b[^.!?]{0,40}\bwith\b[^.!?]{0,40}\b(otp|one[- ]time (code|password|passcode|pin)|verification code|security code|authentication code|2fa code|mfa code|sms code|access code|upi pin|code)\b/u,
       // Deliberately no pattern for "your verification code is 123456". A message *containing* a code is
       // delivering one, which is the most ordinary transactional mail there is, and every service that
       // sends one says so in those words — usually right next to "never share your verification code with
@@ -420,7 +477,7 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
  */
 interface Combination {
   id: string;
-  requires: readonly string[];
+  requires: readonly ThemeId[];
   severity: Severity;
   score: number;
   title: string;
@@ -536,15 +593,26 @@ interface ThemeMatch {
 }
 
 function matchThemes(context: AnalysisContext): ThemeMatch[] {
+  // Pack patterns run against diacritic-folded text so accentless spellings still match; evidence is
+  // always excerpted from the unfolded `matchText`, whose indices the fold preserves.
   const text = context.matchText;
+  const folded = foldLatinDiacritics(text);
+  const packs = detectLanguages(folded);
   const matches: ThemeMatch[] = [];
 
   for (const pattern of CONTENT_PATTERNS) {
     let matchCount = 0;
     let evidenceText = '';
-    for (const regex of pattern.patterns) {
+    const packPatterns = packs.flatMap((pack) => pack.themes[pattern.id] ?? []);
+    for (const regex of [...pattern.patterns, ...packPatterns]) {
+      // English patterns are written against unfolded text (ASCII `\b` is fine for them). Pack patterns
+      // are written against the folded form and use Unicode boundaries from `compile()`.
+      const isPack = !pattern.patterns.includes(regex);
+      const haystack = isPack ? folded : text;
       const hit =
-        pattern.negationReverses === true ? firstUnnegatedMatch(text, regex) : firstMatch(text, regex);
+        pattern.negationReverses === true
+          ? firstUnnegatedMatch(haystack, regex, packs)
+          : firstMatch(haystack, regex);
       if (hit === null) continue;
       matchCount += 1;
       if (evidenceText === '') evidenceText = excerpt(text, hit.index, hit.match.length);
@@ -571,10 +639,13 @@ function looksLikeBulkMail(context: AnalysisContext): boolean {
   const hidden = context.email.hiddenText?.chars ?? 0;
   if (hidden >= DETECTION_TUNING.minHiddenBodyChars) return false;
 
-  const unsubscribe =
+  const folded = foldLatinDiacritics(context.matchText);
+  const packs = detectLanguages(folded);
+  const englishUnsubscribe =
     /\b(unsubscribe|opt[- ]out|manage (your )?(email )?preferences|update (your )?preferences|email preferences|no longer wish to receive|stop receiving|view (this|it) (email )?in (your )?browser|sent to you because|you are receiving this)\b/u.test(
       context.matchText,
     );
+  const unsubscribe = englishUnsubscribe || packs.some((pack) => pack.bulk.test(folded));
   if (!unsubscribe) return false;
 
   const manyLinks = context.webLinks.length >= DETECTION_TUNING.bulkMailLinkCount;
@@ -583,9 +654,12 @@ function looksLikeBulkMail(context: AnalysisContext): boolean {
       `${l.anchorText} ${l.target?.pathname ?? ''}`,
     ),
   );
-  const credentialAsk = /\b(password|credential|verify your account|sign in to (verify|confirm)|otp|one[- ]time (code|passcode))\b/u.test(
-    context.matchText,
-  );
+  const englishCredentialAsk =
+    /\b(password|credential|verify your account|sign in to (verify|confirm)|otp|one[- ]time (code|passcode)|kyc|upi pin)\b/u.test(
+      context.matchText,
+    );
+  const credentialAsk =
+    englishCredentialAsk || packs.some((pack) => pack.credentialAsk.test(folded));
 
   return (manyLinks || hasUnsubscribeLink) && !credentialAsk;
 }
@@ -630,7 +704,14 @@ function genericSalutationWithBrandClaim(context: AnalysisContext): SecuritySign
   if (context.primaryClaim === undefined) return [];
   const generic =
     /\b(dear (customer|client|user|member|sir|madam|sir\/madam|account holder|valued (customer|client|member))|dear (email )?user|hello (customer|user|member)|attention:? (customer|user)|dear [\w.+-]+@)/u;
-  const hit = firstMatch(context.matchText, generic);
+  const folded = foldLatinDiacritics(context.matchText);
+  const packs = detectLanguages(folded);
+  const hit =
+    firstMatch(context.matchText, generic) ??
+    packs.reduce<{ match: string; index: number } | null>((found, pack) => {
+      if (found !== null || pack.genericSalutation === undefined) return found;
+      return firstMatch(folded, pack.genericSalutation);
+    }, null);
   if (hit === null) return [];
 
   return [
@@ -850,4 +931,11 @@ export function detectContentSignals(context: AnalysisContext): SecuritySignal[]
   ];
 }
 
-export const __testables = { CONTENT_PATTERNS, COMBINATIONS, matchThemes, repeatedDecorativeChar };
+export const __testables = {
+  CONTENT_PATTERNS,
+  COMBINATIONS,
+  matchThemes,
+  repeatedDecorativeChar,
+  isNegated,
+  detectLanguages,
+};

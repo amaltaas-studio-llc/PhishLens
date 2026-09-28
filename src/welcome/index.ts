@@ -7,6 +7,7 @@
 import {
   downloadOnDeviceModel,
   onDeviceModelState,
+  type ModelDownloadOutcome,
   type OnDeviceModelState,
 } from '../analysis/llm/on-device.js';
 import { requestSettings, sendMessage } from '../shared/messaging.js';
@@ -142,7 +143,7 @@ class WelcomePage {
     this.#render(state);
     this.#watch = setInterval(() => void this.#watchDownload(run), DOWNLOAD_POLL_MS);
 
-    const started = await downloadOnDeviceModel((fraction) => {
+    const outcome = await downloadOnDeviceModel((fraction) => {
       if (run !== this.#tracking) return;
       this.#progress =
         fraction >= 1
@@ -150,23 +151,27 @@ class WelcomePage {
           : `Downloading… ${String(Math.round(Math.max(0, fraction) * 100))}%`;
       if (this.#mode === 'local') this.#render(state);
     });
-    if (run === this.#tracking) this.#endDownload(started);
+    if (run === this.#tracking) this.#endDownload(outcome);
   }
 
   async #watchDownload(run: number): Promise<void> {
     const state = await onDeviceModelState();
     if (run !== this.#tracking) return;
-    if (state === 'available') this.#endDownload(true);
-    else if (state === 'unavailable' || state === 'unsupported') this.#endDownload(false);
+    if (state === 'available') this.#endDownload({ ok: true });
+    else if (state === 'unavailable' || state === 'unsupported') {
+      this.#endDownload({ ok: false, reason: state === 'unsupported' ? 'unsupported' : 'unavailable' });
+    }
   }
 
-  #endDownload(started: boolean): void {
+  #endDownload(outcome: ModelDownloadOutcome): void {
     this.#tracking += 1;
     clearInterval(this.#watch);
     this.#progress = null;
-    if (!started) {
+    if (!outcome.ok) {
       this.#status.textContent =
-        'Chrome did not start the download. Check the requirements below, then try again.';
+        outcome.reason === 'unavailable'
+          ? 'Chrome’s On-device AI setting is off (or blocked by policy), so the model cannot run. Turn it on under Settings → System, then try again.'
+          : 'Chrome did not start the download. Check the requirements below, then try again.';
     }
     void this.#refresh();
   }

@@ -1,7 +1,7 @@
 /**
  * Rule engine entry point: run every deterministic detector, then refine.
  *
- * "Refine" is the false-positive-resistance stage (docs/ARCHITECTURE.md §4.2). It is a separate pass
+ * "Refine" is the false-positive-resistance stage (docs/adr/0005-false-positive-resistance.md). It is a separate pass
  * rather than logic inside detectors because dampening needs to see *all* the signals to decide —
  * a content heuristic can only be safely softened once we know no link or identity rule fired.
  */

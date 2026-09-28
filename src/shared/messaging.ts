@@ -1,7 +1,7 @@
 /**
  * The content-script ↔ service-worker protocol.
  *
- * Kept deliberately tiny. The worker is stateless (docs/ARCHITECTURE.md §2), so every message is a
+ * Kept deliberately tiny. The worker is stateless (docs/adr/0002-mv3-state-in-content-script.md), so every message is a
  * complete, self-contained request; nothing here depends on a previous message having been handled
  * by the same worker instance.
  */

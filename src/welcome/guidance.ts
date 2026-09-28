@@ -7,7 +7,8 @@
  */
 import type { OnDeviceModelState } from '../analysis/llm/on-device.js';
 
-export const AI_SETTINGS_URL = 'chrome://settings/ai';
+/** On-device AI lives under Settings → System; `settings/ai` is a different page (AI Innovations). */
+export const AI_SETTINGS_URL = 'chrome://settings/system';
 export const UPDATE_CHROME_URL = 'chrome://settings/help';
 export const HELP_URL = 'https://support.google.com/chrome/answer/16961953';
 
@@ -66,8 +67,8 @@ export function onDeviceGuidance(state: OnDeviceModelState): Guidance {
         tone: 'needs-action',
         headline: 'Chrome’s on-device model is not available yet. To turn it on:',
         steps: [
-          `Open Chrome’s AI settings at ${AI_SETTINGS_URL}.`,
-          'Under “On-device AI”, switch On-device AI on.',
+          `Open Chrome’s system settings at ${AI_SETTINGS_URL}.`,
+          'Switch On-device AI on.',
           'Chrome then downloads the model in the background. It needs about 20 GB of free disk space, an unmetered connection, and hardware able to run it.',
           'Come back to this page. It checks again when you return.',
         ],

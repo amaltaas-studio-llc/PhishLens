@@ -1,0 +1,20 @@
+{
+  "name": "northwind-hi-verification-code",
+  "description": "Invented Hindi one-time-code delivery with the local never-share warning. Must stay low: negation in the hi pack has to reverse the MFA/credential wording the warning shares with a real request.",
+  "email": {
+    "senderName": "Northwind Tools",
+    "senderEmail": "notifications@northwind-tools.com",
+    "recipientEmail": "sam.sales@northwind-logistics.com",
+    "subject": "आपका सत्यापन कोड",
+    "bodyText": "आपका सत्यापन कोड 482915 है।\n\nइसे साइन-इन स्क्रीन पर दर्ज करें। कोड दस मिनट में समाप्त हो जाएगा।\n\nअपना ओटीपी कभी किसी को शेयर न करें। Northwind Tools का कर्मचारी कभी भी आपसे ईमेल फोन या चैट पर ओटीपी नहीं मांगेगा।\n\nयदि आपने साइन इन करने का प्रयास नहीं किया तो इस संदेश को अनदेखा करें।\n\nNorthwind Tools",
+    "links": [],
+    "attachments": [],
+    "auth": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass",
+      "signedBy": "northwind-tools.com",
+      "mailedBy": "northwind-tools.com"
+    }
+  }
+}

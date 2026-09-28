@@ -1,0 +1,38 @@
+{
+  "name": "northwind-nl-newsletter",
+  "description": "Invented Dutch marketing newsletter with urgency language and an unsubscribe line. Must stay low: bulk-mail suppression in the nl pack has to recognise the local unsubscribe vocabulary.",
+  "email": {
+    "senderName": "Northwind Roasters",
+    "senderEmail": "hello@northwind-roasters.example",
+    "recipientEmail": "sam.sales@northwind-logistics.com",
+    "subject": "Laatste kans: 20% korting eindigt vanavond",
+    "bodyText": "De uitverkoop eindigt om middernacht. Handel nu om 20% korting op het hele assortiment te krijgen.\n\nOok nieuw deze maand: hervulbare blikken en gratis verzending.\n\nU ontvangt deze e-mail omdat u zich heeft aangemeld bij northwind-roasters.example. Uitschrijven of e-mailvoorkeuren beheren op elk moment. Deze e-mail in uw browser bekijken.\n\nNorthwind Roasters",
+    "links": [
+      {
+        "text": "Shop the sale",
+        "href": "https://northwind-roasters.example/sale"
+      },
+      {
+        "text": "New arrivals",
+        "href": "https://northwind-roasters.example/new"
+      },
+      {
+        "text": "Unsubscribe",
+        "href": "https://northwind-roasters.example/unsubscribe?c=8f21ab"
+      },
+      {
+        "text": "preferences",
+        "href": "https://northwind-roasters.example/preferences?c=8f21ab"
+      }
+    ],
+    "attachments": [],
+    "auth": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass",
+      "signedBy": "northwind-roasters.example",
+      "mailedBy": "northwind-roasters.example",
+      "via": "sendgrid.net"
+    }
+  }
+}

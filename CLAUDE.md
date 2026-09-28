@@ -15,4 +15,5 @@ Quick orientation, all of it expanded in `AGENTS.md`:
 - The language model is capped at 15 of 100 points and cannot originate a score.
 - New detection behaviour needs a fixture asserted in both directions.
 - `npm run harness` shows the real UI without Gmail. Use it instead of guessing.
+- Structural map: `docs/ARCHITECTURE.md`; rejected alternatives: `docs/adr/`.
 - Never add co-author trailers to commits.

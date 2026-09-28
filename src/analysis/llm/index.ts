@@ -16,7 +16,7 @@ import { ModelServerAnalyzer } from './model-server.js';
  * The single on-device analyzer instance.
  *
  * Module-level so the (expensive) model session is reused across messages. Safe only because this
- * module is loaded exclusively in the content script — see docs/ARCHITECTURE.md §2. It must not be
+ * module is loaded exclusively in the content script — see docs/adr/0002-mv3-state-in-content-script.md. It must not be
  * imported by `src/background/`.
  */
 let sharedLocalAnalyzer: ChromePromptAnalyzer | null = null;

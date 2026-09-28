@@ -1,7 +1,7 @@
 /**
  * Per-tab orchestration: observe → extract → analyse → render.
  *
- * This is where the MV3 statefulness decision lands (docs/ARCHITECTURE.md §2). Everything stateful
+ * This is where the MV3 statefulness decision lands (docs/adr/0002-mv3-state-in-content-script.md). Everything stateful
  * lives here, in the content script, because this context lives as long as the Gmail tab:
  *   - the on-device model session (via `localAnalyzer()`)
  *   - the bounded model-reading cache

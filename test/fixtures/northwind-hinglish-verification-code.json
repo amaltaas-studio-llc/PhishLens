@@ -1,0 +1,20 @@
+{
+  "name": "northwind-hinglish-verification-code",
+  "description": "Invented Hinglish one-time-code delivery with the local never-share warning. Must stay low: negation in the hinglish pack has to reverse the MFA/credential wording the warning shares with a real request.",
+  "email": {
+    "senderName": "Northwind Tools",
+    "senderEmail": "notifications@northwind-tools.com",
+    "recipientEmail": "sam.sales@northwind-logistics.com",
+    "subject": "Aapka verification code",
+    "bodyText": "Aapka verification code 482915 hai.\n\nIse sign-in screen par enter karein. Code das minute mein expire ho jayega.\n\nApna otp kabhi kisi ko share na karein. Northwind Tools ka staff kabhi bhi aapse email phone ya chat par otp nahi mangega.\n\nAgar aapne sign in karne ki koshish nahi ki to is message ko ignore karein.\n\nNorthwind Tools",
+    "links": [],
+    "attachments": [],
+    "auth": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass",
+      "signedBy": "northwind-tools.com",
+      "mailedBy": "northwind-tools.com"
+    }
+  }
+}

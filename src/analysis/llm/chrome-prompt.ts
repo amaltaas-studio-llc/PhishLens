@@ -37,6 +37,17 @@ const INFERENCE_TIMEOUT_MS = 20_000;
 const DETERMINISTIC_OPTIONS = { temperature: 0, topK: 1 };
 
 /**
+ * Input languages Chrome's on-device model accepts today.
+ *
+ * Declared on `create()` so a non-English body is not scored against an English-only session. Kept
+ * off the availability probe and the welcome-page download: those only need to know whether *a*
+ * model exists, not whether every language pack is ready.
+ */
+const INPUT_LANGUAGES = {
+  expectedInputs: [{ type: 'text', languages: ['en', 'de', 'es', 'fr', 'ja'] }],
+} as const;
+
+/**
  * Per-prompt options, most useful first: a schema constraint that keeps the schema out of the input,
  * the constraint alone, then nothing. Each has been the only one some Chrome version accepts.
  */
@@ -291,7 +302,7 @@ export class ChromePromptAnalyzer implements SemanticAnalyzer {
     const create = fn(factory.host, 'create');
     if (create === null) return null;
 
-    const attempts: { options: UnknownRecord; system: boolean }[] = [
+    const shapes: { options: UnknownRecord; system: boolean }[] = [
       {
         options: {
           ...DETERMINISTIC_OPTIONS,
@@ -302,7 +313,18 @@ export class ChromePromptAnalyzer implements SemanticAnalyzer {
       { options: { ...DETERMINISTIC_OPTIONS, systemPrompt: SYSTEM_PROMPT }, system: true },
       { options: { initialPrompts: [{ role: 'system', content: SYSTEM_PROMPT }] }, system: true },
       { options: {}, system: false },
-    ].map((attempt) => ({ ...attempt, options: { ...OUTPUT_LANGUAGE, ...attempt.options } }));
+    ];
+    // Input languages first; builds that reject the key still get the output-only shapes below.
+    const attempts = [
+      ...shapes.map((attempt) => ({
+        ...attempt,
+        options: { ...OUTPUT_LANGUAGE, ...INPUT_LANGUAGES, ...attempt.options },
+      })),
+      ...shapes.map((attempt) => ({
+        ...attempt,
+        options: { ...OUTPUT_LANGUAGE, ...attempt.options },
+      })),
+    ];
 
     for (const attempt of attempts) {
       try {

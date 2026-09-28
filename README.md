@@ -180,7 +180,7 @@ silences a finding about identity, links, or attachments. Nothing is hidden, and
 
 **Use optional AI.** AI is off until you turn it on. Where Chrome makes an on-device model available, it
 can add an assessment of the wording. When you choose it on the welcome page, PhishLens checks whether
-Chrome's model is ready and, if it is not, shows how to switch it on in `chrome://settings/ai`. The core
+Chrome's model is ready and, if it is not, shows how to switch it on in `chrome://settings/system`. The core
 checks work without it, and the model is capped: it cannot remove their findings or raise a score that the
 checks do not already support. Advanced users can point PhishLens at their own model server.
 [AI availability and setup →](docs/LOCAL-AI.md)
@@ -212,9 +212,10 @@ addresses, links, and screenshots of real correspondence.
 </details>
 
 PhishLens can miss phishing, and it can flag legitimate mail. It reads what Gmail displays, so a change to
-Gmail's layout can stop a check finding anything until the extension is updated. The wording checks are
-English; the sender, link and filename checks help in any language. It does not open attachments, and it
-consults no blocklists or reputation services — everything it knows comes from the message in front of it.
+Gmail's layout can stop a check finding anything until the extension is updated. The wording checks cover
+English plus Spanish, French, German, Portuguese, Italian, Dutch, Hindi and Hinglish; the sender, link and
+filename checks help in any language. It does not open attachments, and it consults no blocklists or
+reputation services — everything it knows comes from the message in front of it.
 
 ## Open source
 
@@ -224,7 +225,8 @@ consults no blocklists or reputation services — everything it knows comes from
 | [Privacy and security](docs/PRIVACY.md) | Permissions, exactly what data exists and where, and the threat model. |
 | [Local AI](docs/LOCAL-AI.md) | The on-device model, connecting your own, and what a model is allowed to do. |
 | [Development](docs/DEVELOPMENT.md) | Building, testing, the UI harness, project layout, and releases. |
-| [Architecture](docs/ARCHITECTURE.md) | The design record: every significant decision and why it was made that way. |
+| [Architecture](docs/ARCHITECTURE.md) | Short map of where code runs and where to change what. |
+| [Design decisions](docs/adr/) | Why not the obvious alternative (ADRs). |
 
 Bug reports about missed phishing or false alarms are the most useful thing you can send, and a failing
 fixture in `test/fixtures/` is better still. Use invented examples rather than anyone's real mail, and run

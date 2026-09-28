@@ -7,7 +7,7 @@
  * phishing and in legitimate corporate mail. Anything not listed falls back to "last two labels",
  * which is correct for the overwhelming majority of hostnames.
  *
- * Documented as a known limitation in docs/ARCHITECTURE.md §10.
+ * Documented as a known limitation in docs/ARCHITECTURE.md.
  */
 export const MULTI_LABEL_SUFFIXES: ReadonlySet<string> = new Set([
   // United Kingdom

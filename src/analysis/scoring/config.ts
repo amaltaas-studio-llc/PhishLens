@@ -33,7 +33,7 @@ export const SEVERITY_CEILINGS: SeverityCeilings = Object.freeze({
 /**
  * Category weights.
  *
- * These deviate from the brief's table in a documented way (docs/ARCHITECTURE.md §4.1): the table
+ * These deviate from the brief's table in a documented way (docs/adr/0004-scoring-floors-and-weights.md): the table
  * had no row for `content`, and split identity across two overlapping rows ("Authentication /
  * identity 30" + "Sender/domain 15" = 45). Here that 45 becomes `identity: 21` + `authentication:
  * 14` = 35, `content` gets the 15 it needs, `link` and `attachment` are unchanged at 25 and 10, and
@@ -154,7 +154,7 @@ export const SCORE_FLOORS: ScoreFloorConfig = Object.freeze({
 /**
  * Classification bands. `high-risk` starting at 75 is above the sum of any two categories the LLM
  * can influence, which is what makes the "LLM can never produce high-risk on its own" property in
- * §4.3 hold arithmetically rather than by convention.
+ * docs/adr/0006-llm-cannot-outvote-checks.md holds arithmetically rather than by convention.
  */
 export const CLASSIFICATION_THRESHOLDS: readonly { min: number; classification: Classification }[] =
   Object.freeze([
@@ -264,10 +264,27 @@ export const DETECTION_TUNING = Object.freeze({
    * characters of filler prose that make the technique worth using.
    */
   minHiddenBodyChars: 600,
+  /**
+   * Distinct function-word markers a language pack needs in the gating window before its patterns run.
+   *
+   * Three, because one or two words collide across Romance languages (`de`, `la`, `en`) and would run
+   * every pack on every English message; three is enough that a real message in that language qualifies
+   * and a padded English one does not.
+   */
+  languageMarkerMinDistinct: 3,
+  /** Characters of match text considered when counting language-pack markers. */
+  languageMarkerWindowChars: 2000,
+  /**
+   * Share of letters that must be Devanagari before the Hindi pack runs.
+   *
+   * Hinglish (Hindi typed in Latin letters) is gated by markers instead; this threshold is only for
+   * Devanagari script, where function-word lists are less reliable than the script itself.
+   */
+  devanagariLetterShare: 0.12,
 });
 
 /**
- * False-positive dampening (docs/ARCHITECTURE.md §4.2).
+ * False-positive dampening (docs/adr/0005-false-positive-resistance.md).
  *
  * Dampening only ever applies to the `content` category, and only downward. Provable technical
  * findings in `link`/`identity`/`attachment`/`authentication` are never softened.

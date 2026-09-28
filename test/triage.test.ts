@@ -67,7 +67,8 @@ describe('triageSender', () => {
     }
   });
 
-  it('marks no legitimate fixture', () => {
+  // Full pipeline over the fixture corpus; multilingual packs make this slower than a unit check.
+  it('marks no legitimate fixture', { timeout: 15_000 }, () => {
     for (const fixture of loadAllFixtures()) {
       const full = analyzeDeterministic(fixture.email, { now: FIXED_NOW });
       if (full.classification !== 'low') continue;
@@ -99,7 +100,7 @@ describe('triageSender', () => {
  * allowed or deliberately excluded, so adding one forces the decision.
  */
 describe('the sender-only allowlist', () => {
-  it('classifies every identity rule the corpus produces', () => {
+  it('classifies every identity rule the corpus produces', { timeout: 15_000 }, () => {
     const produced = new Set<string>();
     for (const fixture of loadAllFixtures()) {
       for (const signal of analyzeDeterministic(fixture.email, { now: FIXED_NOW }).signals) {
