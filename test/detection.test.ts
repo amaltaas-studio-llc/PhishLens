@@ -591,6 +591,30 @@ describe('link rules against the harmless links that share their shape', () => {
     });
   });
 
+  describe('a host named after its IP address', () => {
+    it.each([
+      'https://203-0-113-7.cloud.northwind-hosting.net/renew',
+      'http://ip-198.51.100.20.northwind-hosting.net/',
+      'https://static.198-51-100-20.northwind-hosting.net/',
+    ])('is reported at medium: %s', (href) => {
+      expect(signalFor(withLinks([href]), 'link.ip_named_host')?.severity).toBe('medium');
+    });
+
+    it.each([
+      'https://build-2026-09-28.northwind-ci.com/',
+      'https://v1.2.3.northwind-docs.com/',
+      'https://300-1-1-1.northwind-hosting.net/',
+      'https://203.northwind-hosting.net/',
+    ])('is not read into dates, versions or numbers that are not addresses: %s', (href) => {
+      expect(hasSignal(withLinks([href]), 'link.ip_named_host')).toBe(false);
+    });
+
+    it("is not reported on the sender's own domain", () => {
+      const result = withLinks(['https://10-0-4-7.build.northwind-logistics.com/'], 'ci@northwind-logistics.com');
+      expect(hasSignal(result, 'link.ip_named_host')).toBe(false);
+    });
+  });
+
   describe('a non-web scheme', () => {
     it('reports an ftp link as a download, not as code', () => {
       const result = withLinks(['ftp://ftp.northwind-mirror.org/pub/readme.txt']);
@@ -703,6 +727,47 @@ describe("a sender under another of the recipient's own suffixes", () => {
     ['ops@northwind-logistlcs.com', 'reader@northwind-logistics.com'],
   ])('is still an imitation when the suffix or the name is a near-miss: %s to %s', (sender, recipient) => {
     expect(signalFor(fromTo(sender, recipient), 'identity.lookalike_of_recipient_domain')?.severity).toBe('critical');
+  });
+});
+
+describe('a brand whose name is an ordinary word', () => {
+  const from = (senderName: string, senderEmail: string, subject = 'Firmware update', bodyText = 'A new release is ready for your device.') =>
+    analyzeDeterministic({ senderName, senderEmail, subject, bodyText, links: [], attachments: [] }, { now: FIXED_NOW });
+  const claimsFor = (senderName: string, subject: string, bodyText: string): string[] =>
+    buildContext({ senderName, senderEmail: 'desk@northwind-books.com', subject, bodyText, links: [], attachments: [] })
+      .claims.map((claim) => claim.brand.id);
+
+  it.each(['Ledger', 'Ledger Support', 'Exodus Wallet', 'EXODUS', 'Ledger Wallet Team'])(
+    'is claimed by a display name that is the brand alone: %s',
+    (name) => {
+      expect(signalFor(from(name, 'notice@northwind-updates.com'), 'identity.display_name_impersonation')?.severity).toBe('high');
+    },
+  );
+
+  it.each(['Trezor', 'MetaMask Security', 'Trust Wallet'])('is claimed by a distinctive wallet name: %s', (name) => {
+    expect(hasSignal(from(name, 'notice@northwind-updates.com'), 'identity.display_name_impersonation')).toBe(true);
+  });
+
+  it('is not impersonation from the brand itself', () => {
+    expect(hasSignal(from('Ledger', 'hello@ledger.com'), 'identity.display_name_impersonation')).toBe(false);
+  });
+
+  it.each(['Ledger Accounting Group', 'Exodus Travel Northwind', 'Sam Ledger'])(
+    'is not claimed by a name that only contains the word: %s',
+    (name) => {
+      expect(claimsFor(name, 'Hello', 'Notes attached.')).not.toContain('ledger');
+      expect(claimsFor(name, 'Hello', 'Notes attached.')).not.toContain('exodus');
+    },
+  );
+
+  it('is not claimed by accounting or news wording', () => {
+    expect(
+      claimsFor('Dana Whitfield', 'General ledger close for Q3', 'The ledger balances. A mass exodus of staff is not expected.'),
+    ).toEqual([]);
+  });
+
+  it('is still claimed by a qualified product name in the subject', () => {
+    expect(claimsFor('Dana Whitfield', 'Your Ledger Live update is ready', 'Install it today.')).toContain('ledger');
   });
 });
 

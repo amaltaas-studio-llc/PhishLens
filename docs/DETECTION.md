@@ -41,7 +41,7 @@ what the name claims.
 
 **Links** (`links.ts`) — anchor text that names one destination while the href goes to another, the
 registrable domain buried behind a convincing prefix (`login.microsoftonline.com.session-verify.net`),
-raw and obfuscated IP addresses, punycode hosts, shorteners, redirect chains and redirect parameters
+raw and obfuscated IP addresses and hosts named after one, punycode hosts, shorteners, redirect chains and redirect parameters
 carrying a second URL, credential-related wording pointing at an unrelated domain, and non-web schemes.
 
 Also here: a page served out of public object storage. `https://storage.googleapis.com/…/renew.html` has a
@@ -208,6 +208,13 @@ mechanisms exist purely to keep legitimate mail at zero.
   may sit inside a word (`SecurePayPal`) or be spread across several (`P a y P a l`), but may only span
   words if it begins at one: folding turns `rn` into `m`, so "Miriam Stearns" runs together as
   `mlrlamsteams`, which contains Microsoft's `msteams`.
+- **A brand named with an ordinary word.** "Ledger" and "Exodus" are wallet makers phished for the recovery
+  phrase, and also words an accounting subject or a news headline uses. As keywords they would make that
+  mail claim a brand, so they match only in qualified forms (`Ledger Live`, `Exodus Wallet`) or as a
+  *standalone name*: a display name that is the brand alone, optionally followed by a generic word from a
+  fixed list ("Ledger Support"). "Ledger Accounting Group" and "Sam Ledger" claim nothing. Neither brand
+  has a lookalike target, because a six-letter core is matched anywhere in a link's subdomain and a
+  `general-ledger.` host is not a disguise.
 - **Severe wording needs its object.** The `high` content rules set a severity floor alone, so each pattern
   has to describe the attack rather than share its vocabulary. A sextortion claim is "I have recorded
   *you*", not "I have captured the trace"; a payroll diversion is *my* salary, not payroll's own
@@ -228,7 +235,10 @@ mechanisms exist purely to keep legitimate mail at zero.
   is exempt unless the message claims to be that brand. And a sender on the recipient's own name under
   another suffix — `.net` beside `.com`, `.fr` beside `.de`, `.com.au` — is the same organisation in
   another market. It is not a lookalike, but a typo suffix (`.co`, `.cm`) still is. "Portal" no longer
-  counts as sign-in wording, because it names every intranet home page.
+  counts as sign-in wording, because it names every intranet home page. The reverse case is a host named
+  after its address (`203-0-113-7.cloud.example.net`), the name a hosting provider gives a rented server:
+  a bare IP with a domain in front, so it is reported (`link.ip_named_host`), at `medium` because a
+  developer's notice about their own cloud instance links to one too, and never on the sender's own domain.
 - **Destinations inside a tracker's path.** The click trackers of the large sending platforms put the real
   destination in the path with its separators percent-encoded — `…/L0/https:%2F%2Fexample.com%2Fpath` —
   and `URL` leaves `%2F` encoded in a pathname, correctly, since decoding it would change the path's
@@ -348,7 +358,7 @@ it is the marker that gets the feature switched off.
 
 ## Confidence in the numbers
 
-1233 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
+1255 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
 `test/fixtures/` holds 26 messages: a plain legitimate message, a legitimate password reset, a legitimate
 one-time code being delivered, a legitimate reply into an existing thread, a newsletter with many links, a
 newsletter whose links are all rewritten through its platform's click tracker, an institutional newsletter
@@ -385,6 +395,9 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for what each test file covers and how to r
   message to suspicious, never to high risk on its own.
 - **English-centric content heuristics.** Social-engineering patterns are English. Non-English phishing is
   caught by identity, link and attachment signals but not content ones.
+- **Callback scams are mostly out of reach.** A fake antivirus renewal asking the reader to phone a number
+  has no link to inspect and reads, word for word, like the genuine receipt it copies; a bank's real fraud
+  alert asks for the same call. What gives it away is usually the sender, so it scores on identity alone.
 - **Authentication is second-hand.** No raw headers means no Received chain analysis and reliance on
   Gmail's summary where it is rendered at all.
 - **The body is truncated** — 200,000 characters for analysis, 4,000 for the model. A lure buried past the

@@ -16,6 +16,16 @@ export interface Brand {
   label: string;
   /** Folded tokens that indicate the message claims to be this brand. */
   keywords: readonly string[];
+  /**
+   * Names that claim the brand only when they are the whole display name, optionally followed by a
+   * generic word such as "Team" or "Support".
+   *
+   * For a brand whose name is an ordinary word. As a keyword, `ledger` would make every accounting
+   * subject a claim to be a hardware-wallet maker, which is why such brands carry only qualified
+   * keywords (`ledger live`) — and those miss the commonest phishing form of all, a sender called just
+   * "Ledger". Nobody's display name is the bare word by accident, so the name alone is the claim there.
+   */
+  standaloneNames?: readonly string[];
   /** Registrable domains this brand legitimately sends from or links to. */
   domains: readonly string[];
   /**
@@ -243,6 +253,47 @@ export const BRANDS: readonly Brand[] = [
     keywords: ['binance'],
     domains: ['binance.com', 'binance.us'],
     lookalikeTargets: ['binance.com'],
+  },
+  // Self-custody wallets are phished for the recovery phrase, which moves the funds for good. Ledger and
+  // Exodus have no lookalike targets: both cores are ordinary six-letter words, and a word that long is
+  // matched anywhere in a link's subdomain, so an accounting vendor's `general-ledger.` host would read
+  // as a disguised brand at `critical`.
+  {
+    id: 'ledger',
+    label: 'Ledger',
+    keywords: ['ledger live', 'ledger nano', 'ledger wallet', 'ledger stax', 'ledger flex', 'ledger recover', 'ledger device'],
+    standaloneNames: ['ledger'],
+    domains: ['ledger.com', 'ledgerwallet.com'],
+    lookalikeTargets: [],
+  },
+  {
+    id: 'trezor',
+    label: 'Trezor',
+    keywords: ['trezor'],
+    domains: ['trezor.io'],
+    lookalikeTargets: ['trezor.io'],
+  },
+  {
+    id: 'exodus',
+    label: 'Exodus',
+    keywords: ['exodus wallet', 'exodus app'],
+    standaloneNames: ['exodus'],
+    domains: ['exodus.com', 'exodus.io'],
+    lookalikeTargets: [],
+  },
+  {
+    id: 'metamask',
+    label: 'MetaMask',
+    keywords: ['metamask'],
+    domains: ['metamask.io', 'consensys.io', 'consensys.net'],
+    lookalikeTargets: ['metamask.io'],
+  },
+  {
+    id: 'trustwallet',
+    label: 'Trust Wallet',
+    keywords: ['trust wallet', 'trustwallet'],
+    domains: ['trustwallet.com'],
+    lookalikeTargets: ['trustwallet.com'],
   },
   {
     id: 'okta',

@@ -211,6 +211,39 @@ function ipAddressLinks(context: AnalysisContext): SecuritySignal[] {
   ];
 }
 
+/** Four octets spelled into a subdomain label, dashed or dotted: `203-0-113-7.` or `ip-203.0.113.7.`. */
+const IP_IN_LABELS = /(?:^|[.-])(\d{1,3})[-.](\d{1,3})[-.](\d{1,3})[-.](\d{1,3})(?=$|[.-])/u;
+
+/**
+ * A host named after its own IP address — the name a hosting provider gives every server it rents out.
+ *
+ * It is the bare-IP link with a domain in front, and it serves the same purpose: a page on a rented
+ * machine that nobody registered a name for, so there is nothing to take down but the machine. Ordinary
+ * senders link to their own names, not to a server's provider-assigned one. `medium` rather than
+ * `critical`, because a provider name is also what a developer's notification about their own cloud
+ * instance links to, and one on the sender's own domain is the sender's infrastructure, not a disguise.
+ */
+function ipNamedHostLinks(context: AnalysisContext): SecuritySignal[] {
+  const named = context.webLinks.filter((l) => {
+    if (l.isIp || l.onSenderDomain || l.subdomain === '') return false;
+    const octets = IP_IN_LABELS.exec(l.subdomain);
+    return octets?.slice(1, 5).every((octet) => Number(octet) <= 255) === true;
+  });
+  const [first] = named;
+  if (first === undefined) return [];
+  return [
+    signal({
+      id: 'link.ip_named_host',
+      category: 'link',
+      severity: 'medium',
+      score: 16,
+      title: 'Link points to a server named after its IP address',
+      description: `${named.length === 1 ? 'A link goes' : `${String(named.length)} links go`} to ${first.hostname}, the name a hosting provider gives a rented server rather than one anybody registered. It is a bare IP address with a domain in front.`,
+      evidence: { url: first.link.href, value: first.hostname },
+    }),
+  ];
+}
+
 /** Punycode / mixed-script hostnames in link destinations. */
 function unicodeSpoofedLinks(context: AnalysisContext): SecuritySignal[] {
   const findings: SecuritySignal[] = [];
@@ -744,6 +777,7 @@ const linkDetectors: Detect[] = [
   displayedUrlMismatch,
   anchorTextBrandMismatch,
   ipAddressLinks,
+  ipNamedHostLinks,
   unicodeSpoofedLinks,
   lookalikeLinkDomains,
   misleadingDomainComposition,

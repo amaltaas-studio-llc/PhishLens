@@ -544,6 +544,10 @@ function orderClaims(claims: BrandClaim[], senderRegistrable: string): BrandClai
  */
 function strongestClaim(brand: Brand, sources: readonly ClaimSource[]): BrandClaim | undefined {
   for (const source of sources) {
+    const standalone = standaloneName(brand, source);
+    if (standalone !== undefined) {
+      return { brand, source: source.origin, matchedKeyword: standalone, position: 0 };
+    }
     for (const keyword of brand.keywords) {
       const folded = skeleton(keyword);
       if (folded.length < 3) continue;
@@ -566,6 +570,32 @@ function strongestClaim(brand: Brand, sources: readonly ClaimSource[]): BrandCla
     }
   }
   return undefined;
+}
+
+/**
+ * Words a sender adds after a brand's name without changing who it claims to be.
+ *
+ * Enumerated rather than "any short word", because the bound is what keeps a standalone name standalone:
+ * "Exodus Wallet" and "Ledger Support" are the brand, and "Ledger Accounting Group" is somebody's firm.
+ */
+const GENERIC_NAME_WORDS: ReadonlySet<string> = new Set(
+  [
+    'team', 'support', 'security', 'wallet', 'service', 'services', 'notification', 'notifications',
+    'official', 'help', 'helpdesk', 'billing', 'account', 'accounts', 'alert', 'alerts', 'update',
+    'updates', 'app', 'customer', 'care', 'live',
+  ].map((word) => skeleton(word)),
+);
+
+/** How many words a display name may have and still be a brand's name alone. */
+const MAX_STANDALONE_NAME_WORDS = 3;
+
+function standaloneName(brand: Brand, source: ClaimSource): string | undefined {
+  if (source.origin !== 'sender-name' || brand.standaloneNames === undefined) return undefined;
+  const words = source.words.filter((word) => word !== '');
+  if (words.length === 0 || words.length > MAX_STANDALONE_NAME_WORDS) return undefined;
+  const [first, ...rest] = words;
+  if (!rest.every((word) => GENERIC_NAME_WORDS.has(word))) return undefined;
+  return brand.standaloneNames.find((name) => skeleton(name) === first);
 }
 
 const CLAIM_SOURCE_PRIORITY: Readonly<Record<BrandClaim['source'], number>> = {
