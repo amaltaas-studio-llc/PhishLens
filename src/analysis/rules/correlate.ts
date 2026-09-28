@@ -136,6 +136,7 @@ function impersonationWithCredentialAsk(
  */
 const IMPERSONATION_DESCRIPTIONS: Record<string, string> = {
   'identity.display_name_impersonation': 'presents itself as an organisation it does not send from',
+  'identity.brand_named_in_legal_notice': 'names an organisation it does not send from',
   'identity.unsupported_org_claim': 'presents itself as an organisation it does not send from',
   'identity.lookalike_sender_domain': 'sends from a domain that imitates a real one',
   'identity.brand_domain_in_subdomain':
@@ -151,6 +152,7 @@ const IMPERSONATION_SIGNALS = Object.keys(IMPERSONATION_DESCRIPTIONS);
 /** Those of the above whose subject is a brand this engine can name. */
 const BRAND_CLAIM_SIGNALS: ReadonlySet<string> = new Set([
   'identity.display_name_impersonation',
+  'identity.brand_named_in_legal_notice',
   'identity.lookalike_sender_domain',
   'identity.brand_domain_in_subdomain',
 ]);

@@ -479,6 +479,22 @@ describe('the scoring half of the report', () => {
     expect(reportFor(summarizeScoring(result, loud, 'ready'))).toContain('content.urgency  (dampened)');
   });
 
+  /**
+   * A check's own score is raw, before its category's cap, so the report sums what each category
+   * actually added and names a floor that decided the rest — "llm 23" beside a 15-point cap otherwise
+   * reads as the cap having failed.
+   */
+  it('shows what each category added after its cap, and what a floor added', () => {
+    const capped: AnalysisResult = {
+      ...result,
+      score: 50,
+      categoryScores: { identity: 21, link: 0, attachment: 0, content: 0, authentication: 0, llm: 15 },
+    };
+    const report = reportFor(summarizeScoring(capped, loud, 'ready'));
+    expect(report).toContain('score:       identity 21 + llm 15 + floor 14 = 50');
+    expect(report).toContain('checks (raw points, before category caps):');
+  });
+
   it('copies only the four fields a check is allowed to contribute', () => {
     const [first] = summarizeScoring(result, loud, 'ready').checks;
     expect(Object.keys(first ?? {}).sort()).toEqual(['dampened', 'id', 'score', 'severity']);

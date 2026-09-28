@@ -42,6 +42,7 @@ const LEGITIMATE_FIXTURES = [
   'legitimate-verification-code',
   'legitimate-brand-product-name',
   'legitimate-brand-tld',
+  'legitimate-settlement-notice',
 ];
 
 /**
@@ -76,6 +77,7 @@ const MALICIOUS_FIXTURES = [
   'thread-hijack-name-reuse',
   'storage-quota-bucket-page',
   'storage-payment-bucket-page',
+  'settlement-credential-phish',
 ];
 
 const FIXED_NOW = 1_760_000_000_000;
@@ -151,6 +153,58 @@ describe('legitimate email', () => {
   it('contributes nothing from the llm category', () => {
     expect(result.categoryScores.llm).toBe(0);
     expect(result.meta.semanticSource).toBe('none');
+  });
+});
+
+/**
+ * A court-directed notice names the defendant in its sender line and is sent by a claims administrator.
+ * The display-name rule's premise, that the name claims to *be* the brand, is false for it, and at `high`
+ * its floor made every genuine notice Suspicious. The pair below pins both halves: the notice loses the
+ * floor but keeps a finding saying the brand did not send it, and the same sender name asking for a
+ * password is as critical as any other impersonation.
+ */
+describe('a settlement notice that names a brand', () => {
+  const notice = analyzeFixture('legitimate-settlement-notice');
+  const phish = analyzeFixture('settlement-credential-phish');
+
+  it('says the brand did not send it, without calling it impersonation', () => {
+    expect(hasSignal(notice, 'identity.display_name_impersonation')).toBe(false);
+    const finding = signalFor(notice, 'identity.brand_named_in_legal_notice');
+    expect(finding?.severity).toBe('medium');
+    expect(finding?.title).toMatch(/not from Microsoft/u);
+    expect(notice.classification).toBe('low');
+  });
+
+  it('still treats the same sender name asking for a password as impersonation', () => {
+    expect(hasSignal(phish, 'identity.brand_named_in_legal_notice')).toBe(true);
+    expect(signalFor(phish, 'identity.impersonation_with_credential_request')?.severity).toBe(
+      'critical',
+    );
+    expect(phish.classification).toBe('high-risk');
+  });
+
+  it('needs the role spelled out: a bare "Claims" is how a dispute phish names itself', () => {
+    const disputes = analyzeDeterministic(
+      {
+        ...loadFixture('settlement-credential-phish').email,
+        senderName: 'PayPal Claims',
+      },
+      { now: FIXED_NOW },
+    );
+    expect(hasSignal(disputes, 'identity.display_name_impersonation')).toBe(true);
+    expect(hasSignal(disputes, 'identity.brand_named_in_legal_notice')).toBe(false);
+  });
+
+  it('does not soften a freemail sender, which no claims administrator uses', () => {
+    const freemail = analyzeDeterministic(
+      {
+        ...loadFixture('legitimate-settlement-notice').email,
+        senderEmail: 'settlement.admin@gmail.com',
+        auth: undefined,
+      },
+      { now: FIXED_NOW },
+    );
+    expect(signalFor(freemail, 'identity.display_name_impersonation')?.severity).toBe('critical');
   });
 });
 

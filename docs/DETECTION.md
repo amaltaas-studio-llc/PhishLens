@@ -286,6 +286,16 @@ mechanisms exist purely to keep legitimate mail at zero.
   normally arrives from — and the links to that domain are left to it rather than each restating the
   uncertainty as a certainty. `legitimate-brand-country-domain` is held to `caution`: never an all-clear,
   never an accusation.
+- **A legal notice that names the defendant.** Class-action and settlement notices are titled after the
+  case, so the sender line reads "*Brand* … Settlement Administrator" and the mail comes from a claims
+  administrator's own domain. The display-name rule read that as the brand claiming to send it, at `high`,
+  and its floor put genuine notices at Suspicious. When the name spells out a legal role in full — class
+  action, settlement, claims, litigation or notice *administrator* — the finding becomes
+  `identity.brand_named_in_legal_notice`: `medium`, no floor, saying the brand did not send it and telling
+  the reader to find the settlement's site through the court rather than the message, since fake notices
+  copy the shape exactly. It buys an attacker nothing: it still counts as impersonation for the credential
+  correlation, so `settlement-credential-phish` asking for a password is critical and High Risk, a bare
+  "Claims" (how a dispute phish names itself) is not a legal role, and a freemail sender is not softened.
 - **Brands that run their own top-level domain.** Ownership is a question about a name's TLD as well as its
   second level. ICANN's Specification 13 restricts registrations in a brand TLD to the operator, its
   affiliates and its trademark licensees, so every name under `.apple` or `.microsoft` is the brand's by the
@@ -358,7 +368,7 @@ it is the marker that gets the feature switched off.
 
 ## Confidence in the numbers
 
-1288 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
+1310 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
 `test/fixtures/` holds 26 messages: a plain legitimate message, a legitimate password reset, a legitimate
 one-time code being delivered, a legitimate reply into an existing thread, a newsletter with many links, a
 newsletter whose links are all rewritten through its platform's click tracker, an institutional newsletter

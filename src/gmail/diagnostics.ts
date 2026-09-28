@@ -26,6 +26,7 @@ import type {
   MessagePart,
   SemanticStatus,
   Severity,
+  SignalCategory,
 } from '../shared/types.js';
 import type { TabHealth } from '../shared/messaging.js';
 import type { MessageHandle } from './adapter.js';
@@ -168,6 +169,15 @@ export interface ScoringSummary {
   hidden: { chars: number; techniques: readonly string[] } | null;
   checks: readonly CheckSummary[];
   /**
+   * What each category added after its cap, largest first, and what a severity floor added on top.
+   *
+   * The per-check scores are raw, before the caps, so a check reading "23" in a category worth 15 looked
+   * like the cap had failed. Contributions are per category rather than per check because that is where
+   * the caps apply: two findings sharing a capped category have no individual share to report.
+   */
+  contributions: readonly (readonly [SignalCategory, number])[];
+  floorPoints: number;
+  /**
    * How long the checks and the model took. Durations only: they say how slow this machine and model
    * are, which is what a "PhishLens is slow" report needs and nothing about the mail.
    */
@@ -188,6 +198,10 @@ export function summarizeScoring(
   timing: AnalysisTiming | null = null,
 ): ScoringSummary {
   const hidden = email.hiddenText;
+  const contributions = (Object.entries(result.categoryScores) as [SignalCategory, number][])
+    .filter(([, points]) => points > 0)
+    .sort((a, b) => b[1] - a[1]);
+  const added = contributions.reduce((sum, [, points]) => sum + points, 0);
   return {
     score: result.score,
     classification: result.classification,
@@ -203,6 +217,8 @@ export function summarizeScoring(
       score: signal.score,
       dampened: signal.dampened === true,
     })),
+    contributions,
+    floorPoints: Math.max(0, result.score - added),
     timing:
       timing === null
         ? null
@@ -311,7 +327,8 @@ function scoringLines(scoring: ScoringSummary | null): string[] {
     );
   }
 
-  lines.push('checks:');
+  lines.push(`score:       ${describeContributions(scoring)}`);
+  lines.push('checks (raw points, before category caps):');
   if (scoring.checks.length === 0) {
     lines.push('  none');
     return lines;
@@ -326,6 +343,14 @@ function scoringLines(scoring: ScoringSummary | null): string[] {
 }
 
 /** Whole milliseconds; finer precision is noise in a report pasted by hand. */
+/** `identity 21 + llm 15 + floor 14 = 50`, so a floor deciding the score is visible as such. */
+function describeContributions(scoring: ScoringSummary): string {
+  const parts = scoring.contributions.map(([category, points]) => `${category} ${String(points)}`);
+  if (scoring.floorPoints > 0) parts.push(`floor ${String(scoring.floorPoints)}`);
+  if (parts.length === 0) return `nothing added = ${String(scoring.score)}`;
+  return `${parts.join(' + ')} = ${String(scoring.score)}`;
+}
+
 function describeTiming(timing: AnalysisTiming | null): string {
   if (timing === null) return 'not measured';
   if (timing.cached) return 'replayed from this session';

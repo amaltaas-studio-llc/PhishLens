@@ -52,6 +52,8 @@ const SENDER_ONLY_RULES: ReadonlySet<string> = new Set([
    * ordinary — the thing that gets the feature switched off.
    */
   'identity.unverified_brand_domain',
+  // Sender-only too, and silent on a row at `medium` for the same reason.
+  'identity.brand_named_in_legal_notice',
 ]);
 
 /**

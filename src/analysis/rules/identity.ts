@@ -58,6 +58,9 @@ function displayNameImpersonation(context: AnalysisContext): SecuritySignal[] {
   if (owner?.id === claim.brand.id) return [];
 
   const viaFreemail = context.senderIsFreemail;
+  if (!viaFreemail && LEGAL_NOTICE_ROLE.test(context.senderNameMatch)) {
+    return [legalNoticeNamingBrand(context, claim.brand)];
+  }
   return [
     signal({
       id: 'identity.display_name_impersonation',
@@ -74,6 +77,39 @@ function displayNameImpersonation(context: AnalysisContext): SecuritySignal[] {
       },
     }),
   ];
+}
+
+/**
+ * A display name that names a brand as the subject of a court-directed notice: "Northwind Privacy
+ * Settlement Administrator", "Northwind Class Action Administrator".
+ *
+ * Class-action and settlement notices name the defendant in the sender line and are sent by a claims
+ * administrator from its own domain, so the impersonation rule's premise — the name claims to *be* the
+ * brand — is false for them, and at `high` its floor put every genuine notice at Suspicious. The mismatch
+ * is still reported, because a fake settlement is a real scam and looks the same at the string level;
+ * what changes is the wording and a `medium` severity that sets no floor.
+ *
+ * The role has to be spelled out in full. A bare "Settlement" or "Claims" is ordinary vocabulary for a
+ * payments sender, and "PayPal Claims" is exactly how a dispute phish would name itself. Nor does the
+ * phrase buy an attacker anything past the floor: the finding still counts as an impersonation for the
+ * credential correlation, so "PayPal Claims Administrator" asking for a password is critical as before.
+ */
+const LEGAL_NOTICE_ROLE =
+  /\b(?:class action|settlement|claims|litigation|notice) administrator\b/u;
+
+function legalNoticeNamingBrand(context: AnalysisContext, brand: Brand): SecuritySignal {
+  return signal({
+    id: 'identity.brand_named_in_legal_notice',
+    category: 'identity',
+    severity: 'medium',
+    score: 15,
+    title: `Sender name refers to ${brand.label}, but the message is not from ${brand.label}`,
+    description: `The sender describes itself as an administrator for a legal matter involving ${brand.label}, and sends from ${context.senderRegistrable}, which ${brand.label} does not own. Genuine class-action and settlement notices are sent this way by claims administrators, and fake settlement notices copy them. Before entering details or filing a claim, find the settlement's official website through the court or a news report rather than through this message's links.`,
+    evidence: {
+      text: context.senderName !== '' ? context.senderName : context.senderEmail,
+      value: context.senderRegistrable,
+    },
+  });
 }
 
 /**

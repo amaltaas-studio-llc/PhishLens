@@ -1,0 +1,24 @@
+{
+  "name": "legitimate-settlement-notice",
+  "description": "False-positive resistance: a court-directed class-action notice. The display name names the defendant, a curated brand, because that is how such notices are titled, and the mail is sent by a claims administrator from its own domain, authenticated. The brand is not claiming to send it, so this must not reach the impersonation floor; it still says the brand did not send it, because fake settlement notices copy exactly this shape. Invented case, administrator and identifiers.",
+  "email": {
+    "senderName": "Microsoft Cloud Storage Settlement Administrator",
+    "senderEmail": "notices@mail.northwind-claims-admin.com",
+    "recipientEmail": "sam.okafor@northwind-logistics.com",
+    "subject": "Reminder: Cloud Storage Settlement claim deadline",
+    "bodyText": "A COURT DIRECTED THIS NOTICE\n\nIf you paid for an eligible cloud storage plan between 2019 and 2025, you may be entitled to a payment from a class action settlement with the defendant.\n\nWe previously wrote to you because records show you may be a class member. To receive a payment you must file a claim. If you have already filed a claim, you do not need to take any action.\n\nClaim ID: NW4Q7K2\n\nThe deadline to file a claim is 30 November. You can file online at the settlement website or by mail. For more information, visit the settlement website or call the administrator.\n\nTo unsubscribe from settlement reminders, use the link below.",
+    "links": [
+      { "text": "File a claim", "href": "https://email.mail.northwind-claims-admin.com/c/aGVsbG8" },
+      { "text": "settlement website", "href": "https://email.mail.northwind-claims-admin.com/c/d29ybGQ" },
+      { "text": "Unsubscribe", "href": "https://email.mail.northwind-claims-admin.com/u/Ynll" }
+    ],
+    "attachments": [],
+    "auth": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass",
+      "signedBy": "mail.northwind-claims-admin.com",
+      "mailedBy": "mail.northwind-claims-admin.com"
+    }
+  }
+}
