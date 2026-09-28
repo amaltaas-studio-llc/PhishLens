@@ -551,6 +551,161 @@ describe('IP-address URL', () => {
   });
 });
 
+/**
+ * Each link rule below was `critical` or `high` on ordinary technical and corporate mail in a public
+ * corpus, because it read a link by a property the attack shares with something harmless. Every case
+ * pairs the harmless shape with the attack it must still catch.
+ */
+describe('link rules against the harmless links that share their shape', () => {
+  const withLinks = (hrefs: string[], senderEmail = 'ops@northwind-logistics.com') =>
+    analyzeDeterministic(
+      {
+        senderEmail,
+        bodyText: 'The details are at the link below.',
+        links: hrefs.map((href) => toEmailLink({ text: '', href })),
+        attachments: [],
+      },
+      { now: FIXED_NOW },
+    );
+
+  describe('a private network address', () => {
+    it.each(['http://192.168.10.20/tools/', 'http://10.0.4.7:8080/status', 'http://172.20.1.1/', 'http://[fd12:3456::1]/'])(
+      'is reported without a floor: %s',
+      (href) => {
+        const result = withLinks([href]);
+        expect(hasSignal(result, 'link.ip_address_url')).toBe(false);
+        expect(signalFor(result, 'link.private_ip_url')?.severity).toBe('low');
+      },
+    );
+
+    it.each(['http://185.234.219.14/login', 'http://172.32.0.1/', 'http://100.128.0.1/'])(
+      'leaves a public address critical: %s',
+      (href) => {
+        expect(signalFor(withLinks([href]), 'link.ip_address_url')?.severity).toBe('critical');
+      },
+    );
+
+    it('names the public address when both kinds are present', () => {
+      const result = withLinks(['http://192.168.1.1/', 'http://185.234.219.14/verify']);
+      expect(signalFor(result, 'link.ip_address_url')?.evidence?.value).toBe('185.234.219.14');
+    });
+  });
+
+  describe('a non-web scheme', () => {
+    it('reports an ftp link as a download, not as code', () => {
+      const result = withLinks(['ftp://ftp.northwind-mirror.org/pub/readme.txt']);
+      expect(hasSignal(result, 'link.dangerous_scheme')).toBe(false);
+      expect(signalFor(result, 'link.ftp_link')?.severity).toBe('medium');
+    });
+
+    it.each(['file:///C:/Users/reports/q3.xlsx', 'file:///home/dana/build/', 'file://localhost/etc/notes.txt'])(
+      'reports a file link with no host as local: %s',
+      (href) => {
+        const result = withLinks([href]);
+        expect(hasSignal(result, 'link.dangerous_scheme')).toBe(false);
+        expect(signalFor(result, 'link.local_file_link')?.severity).toBe('low');
+      },
+    );
+
+    it.each(['file://fileserver.northwind-logistics.com/share/q3.xlsx', 'file://\\\\fileserver\\share\\q3.xlsx'])(
+      'keeps a file link to another machine critical: %s',
+      (href) => {
+        expect(signalFor(withLinks([href]), 'link.dangerous_scheme')?.severity).toBe('critical');
+      },
+    );
+
+    it('keeps a code-running scheme critical, and reports it over a milder one', () => {
+      const result = withLinks(['ftp://ftp.northwind-mirror.org/pub/', 'data:text/html,<p>hello</p>']);
+      expect(signalFor(result, 'link.dangerous_scheme')?.severity).toBe('critical');
+      expect(hasSignal(result, 'link.ftp_link')).toBe(false);
+    });
+  });
+
+  describe("a brand's name in front of an unrelated domain", () => {
+    it.each([
+      'https://bigmail.northwind-dev.org/',
+      'https://purchase.northwind-shop.com/',
+      'https://pineapple.northwind-garden.com/',
+    ])(
+      'does not find a short brand at the end of a longer word: %s',
+      (href) => {
+        expect(hasSignal(withLinks([href]), 'link.misleading_domain')).toBe(false);
+      },
+    );
+
+    it.each([
+      'https://chase.northwind-alerts.com/',
+      'https://secure-chase.northwind-alerts.com/',
+      'https://chasesecure.northwind-alerts.com/',
+      'https://apple7.northwind-alerts.com/',
+      'https://securepaypal.northwind-alerts.com/',
+    ])('still reports a brand leading a name, or a long one anywhere: %s', (href) => {
+      expect(hasSignal(withLinks([href]), 'link.misleading_domain')).toBe(true);
+    });
+
+    it("does not report a section of the sender's own site", () => {
+      const result = withLinks(['https://apple.northwind-news.com/story/41'], 'desk@northwind-news.com');
+      expect(hasSignal(result, 'link.misleading_domain')).toBe(false);
+    });
+
+    it("still reports it when the message claims to be that brand", () => {
+      const result = analyzeDeterministic(
+        {
+          senderName: 'Apple Support',
+          senderEmail: 'desk@northwind-news.com',
+          bodyText: 'Your Apple ID has been locked. Unlock it at the link below.',
+          links: [toEmailLink({ text: '', href: 'https://apple.northwind-news.com/unlock' })],
+          attachments: [],
+        },
+        { now: FIXED_NOW },
+      );
+      expect(hasSignal(result, 'link.misleading_domain')).toBe(true);
+    });
+  });
+
+  describe('an unencrypted link that may be a sign-in page', () => {
+    it("does not read an intranet's front page as a sign-in form", () => {
+      const result = withLinks(['http://intranet.northwind-logistics.com/portal/home']);
+      expect(hasSignal(result, 'link.insecure_login')).toBe(false);
+      expect(hasSignal(result, 'link.insecure_http')).toBe(true);
+    });
+
+    it("still reports a portal's sign-in page", () => {
+      const result = withLinks(['http://intranet.northwind-logistics.com/portal/login']);
+      expect(hasSignal(result, 'link.insecure_login')).toBe(true);
+    });
+  });
+});
+
+/**
+ * Staff write from their organisation's `.net` and `.com`, and colleagues abroad from its country
+ * domain, so the same name under another suffix is the same organisation — unless the suffix is the
+ * reader's own with characters dropped, which is a trap and not a market.
+ */
+describe("a sender under another of the recipient's own suffixes", () => {
+  const fromTo = (senderEmail: string, recipientEmail: string) =>
+    analyzeDeterministic(
+      { senderEmail, recipientEmail, bodyText: 'Notes from this morning attached.', links: [], attachments: [] },
+      { now: FIXED_NOW },
+    );
+
+  it.each([
+    ['ops@northwind-logistics.net', 'reader@northwind-logistics.com'],
+    ['ops@northwind-logistics.fr', 'reader@northwind-logistics.de'],
+    ['ops@northwind-logistics.com', 'reader@northwind-logistics.com.au'],
+  ])('is not an imitation: %s to %s', (sender, recipient) => {
+    expect(hasSignal(fromTo(sender, recipient), 'identity.lookalike_of_recipient_domain')).toBe(false);
+  });
+
+  it.each([
+    ['ops@northwind-logistics.co', 'reader@northwind-logistics.com'],
+    ['ops@northwind-logistics.cm', 'reader@northwind-logistics.com'],
+    ['ops@northwind-logistlcs.com', 'reader@northwind-logistics.com'],
+  ])('is still an imitation when the suffix or the name is a near-miss: %s to %s', (sender, recipient) => {
+    expect(signalFor(fromTo(sender, recipient), 'identity.lookalike_of_recipient_domain')?.severity).toBe('critical');
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Attachments
 // ---------------------------------------------------------------------------

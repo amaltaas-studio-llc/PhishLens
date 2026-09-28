@@ -11,9 +11,9 @@
  */
 import { brandOwningDomain, brandOwns, BRANDS } from '../../shared/brands.js';
 import type { SecuritySignal } from '../../shared/types.js';
-import { describeUrl, registrableDomain } from '../../shared/url.js';
+import { describeUrl, isPrivateIpHost, registrableDomain } from '../../shared/url.js';
 import { decodeIdnHost, hasSuspiciousScriptMixing, scriptsUsed, skeleton } from '../../shared/unicode.js';
-import type { AnalysisContext } from '../context.js';
+import type { AnalysisContext, LinkAnalysis } from '../context.js';
 import { displayKey } from '../scoring/aggregate.js';
 import { DETECTION_TUNING } from '../scoring/config.js';
 import { brandNamingDomain, findLookalike } from './identity.js';
@@ -22,7 +22,9 @@ import type { Detect } from './types.js';
 
 /** Words that mean "this link leads to a login form". */
 const CREDENTIAL_LINK_TERMS =
-  /\b(sign\s?in|signon|log\s?in|logon|log-on|password|passwd|credential|authenticate|authentication|verify|verification|validate|confirm|secure\s?access|account\s?access|mfa|2fa|otp|sso|webmail|owa|portal|unlock|reactivate|re-?activate)\b/u;
+  // No `portal`: it names an intranet's front page as often as a sign-in form, and plain-HTTP intranet
+  // portals made a `high` of ordinary internal mail. A portal's sign-in page still says `login`.
+  /\b(sign\s?in|signon|log\s?in|logon|log-on|password|passwd|credential|authenticate|authentication|verify|verification|validate|confirm|secure\s?access|account\s?access|mfa|2fa|otp|sso|webmail|owa|unlock|reactivate|re-?activate)\b/u;
 
 /**
  * Take only the first N of a repeated finding so one hostile message cannot flood the panel, after
@@ -169,12 +171,33 @@ function anchorTextBrandMismatch(context: AnalysisContext): SecuritySignal[] {
   return limit(findings);
 }
 
-/** A destination that is a raw IP address. Effectively never legitimate in commercial mail. */
+/**
+ * A destination that is a raw IP address. Effectively never legitimate in commercial mail.
+ *
+ * A private address is the exception, and not a milder form of the same finding: nobody outside the
+ * reader's network can serve a page from `192.168.x.x`, so it cannot be where an attacker's page lives. It
+ * is what an internal tool or a device on the reader's own network looks like, which is why colleagues
+ * paste them. Reported, because it is still a link that names no host, but at a severity that sets no floor.
+ */
 function ipAddressLinks(context: AnalysisContext): SecuritySignal[] {
   const ipLinks = context.webLinks.filter((l) => l.isIp);
-  const [first] = ipLinks;
-  if (first === undefined) return [];
-
+  const publicLinks = ipLinks.filter((l) => !isPrivateIpHost(l.hostname));
+  const [first] = publicLinks;
+  if (first === undefined) {
+    const [local] = ipLinks;
+    if (local === undefined) return [];
+    return [
+      signal({
+        id: 'link.private_ip_url',
+        category: 'link',
+        severity: 'low',
+        score: 8,
+        title: 'Link points to an address on a private network',
+        description: `${ipLinks.length === 1 ? 'A link goes' : `${String(ipLinks.length)} links go`} to ${local.hostname}, a private network address. It only works from inside that network, so it cannot lead to a page on the internet — it is how internal tools and home devices are reached.`,
+        evidence: { url: local.link.href, value: local.hostname },
+      }),
+    ];
+  }
   return [
     signal({
       id: 'link.ip_address_url',
@@ -182,7 +205,7 @@ function ipAddressLinks(context: AnalysisContext): SecuritySignal[] {
       severity: 'critical',
       score: 40,
       title: 'Link points directly to an IP address',
-      description: `${ipLinks.length === 1 ? 'A link goes' : `${String(ipLinks.length)} links go`} to the bare address ${first.hostname} instead of a domain name. Legitimate services publish hostnames; bare IPs are used to avoid registering a domain that could be taken down.`,
+      description: `${publicLinks.length === 1 ? 'A link goes' : `${String(publicLinks.length)} links go`} to the bare address ${first.hostname} instead of a domain name. Legitimate services publish hostnames; bare IPs are used to avoid registering a domain that could be taken down.`,
       evidence: { url: first.link.href, value: first.hostname },
     }),
   ];
@@ -262,10 +285,16 @@ function misleadingDomainComposition(context: AnalysisContext): SecuritySignal[]
     const beforeRegistrable = link.subdomain;
     if (beforeRegistrable === '') continue;
     const foldedPrefix = skeleton(beforeRegistrable);
+    const foldedTokens = beforeRegistrable.split(/[.\-_]+/u).map((token) => skeleton(token));
 
     for (const brand of BRANDS) {
       // Match a full brand domain in the subdomain (`microsoft.com.evil.example`) or a distinctive
-      // brand token (`paypal.security-login.example`).
+      // brand token (`paypal.security-login.example`). A short core has to *begin* a token, since an
+      // English compound ends in one far more often than a phishing host does: `gmail` ends `bigmail`,
+      // `chase` ends `purchase`, `apple` ends `pineapple`, and names like these were `critical` on
+      // ordinary mail. What phishing hosts do is lead with the brand — `chasesecure.`, `apple7.` —
+      // and that stays reported. The cost is a short brand fused after a word (`securechase.`); the
+      // hyphenated form is still caught. A long core may appear anywhere (`securepaypal.example`).
       const domainHit = brand.domains.find((d) => {
         const f = skeleton(d);
         return f.length >= 6 && foldedPrefix.includes(f);
@@ -274,11 +303,19 @@ function misleadingDomainComposition(context: AnalysisContext): SecuritySignal[]
         domainHit === undefined
           ? brand.lookalikeTargets.find((t) => {
               const core = skeleton(t.split('.')[0] ?? '');
-              return core.length >= 5 && foldedPrefix.includes(core);
+              if (core.length < 5) return false;
+              return core.length >= 6
+                ? foldedPrefix.includes(core)
+                : foldedTokens.some((token) => token.startsWith(core));
             })
           : undefined;
 
       if (domainHit === undefined && tokenHit === undefined) continue;
+      // A section of the sender's own site named after a subject it covers — a news site's `apple.`
+      // section — borrows nobody's reputation but its own, as a social footer on the sender's tracker
+      // does in `anchorTextBrandMismatch`. It yields in the same place: a message presenting itself as
+      // this brand, where a brand-named host on the sender's domain is the disguise.
+      if (link.onSenderDomain && context.primaryClaim?.brand.id !== brand.id) break;
       reported.add(link.hostname);
 
       findings.push(
@@ -397,12 +434,65 @@ function insecureCredentialLinks(context: AnalysisContext): SecuritySignal[] {
   return limit(findings);
 }
 
+/**
+ * How much harm a non-web scheme can do, which is not one answer for the whole list.
+ *
+ * `javascript:`, `data:` and the Windows handlers run code or open a remote resource on click, and a
+ * `file:` link *to another machine* (`file://host/share`, or a UNC path, which the parser turns into a path
+ * beginning `//`) makes Windows offer the reader's credentials to that machine. Those are `critical`. Two
+ * are not, and both were `critical` on ordinary technical mail: `ftp:` is a file download Chrome no longer
+ * handles itself — it can hand a file to another program but cannot run anything or show a sign-in page —
+ * and a `file:` link with no host names a path on the reader's own disk, a pasted local path or a
+ * `file:///C` left behind by a word processor, which nothing remote can be fetched through.
+ */
+function schemeHarm(link: LinkAnalysis): 'executes' | 'download' | 'local' {
+  const raw = link.raw;
+  if (raw === null) return 'executes';
+  if (raw.protocol === 'ftp:') return 'download';
+  if (raw.protocol === 'file:') {
+    const host = raw.hostname.toLowerCase();
+    const remote = (host !== '' && host !== 'localhost') || raw.pathname.startsWith('//');
+    return remote ? 'executes' : 'local';
+  }
+  return 'executes';
+}
+
+const SCHEME_RANK = { executes: 2, download: 1, local: 0 } as const;
+
 /** `javascript:`, `data:`, and other schemes that should never appear as a link in mail. */
 function dangerousSchemeLinks(context: AnalysisContext): SecuritySignal[] {
   const dangerous = context.links.filter((l) => l.isDangerousScheme);
-  const [first] = dangerous;
-  if (first === undefined) return [];
+  if (dangerous.length === 0) return [];
+  const first = dangerous.reduce((worst, l) => (SCHEME_RANK[schemeHarm(l)] > SCHEME_RANK[schemeHarm(worst)] ? l : worst));
   const scheme = first.raw?.protocol ?? '';
+  const harm = schemeHarm(first);
+
+  if (harm === 'download') {
+    return [
+      signal({
+        id: 'link.ftp_link',
+        category: 'link',
+        severity: 'medium',
+        score: 18,
+        title: 'Link uses the ftp: scheme',
+        description: 'A link uses "ftp:" rather than http or https. Browsers no longer open FTP themselves, so clicking it hands a file download to another program, outside the browser\'s protections. It cannot run code or show a sign-in page, but anything it downloads deserves the same caution as an attachment.',
+        evidence: { value: scheme, url: first.link.href },
+      }),
+    ];
+  }
+  if (harm === 'local') {
+    return [
+      signal({
+        id: 'link.local_file_link',
+        category: 'link',
+        severity: 'low',
+        score: 8,
+        title: 'Link points to a file on your own computer',
+        description: 'A link uses "file:" with no host, so it names a path on the reader\'s own disk rather than anything on the internet. It is usually a local path pasted into the message, and cannot fetch anything from elsewhere.',
+        evidence: { value: scheme, url: first.link.href },
+      }),
+    ];
+  }
 
   return [
     signal({

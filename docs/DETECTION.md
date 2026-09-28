@@ -216,6 +216,19 @@ mechanisms exist purely to keep legitimate mail at zero.
   `f` and no `0`, which no hex checksum or Message-ID does. Each boundary came from running the rules over
   a public corpus of genuine mailing-list, corporate and newsletter mail, and each is tested with the
   ordinary sentence it used to misread.
+- **A link's shape is not its harm.** The same kind of corpus, run through the link and identity rules,
+  showed several `critical` findings describing something harmless as often as an attack. An IP address on
+  a private network (`192.168.…`, `10.…`) is an intranet link a colleague pasted, unreachable from outside,
+  so it is `low` (`link.private_ip_url`); a public IP stays `critical`. `ftp:` is a file download, so it is
+  `medium`; a `file:` link to the reader's own disk (`file:///…`) is `low`, since it can only open
+  something already there. A `file:` link to a remote host or a UNC path still reads as `critical`, like
+  `javascript:`, because opening one can leak Windows credentials. A short brand core in a subdomain has to
+  *begin* a word: `bigmail.`, `purchase.` and `pineapple.` end with one, whereas phishing hosts lead
+  with the brand (`chasesecure.`). A brand-named section of the sender's own site (`apple.` on a news site)
+  is exempt unless the message claims to be that brand. And a sender on the recipient's own name under
+  another suffix — `.net` beside `.com`, `.fr` beside `.de`, `.com.au` — is the same organisation in
+  another market. It is not a lookalike, but a typo suffix (`.co`, `.cm`) still is. "Portal" no longer
+  counts as sign-in wording, because it names every intranet home page.
 - **Destinations inside a tracker's path.** The click trackers of the large sending platforms put the real
   destination in the path with its separators percent-encoded — `…/L0/https:%2F%2Fexample.com%2Fpath` —
   and `URL` leaves `%2F` encoded in a pathname, correctly, since decoding it would change the path's
@@ -335,7 +348,7 @@ it is the marker that gets the feature switched off.
 
 ## Confidence in the numbers
 
-1200 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
+1233 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
 `test/fixtures/` holds 26 messages: a plain legitimate message, a legitimate password reset, a legitimate
 one-time code being delivered, a legitimate reply into an existing thread, a newsletter with many links, a
 newsletter whose links are all rewritten through its platform's click tracker, an institutional newsletter

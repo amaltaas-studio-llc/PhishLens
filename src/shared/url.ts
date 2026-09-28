@@ -183,6 +183,36 @@ export function isIpHost(hostname: string): boolean {
   return false;
 }
 
+/**
+ * True for an IP literal no one outside the reader's own network can reach: RFC 1918 private ranges,
+ * loopback, link-local, carrier-grade NAT, and their IPv6 counterparts.
+ *
+ * Expects the hostname `URL` produced, which has already canonicalised the obfuscated decimal, hex and
+ * octal forms to a dotted quad; anything else is answered `false`, so an unparsed trick still reads as a
+ * public address rather than escaping as a private one.
+ */
+export function isPrivateIpHost(hostname: string): boolean {
+  const host = hostname.trim().toLowerCase();
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/u.exec(host);
+  if (v4 !== null) {
+    const a = Number(v4[1]);
+    const b = Number(v4[2]);
+    return (
+      a === 10 ||
+      a === 127 ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 169 && b === 254) ||
+      (a === 100 && b >= 64 && b <= 127)
+    );
+  }
+  if (host.startsWith('[') && host.endsWith(']')) {
+    const v6 = host.slice(1, -1);
+    return v6 === '::1' || /^f[cd][0-9a-f]{0,2}:/u.test(v6) || /^fe[89ab][0-9a-f]?:/u.test(v6);
+  }
+  return false;
+}
+
 /** True when any label is punycode-encoded, i.e. the display form contains non-ASCII characters. */
 export function hasPunycode(hostname: string): boolean {
   return domainLabels(hostname).some((label) => label.startsWith('xn--'));

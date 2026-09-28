@@ -800,6 +800,8 @@ function lookalikeOfRecipientDomain(context: AnalysisContext): SecuritySignal[] 
   if (recipientDomain === context.senderRegistrable) return [];
   if (FREEMAIL_DOMAINS.has(recipientDomain)) return [];
 
+  if (isSameNameInAnotherMarket(context.senderRegistrable, recipientDomain)) return [];
+
   const senderCore = skeleton(domainCore(decodeIdnHost(context.senderRegistrable)));
   const recipientCore = skeleton(domainCore(recipientDomain));
   if (recipientCore.length < 5) return [];
@@ -825,6 +827,27 @@ function lookalikeOfRecipientDomain(context: AnalysisContext): SecuritySignal[] 
       evidence: { value: `${context.senderRegistrable} vs ${recipientDomain}` },
     }),
   ];
+}
+
+/**
+ * The recipient's own name, spelled identically, under a suffix that does not misspell theirs.
+ *
+ * An organisation's staff write from its `.net` and its `.com`, and a colleague abroad from its `.fr`,
+ * all day — so reporting `example.net` to someone at `example.com` as a `critical` imitation put one
+ * company's internal mail at High Risk, hundreds of messages at a time. The thread rule reached the same
+ * conclusion for the same reason. What this keeps is the one suffix change that *is* a trap: the reader's
+ * own suffix with characters dropped (`.co`, `.cm`, `.om` against `.com`), judged the way the brand rule
+ * judges it. A multi-label suffix is never read as a typo of a single one, or `example.com` would be a
+ * trap for everyone at `example.com.au`.
+ */
+function isSameNameInAnotherMarket(senderRegistrable: string, recipientRegistrable: string): boolean {
+  const core = domainCore(senderRegistrable);
+  if (core === '' || core !== domainCore(recipientRegistrable)) return false;
+  const senderSuffix = senderRegistrable.slice(core.length + 1);
+  const recipientSuffix = recipientRegistrable.slice(core.length + 1);
+  if (senderSuffix === '' || recipientSuffix === '') return false;
+  if (senderSuffix.includes('.') || recipientSuffix.includes('.')) return true;
+  return !isDroppedCharacterVariant(senderSuffix, recipientSuffix);
 }
 
 const identityDetectors: Detect[] = [
