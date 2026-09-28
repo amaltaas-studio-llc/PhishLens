@@ -82,9 +82,15 @@ const targets = [
     outdir,
     format: 'esm',
   },
+  {
+    ...common,
+    entryPoints: { welcome: path.join(root, 'src/welcome/index.ts') },
+    outdir,
+    format: 'esm',
+  },
 ];
 
-/** Pages that ship as authored HTML. The welcome page has no script at all; see the file. */
+/** Pages that ship as authored HTML, each loading the bundle of the same name. */
 const pages = ['src/options/options.html', 'src/popup/popup.html', 'src/welcome/welcome.html'];
 
 async function copyStatic() {

@@ -13,6 +13,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ChromePromptAnalyzer } from '../src/analysis/llm/chrome-prompt.js';
+import { downloadOnDeviceModel, onDeviceModelState } from '../src/analysis/llm/on-device.js';
 import { SYSTEM_PROMPT } from '../src/analysis/llm/prompt.js';
 import type { EmailMessage } from '../src/shared/types.js';
 
@@ -705,5 +706,74 @@ describe('on-device adapter: cancellation', () => {
 
     expect(stale).toBeNull();
     expect(current?.risk).toBe(78);
+  });
+});
+
+/**
+ * The welcome page's view of the model. It needs the states the analyzer collapses, because each has
+ * different advice: an old Chrome is fixed by updating it, a switched-off setting in chrome://settings/ai.
+ */
+describe('on-device model state, for the welcome page', () => {
+  it('distinguishes a Chrome without the API from one without the model', async () => {
+    await expect(onDeviceModelState()).resolves.toBe('unsupported');
+    install({ LanguageModel: modernFactory({ availability: 'unavailable' }).factory });
+    await expect(onDeviceModelState()).resolves.toBe('unavailable');
+  });
+
+  it.each(['available', 'downloadable', 'downloading'])('reports "%s" as Chrome does', async (state) => {
+    install({ LanguageModel: modernFactory({ availability: state }).factory });
+    await expect(onDeviceModelState()).resolves.toBe(state);
+  });
+
+  it('maps the legacy vocabulary and never throws', async () => {
+    install({ LanguageModel: { capabilities: () => Promise.resolve({ available: 'after-download' }), create: vi.fn() } });
+    await expect(onDeviceModelState()).resolves.toBe('downloadable');
+    install({ LanguageModel: { availability: () => Promise.reject(new Error('boom')), create: vi.fn() } });
+    await expect(onDeviceModelState()).resolves.toBe('unavailable');
+  });
+
+  it('downloads by creating a session, reports progress, and releases the session', async () => {
+    const { factory, create, destroy } = modernFactory();
+    create.mockImplementation((options?: unknown) => {
+      const monitor = (options as { monitor: (target: EventTarget) => void }).monitor;
+      const target = new EventTarget();
+      monitor(target);
+      target.dispatchEvent(Object.assign(new Event('downloadprogress'), { loaded: 0.5 }));
+      return Promise.resolve({ prompt: vi.fn(), destroy, clone: vi.fn() });
+    });
+    install({ LanguageModel: factory });
+
+    const progress: number[] = [];
+    await expect(downloadOnDeviceModel((fraction) => progress.push(fraction))).resolves.toBe(true);
+    expect(progress).toEqual([0.5]);
+    expect(destroy).toHaveBeenCalledTimes(1);
+  });
+
+  /** Chrome logs a warning on every request that does not name its output language. */
+  it('declares English output when probing, downloading and analysing', async () => {
+    const { factory, availability, create } = modernFactory();
+    install({ LanguageModel: factory });
+    const english = [{ type: 'text', languages: ['en'] }];
+
+    await onDeviceModelState();
+    await downloadOnDeviceModel(() => undefined);
+    await new ChromePromptAnalyzer().analyze(EMAIL);
+
+    expect(availability.mock.calls).not.toHaveLength(0);
+    for (const call of availability.mock.calls as unknown[][]) {
+      expect((call[0] as Record<string, unknown> | undefined)?.['expectedOutputs']).toEqual(english);
+    }
+    expect(create.mock.calls).not.toHaveLength(0);
+    for (const [options] of create.mock.calls) {
+      expect((options as Record<string, unknown>)['expectedOutputs']).toEqual(english);
+    }
+  });
+
+  it('reports a download that could not start rather than throwing', async () => {
+    await expect(downloadOnDeviceModel(() => undefined)).resolves.toBe(false);
+    const { factory, create } = modernFactory();
+    create.mockRejectedValue(new Error('NotAllowedError'));
+    install({ LanguageModel: factory });
+    await expect(downloadOnDeviceModel(() => undefined)).resolves.toBe(false);
   });
 });

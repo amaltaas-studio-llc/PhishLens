@@ -6,10 +6,10 @@
     <title>PhishLens is installed</title>
     <style>
       /*
-        No script on this page, deliberately. It is shown once, at install, to a person deciding whether
-        to trust the extension with their mail — so everything it claims can be verified by reading the
-        page source, and there is no bundle to go stale. Choices live in the settings page, which is one
-        click away and is where they can be revisited.
+        Shown once, at install, to a person deciding whether to trust the extension with their mail — so
+        every claim is static text they can verify in the page source. The one script (welcome.js) does
+        only the AI choice: saving it, and checking whether Chrome's on-device model is ready. Every other
+        choice lives in the settings page, where it can be revisited.
       */
       :root {
         color-scheme: light dark;
@@ -165,8 +165,86 @@
         text-decoration: none;
         font-weight: 500;
       }
-      a.button:hover {
+      a.button:hover,
+      button.button:hover:not(:disabled) {
         border-color: var(--accent);
+      }
+      button.button {
+        padding: 8px 16px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--bg);
+        color: var(--fg);
+        font: inherit;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      button.button:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+      .choices {
+        display: grid;
+        gap: 8px;
+        margin: 0 0 12px;
+        padding: 0;
+        border: 0;
+      }
+      .choice {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        cursor: pointer;
+      }
+      .choice:has(input:checked) {
+        border-color: var(--accent);
+        background: var(--card);
+      }
+      .choice input {
+        margin-top: 5px;
+      }
+      .choice-title {
+        font-weight: 600;
+      }
+      .choice-desc {
+        display: block;
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .check {
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+        border-left-width: 4px;
+        border-radius: 8px;
+        margin: 0 0 12px;
+      }
+      .check[data-tone="ready"] {
+        border-left-color: #1e8e3e;
+      }
+      .check[data-tone="waiting"] {
+        border-left-color: var(--accent);
+      }
+      .check[data-tone="needs-action"] {
+        border-left-color: #e37400;
+      }
+      .check-headline {
+        font-weight: 600;
+      }
+      .check ol,
+      .check ul {
+        margin-bottom: 14px;
+      }
+      .check-note,
+      .check-progress,
+      #mode-status {
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .check-note {
+        margin: 12px 0 0;
       }
       a.button.primary {
         background: var(--accent);
@@ -259,16 +337,41 @@
         </tbody>
       </table>
 
-      <h2>The optional AI layer</h2>
+      <h2>Optional: add an AI reading</h2>
       <p>
         The technical checks — sender domains, links, attachments, wording — always run on this device
         and need no AI. On top of them, PhishLens can ask a language model what it makes of the
-        message's intent. By default that is Chrome's built-in on-device model, if your browser has one;
-        if it does not, everything else still works and the panel says so.
+        message's intent. It is off until you choose it.
       </p>
+      <fieldset class="choices">
+        <legend class="brand">AI mode</legend>
+        <label class="choice">
+          <input type="radio" name="aiMode" value="off" checked />
+          <span>
+            <span class="choice-title">Off</span>
+            <span class="choice-desc">Technical checks only. No model runs.</span>
+          </span>
+        </label>
+        <label class="choice">
+          <input type="radio" name="aiMode" value="local" />
+          <span>
+            <span class="choice-title">Chrome's on-device model</span>
+            <span class="choice-desc">
+              Uses the model built into Chrome, if this device has it. Message content never leaves
+              the machine.
+            </span>
+          </span>
+        </label>
+      </fieldset>
+      <div id="local-check" class="check" role="status" aria-live="polite" hidden></div>
+      <p id="mode-status" role="status" aria-live="polite"></p>
       <p>
         A model can never outvote the checks. It contributes at most 15 of the 100 points, cannot remove
-        a finding, and scores nothing at all unless a technical check already found something.
+        a finding, and scores nothing at all unless a technical check already found something. To use a
+        model server you run yourself, see Settings. Google explains Chrome's on-device AI in
+        <a href="https://support.google.com/chrome/answer/16961953" target="_blank" rel="noreferrer"
+          >Manage on-device Generative AI models</a
+        >.
       </p>
 
       <div class="actions">
@@ -281,5 +384,6 @@
         permission to trust a message.
       </footer>
     </main>
+    <script type="module" src="welcome.js"></script>
   </body>
 </html>

@@ -27,7 +27,7 @@ function changed(patch: Partial<Settings>): ReturnType<typeof settingsImpact> {
  * about the extension's behaviour would not be a setting.
  */
 const ALTERNATIVES: { [K in keyof Settings]: Settings[K] } = {
-  aiMode: 'off',
+  aiMode: 'local',
   aiOnlyWhenFlagged: false,
   highlightEnabled: false,
   showBadgeWhenLow: false,
@@ -58,7 +58,7 @@ describe('settingsImpact', () => {
     expect(changed({ modelBaseUrl: 'http://127.0.0.1:11434' }).rescore).toBe(true);
     expect(changed({ modelName: 'a-different-model' }).rescore).toBe(true);
     expect(changed({ backendBaseUrl: 'https://analysis.northwind-tools.example' }).rescore).toBe(true);
-    expect(changed({ aiMode: 'off' }).rescore).toBe(true);
+    expect(changed({ aiMode: 'local' }).rescore).toBe(true);
   });
 
   it('separates a changed judge from a changed verdict', () => {

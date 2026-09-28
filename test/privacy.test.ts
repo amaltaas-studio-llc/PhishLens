@@ -33,8 +33,8 @@ import type { EmailMessage } from '../src/shared/types.js';
 import { loadFixture } from './fixtures/load.js';
 
 describe('default settings', () => {
-  it('processes locally and requires no backend', () => {
-    expect(DEFAULT_SETTINGS.aiMode).toBe('local');
+  it('runs no model and requires no backend', () => {
+    expect(DEFAULT_SETTINGS.aiMode).toBe('off');
     expect(DEFAULT_SETTINGS.backendBaseUrl).toBe('');
     expect(isCloudConfigured(DEFAULT_SETTINGS)).toBe(false);
   });
@@ -82,13 +82,13 @@ describe('normalizeSettings', () => {
   });
 
   it('rejects an unrecognised AI mode rather than passing it through', () => {
-    expect(normalizeSettings({ aiMode: 'remote' }).aiMode).toBe('local');
-    expect(normalizeSettings({ aiMode: 42 }).aiMode).toBe('local');
-    expect(normalizeSettings({ aiMode: null }).aiMode).toBe('local');
+    expect(normalizeSettings({ aiMode: 'remote' }).aiMode).toBe('off');
+    expect(normalizeSettings({ aiMode: 42 }).aiMode).toBe('off');
+    expect(normalizeSettings({ aiMode: null }).aiMode).toBe('off');
   });
 
   it('preserves valid choices', () => {
-    expect(normalizeSettings({ aiMode: 'off' }).aiMode).toBe('off');
+    expect(normalizeSettings({ aiMode: 'local' }).aiMode).toBe('local');
     expect(normalizeSettings({ aiMode: 'cloud' }).aiMode).toBe('cloud');
     expect(normalizeSettings({ highlightEnabled: false }).highlightEnabled).toBe(false);
     expect(normalizeSettings({ showBadgeWhenLow: false }).showBadgeWhenLow).toBe(false);
@@ -105,9 +105,9 @@ describe('normalizeSettings', () => {
    * The defaults a fresh install gets, asserted rather than described, because each is a promise the
    * README makes on the strength of nobody having changed it.
    */
-  it('defaults to on-device AI, no network address, and no annotation of unopened mail', () => {
+  it('defaults to no AI, no network address, and no annotation of unopened mail', () => {
     const fresh = normalizeSettings({});
-    expect(fresh.aiMode).toBe('local');
+    expect(fresh.aiMode).toBe('off');
     expect(fresh.backendBaseUrl).toBe('');
     expect(fresh.modelBaseUrl).toBe('');
     expect(fresh.trustedSenders).toEqual([]);
@@ -181,7 +181,7 @@ describe('normalizeModelBaseUrl', () => {
     // The same guarantee the backend URL has: a value arriving from an older build, or from a synced
     // profile, does not by itself start sending anything anywhere.
     const settings = normalizeSettings({ modelBaseUrl: 'https://models.example.com/v1' });
-    expect(settings.aiMode).toBe('local');
+    expect(settings.aiMode).toBe('off');
     expect(isModelServerConfigured(settings)).toBe(false);
   });
 
@@ -272,7 +272,7 @@ describe('normalizeBackendUrl', () => {
 
   it('cannot be pointed at a model vendor by editing storage without also choosing cloud mode', () => {
     const settings = normalizeSettings({ backendBaseUrl: 'https://api.openai.com' });
-    expect(settings.aiMode).toBe('local');
+    expect(settings.aiMode).toBe('off');
     expect(isCloudConfigured(settings)).toBe(false);
   });
 });

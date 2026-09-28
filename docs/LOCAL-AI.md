@@ -146,13 +146,19 @@ from a broken one.
 ### Trying it with a real model
 
 Development targeted the Chrome 138+ `LanguageModel` global as the primary path, with Chrome ≥ 120 as the
-manifest minimum. To exercise a real model rather than the fakes you need a build where Gemini Nano is
-available, which currently means enabling `chrome://flags/#prompt-api-for-gemini-nano` and
-`chrome://flags/#optimization-guide-on-device-model` and waiting for the download. Expect this to drift;
-the detection code is written so that drift degrades to "unavailable" rather than to a crash.
+manifest minimum. On current Chrome the model is governed by **On-device AI** in `chrome://settings/ai`,
+and Chrome downloads it on eligible devices — about 20 GB free, an unmetered connection, capable
+hardware ([Google's help page](https://support.google.com/chrome/answer/16961953)). Older builds needed
+`chrome://flags/#prompt-api-for-gemini-nano` and `chrome://flags/#optimization-guide-on-device-model`.
+Expect this to drift; the detection code is written so that drift degrades to "unavailable" rather than to
+a crash.
 
 A `downloadable` or `downloading` model is deliberately treated as **unavailable**. Opening an email
-should not start a multi-hundred-megabyte download.
+should not start a multi-hundred-megabyte download. The one place a download can start is the welcome
+page, on a click, when the reader has just chosen the on-device model. That page reports each state
+`onDeviceModelState()` distinguishes — ready, downloadable, downloading, unavailable, and a Chrome with no
+Prompt API at all — with the steps for it. Chrome reports "On-device AI is switched off" and "this device
+does not qualify" identically, so the page gives the steps for the first and says the second is possible.
 
 ## When there is no model
 

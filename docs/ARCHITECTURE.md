@@ -888,9 +888,14 @@ checked by driving a browser.
 **The welcome page** (`src/welcome/`) exists because an unpacked extension gives no other opportunity to
 explain itself. There is no store listing, and the interesting properties — that nothing is uploaded, that
 the badge appears next to the sender, that AI is optional — are exactly the ones a user cannot discover by
-looking. It opens once, on install, and asks for nothing. It ships as authored HTML with no script at all,
-which is why `check-dist.mjs` scans every page in `dist/` rather than only the ones the manifest names:
-nothing the manifest can be read for references it.
+looking. It opens once, on install, and asks one thing: whether to use AI, which is off until chosen. Every
+claim on it is static HTML a reader can verify in the source; the one script, `welcome/index.ts`, saves that
+choice and, for Chrome's model, reports what state Chrome says it is in, with the steps that state needs
+(`welcome/guidance.ts`, pure and tested). The probe lives in `llm/on-device.ts` rather than the adapter so
+the page does not bundle a prompt it never sends. It is also the only place a model download can start,
+on a click, because the adapter will never start one from Gmail. `check-dist.mjs` scans every page in
+`dist/` rather than only the ones the manifest names, because nothing the manifest can be read for
+references this one.
 
 **Inbox-row markers** (`src/content/list-marks.ts`) are the one surface that makes a claim about a message
 nobody opened, and the design constraints follow from how little a row contains. The pure half is described

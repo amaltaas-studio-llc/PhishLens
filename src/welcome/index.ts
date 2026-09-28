@@ -1,0 +1,184 @@
+/**
+ * The welcome page's one choice: whether to use AI, and if Chrome's model, whether it is ready yet.
+ *
+ * Everything else on the page is static HTML that makes its claims in the page source. The wording is in
+ * `guidance.ts`, which is pure and tested; this file is the wiring.
+ */
+import {
+  downloadOnDeviceModel,
+  onDeviceModelState,
+  type OnDeviceModelState,
+} from '../analysis/llm/on-device.js';
+import { requestSettings, sendMessage } from '../shared/messaging.js';
+import { isAiMode } from '../shared/settings.js';
+import type { AiMode } from '../shared/types.js';
+import { el, requireElement } from '../ui/dom.js';
+import {
+  ACTION_LABELS,
+  AI_SETTINGS_URL,
+  onDeviceGuidance,
+  UPDATE_CHROME_URL,
+  type GuidanceAction,
+} from './guidance.js';
+
+/** Chrome raises no event for a download this page did not start, so one in progress is polled. */
+const DOWNLOAD_POLL_MS = 5000;
+
+class WelcomePage {
+  readonly #modeInputs = [...document.querySelectorAll<HTMLInputElement>('input[name="aiMode"]')];
+  readonly #check = requireElement('local-check', HTMLDivElement);
+  readonly #status = requireElement('mode-status', HTMLParagraphElement);
+  #mode: AiMode = 'off';
+  #poll: ReturnType<typeof setTimeout> | undefined;
+  /** Progress text while this page's own download runs; the probe would only say "downloading". */
+  #progress: string | null = null;
+  #watch: ReturnType<typeof setInterval> | undefined;
+  /** Bumped when a download wait starts or ends, so a late answer from an earlier one is ignored. */
+  #tracking = 0;
+
+  async init(): Promise<void> {
+    for (const input of this.#modeInputs) {
+      input.addEventListener('change', () => {
+        if (input.checked && isAiMode(input.value)) void this.#choose(input.value);
+      });
+    }
+    // Coming back from Chrome's settings is when the answer is most likely to have changed.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') void this.#refresh();
+    });
+    this.#show((await requestSettings()).aiMode);
+  }
+
+  async #choose(mode: AiMode): Promise<void> {
+    const response = await sendMessage({ type: 'SET_SETTINGS', patch: { aiMode: mode } });
+    if (response === null || !response.ok || response.type !== 'SETTINGS') {
+      this.#status.textContent = 'Could not save that choice. Try again, or use Settings.';
+      return;
+    }
+    this.#show(response.settings.aiMode);
+  }
+
+  #show(mode: AiMode): void {
+    this.#mode = mode;
+    for (const input of this.#modeInputs) input.checked = input.value === mode;
+    this.#status.textContent =
+      mode === 'server' || mode === 'cloud'
+        ? 'A different AI option is chosen in Settings, which is where it can be changed.'
+        : '';
+    void this.#refresh();
+  }
+
+  async #refresh(): Promise<void> {
+    clearTimeout(this.#poll);
+    if (this.#mode !== 'local') {
+      this.#check.hidden = true;
+      this.#check.replaceChildren();
+      return;
+    }
+    if (this.#progress !== null) return;
+
+    const state = await onDeviceModelState();
+    if (!this.#probeStillWanted()) return;
+    this.#render(state);
+    if (state === 'downloading') {
+      // Without this the panel reads identically after every poll, which looks like a page that stopped.
+      this.#check.append(
+        el('p', { class: 'check-note', text: `Last checked ${new Date().toLocaleTimeString()}.` }),
+      );
+      this.#poll = setTimeout(() => void this.#refresh(), DOWNLOAD_POLL_MS);
+    }
+  }
+
+  /**
+   * The reader can change their mind, or start a download, during the probe. A method rather than an
+   * inline check because narrowing does not survive the `await` before it.
+   */
+  #probeStillWanted(): boolean {
+    return this.#mode === 'local' && this.#progress === null;
+  }
+
+  #render(state: OnDeviceModelState): void {
+    const guidance = onDeviceGuidance(state);
+    const numbered = guidance.action === 'open-ai-settings' || guidance.action === 'update-chrome';
+    const parts: Node[] = [el('p', { class: 'check-headline', text: guidance.headline })];
+    if (guidance.steps.length > 0) {
+      parts.push(el(numbered ? 'ol' : 'ul', { children: guidance.steps.map((step) => el('li', { text: step })) }));
+    }
+    if (this.#progress !== null) parts.push(el('p', { class: 'check-progress', text: this.#progress }));
+    if (guidance.action !== undefined) parts.push(this.#button(guidance.action));
+    if (guidance.note !== undefined) parts.push(el('p', { class: 'check-note', text: guidance.note }));
+
+    this.#check.hidden = false;
+    this.#check.dataset['tone'] = guidance.tone;
+    this.#check.replaceChildren(...parts);
+  }
+
+  #button(action: GuidanceAction): HTMLButtonElement {
+    const onClick = (): void => {
+      if (action === 'download') void this.#download('downloadable');
+      else if (action === 'track-download') void this.#download('downloading');
+      else void openBrowserPage(action === 'open-ai-settings' ? AI_SETTINGS_URL : UPDATE_CHROME_URL);
+    };
+    return el('button', {
+      class: 'button',
+      text: ACTION_LABELS[action],
+      attrs: { type: 'button', disabled: this.#progress !== null },
+      on: { click: onClick },
+    });
+  }
+
+  /**
+   * Creating a session is what downloads the model, or joins a download already running.
+   *
+   * Progress reaching 100% is not the end: Chrome still unpacks and loads the model before `create()`
+   * returns, and nothing guarantees it returns at all. So availability is re-checked alongside, and
+   * whichever reports readiness first ends the wait; `#tracking` makes the slower one a no-op.
+   */
+  async #download(state: 'downloadable' | 'downloading'): Promise<void> {
+    clearTimeout(this.#poll);
+    const run = ++this.#tracking;
+    this.#status.textContent = '';
+    this.#progress = 'Waiting for Chrome to report progress…';
+    this.#render(state);
+    this.#watch = setInterval(() => void this.#watchDownload(run), DOWNLOAD_POLL_MS);
+
+    const started = await downloadOnDeviceModel((fraction) => {
+      if (run !== this.#tracking) return;
+      this.#progress =
+        fraction >= 1
+          ? 'Downloaded. Chrome is now unpacking and loading the model, which can take a few minutes.'
+          : `Downloading… ${String(Math.round(Math.max(0, fraction) * 100))}%`;
+      if (this.#mode === 'local') this.#render(state);
+    });
+    if (run === this.#tracking) this.#endDownload(started);
+  }
+
+  async #watchDownload(run: number): Promise<void> {
+    const state = await onDeviceModelState();
+    if (run !== this.#tracking) return;
+    if (state === 'available') this.#endDownload(true);
+    else if (state === 'unavailable' || state === 'unsupported') this.#endDownload(false);
+  }
+
+  #endDownload(started: boolean): void {
+    this.#tracking += 1;
+    clearInterval(this.#watch);
+    this.#progress = null;
+    if (!started) {
+      this.#status.textContent =
+        'Chrome did not start the download. Check the requirements below, then try again.';
+    }
+    void this.#refresh();
+  }
+}
+
+/** `chrome://` pages cannot be opened by a link from an extension page, only by the tabs API. */
+async function openBrowserPage(url: string): Promise<void> {
+  try {
+    await chrome.tabs.create({ url });
+  } catch {
+    // Nothing better to offer than the address itself, which the steps already spell out.
+  }
+}
+
+void new WelcomePage().init();

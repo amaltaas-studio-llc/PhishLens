@@ -1,12 +1,12 @@
 import type { AiMode, Settings } from './types.js';
 
 /**
- * Defaults favour local processing: AI analysis, if it runs at all, runs on-device. Cloud is opt-in
- * and additionally requires a backend URL, so there is no configuration in which the MVP sends
- * message content off the machine.
+ * AI is off until the reader chooses it, on the welcome page or in settings: the checks need no model,
+ * and a model is a cost in time and battery the reader should opt into. Cloud additionally requires a
+ * backend URL, so there is no configuration in which the MVP sends message content off the machine.
  */
 export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
-  aiMode: 'local',
+  aiMode: 'off',
   aiOnlyWhenFlagged: true,
   highlightEnabled: true,
   showBadgeWhenLow: true,

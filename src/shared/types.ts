@@ -326,7 +326,7 @@ export interface SemanticAnalyzer {
 export type AiMode = 'off' | 'local' | 'cloud' | 'server';
 
 export interface Settings {
-  /** Default is `local`: on-device only. Neither network mode is ever the default. */
+  /** Default is `off`. Neither network mode is ever the default. */
   aiMode: AiMode;
   /**
    * Ask the model only when a technical check found something.

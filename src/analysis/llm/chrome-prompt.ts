@@ -1,11 +1,9 @@
-/**
+﻿/**
  * Chrome on-device model adapter (the Prompt API / built-in AI).
  *
- * The API surface is unstable: the entry point, the availability method, and the values it returns have
- * all differed between Chrome versions, and the feature is often behind a flag the user never enabled.
- * Every shape this file knows about is therefore probed rather than assumed, and anything unexpected
- * resolves to "unavailable" instead of throwing. `analyze()` returns `null` for both "no model" and
- * "nothing usable came back", so the pipeline needs no special case for either.
+ * The API surface is unstable, so finding it and reading its state live in `on-device.ts`, where every
+ * shape is probed rather than assumed. `analyze()` returns `null` for both "no model" and "nothing usable
+ * came back", so the pipeline needs no special case for either.
  *
  * Two structural constraints shape the class:
  *  - The session is expensive, so it is cached. That is only sound in the content script, which lives
@@ -20,6 +18,15 @@ import type {
   SemanticAnalyzeOptions,
   SemanticAnalyzer,
 } from '../../shared/types.js';
+import {
+  findFactory,
+  fn,
+  isRecord,
+  OUTPUT_LANGUAGE,
+  probeAvailability,
+  type OnDeviceModelState,
+  type UnknownRecord,
+} from './on-device.js';
 import { parseSemanticAnalysis } from './parse.js';
 import { RESPONSE_SCHEMA, SYSTEM_PROMPT, buildUserPrompt, describePromptShape } from './prompt.js';
 
@@ -38,98 +45,6 @@ const PROMPT_SHAPES: readonly (UnknownRecord | undefined)[] = [
   { responseConstraint: RESPONSE_SCHEMA },
   undefined,
 ];
-
-// ---------------------------------------------------------------------------
-// Structural probing (no `any`, no optimistic casts)
-// ---------------------------------------------------------------------------
-
-type UnknownRecord = Record<string, unknown>;
-
-function isRecord(value: unknown): value is UnknownRecord {
-  return typeof value === 'object' && value !== null;
-}
-
-/**
- * Whether properties can be read off `value`.
- *
- * Broader than `isRecord` on purpose: the current entry point is a class, so it is function-typed and
- * an object-only check rejects the real API. Availability *results* still use `isRecord`, since a
- * function there would mean something is wrong.
- */
-function isPropertyHost(value: unknown): value is UnknownRecord {
-  return value !== null && (typeof value === 'object' || typeof value === 'function');
-}
-
-function fn(host: unknown, name: string): ((...args: unknown[]) => unknown) | null {
-  if (!isPropertyHost(host)) return null;
-  const candidate = host[name];
-  return typeof candidate === 'function' ? (candidate as (...args: unknown[]) => unknown) : null;
-}
-
-/**
- * Locates the language-model factory across the shapes this API has shipped as.
- * Returns the object that exposes `create()`, or `null`.
- */
-function findFactory(): { host: UnknownRecord; label: string } | null {
-  const g = globalThis as unknown as UnknownRecord;
-
-  // Current: bare `LanguageModel` global (Chrome 138+ in extensions, 148+ on the web). This is a
-  // class, so it is function-typed — see `isPropertyHost`.
-  const bare = g['LanguageModel'];
-  if (isPropertyHost(bare) && fn(bare, 'create') !== null) {
-    return { host: bare, label: 'LanguageModel' };
-  }
-
-  // Earlier: `window.ai.languageModel`.
-  const ai = g['ai'];
-  if (isPropertyHost(ai)) {
-    const languageModel = ai['languageModel'];
-    if (isPropertyHost(languageModel) && fn(languageModel, 'create') !== null) {
-      return { host: languageModel, label: 'window.ai.languageModel' };
-    }
-  }
-
-  // Origin-trial era: `chrome.aiOriginTrial.languageModel`.
-  const chromeNs = g['chrome'];
-  if (isPropertyHost(chromeNs)) {
-    const trial = chromeNs['aiOriginTrial'];
-    if (isPropertyHost(trial)) {
-      const languageModel = trial['languageModel'];
-      if (isPropertyHost(languageModel) && fn(languageModel, 'create') !== null) {
-        return { host: languageModel, label: 'chrome.aiOriginTrial.languageModel' };
-      }
-    }
-  }
-  return null;
-}
-
-/** Normalises the two historical availability reporting shapes to a single verdict. */
-async function probeAvailability(host: UnknownRecord): Promise<'ready' | 'needs-download' | 'no'> {
-  const availability = fn(host, 'availability');
-  if (availability !== null) {
-    const result: unknown = await availability.call(host);
-    if (typeof result === 'string') {
-      if (result === 'available') return 'ready';
-      if (result === 'downloadable' || result === 'downloading') return 'needs-download';
-      return 'no';
-    }
-  }
-
-  const capabilities = fn(host, 'capabilities');
-  if (capabilities !== null) {
-    const result: unknown = await capabilities.call(host);
-    if (isRecord(result)) {
-      const available = result['available'];
-      if (available === 'readily') return 'ready';
-      if (available === 'after-download') return 'needs-download';
-    }
-    return 'no';
-  }
-
-  // A factory that exposes `create()` but no availability probe at all. Assume unavailable rather
-  // than triggering a model download as a side effect of a feature check.
-  return 'no';
-}
 
 interface Session {
   prompt(input: string, options?: UnknownRecord): Promise<unknown>;
@@ -210,7 +125,7 @@ export class ChromePromptAnalyzer implements SemanticAnalyzer {
   #sessionHasSystemPrompt = false;
   #factoryLabel = '';
   /** Set once availability has been determined, to avoid re-probing on every message. */
-  #availability: 'ready' | 'needs-download' | 'no' | 'unknown' = 'unknown';
+  #availability: OnDeviceModelState | 'unknown' = 'unknown';
   /** Index into `PROMPT_SHAPES` of the options this browser last accepted, once one has been. */
   #promptShape: number | null = null;
 
@@ -229,7 +144,7 @@ export class ChromePromptAnalyzer implements SemanticAnalyzer {
       if (this.#availability === 'unknown') {
         const factory = findFactory();
         if (factory === null) {
-          this.#availability = 'no';
+          this.#availability = 'unsupported';
           logger.debug('on-device model: no factory global present');
           return false;
         }
@@ -240,12 +155,12 @@ export class ChromePromptAnalyzer implements SemanticAnalyzer {
           availability: this.#availability,
         });
       }
-      // `needs-download` is deliberately not treated as available: triggering a multi-hundred-
+      // A model still to download is deliberately not available: triggering a multi-hundred-
       // megabyte download because a user opened an email would be an unacceptable surprise.
-      return this.#availability === 'ready';
+      return this.#availability === 'available';
     } catch (error) {
       // Any unexpected shape or thrown error resolves to false. Never propagate.
-      this.#availability = 'no';
+      this.#availability = 'unavailable';
       logger.debug('on-device model probe failed', error);
       return false;
     }
@@ -387,7 +302,7 @@ export class ChromePromptAnalyzer implements SemanticAnalyzer {
       { options: { ...DETERMINISTIC_OPTIONS, systemPrompt: SYSTEM_PROMPT }, system: true },
       { options: { initialPrompts: [{ role: 'system', content: SYSTEM_PROMPT }] }, system: true },
       { options: {}, system: false },
-    ];
+    ].map((attempt) => ({ ...attempt, options: { ...OUTPUT_LANGUAGE, ...attempt.options } }));
 
     for (const attempt of attempts) {
       try {

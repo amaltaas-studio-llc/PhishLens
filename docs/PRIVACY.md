@@ -42,8 +42,9 @@ already on screen: no message is fetched, and nothing outside the open thread is
 content script for as long as the message is on screen, then is dropped. It is never written to
 `chrome.storage`, never sent to the service worker, and never logged in a release build.
 
-**Analysed locally** — all of it. Every deterministic detector, the whole scoring engine, and in the
-default configuration the semantic layer run inside the tab. Nothing touches the network. Only the
+**Analysed locally** — all of it. Every deterministic detector and the whole scoring engine run inside
+the tab, and so does Chrome's on-device model if you choose it; AI is off until you do. Nothing touches
+the network. Only the
 model's readings are kept, in the tab, capped at 50, and discarded when the tab closes.
 
 **Written to `chrome.storage`** — the settings you choose, and one list that comes from a message: the

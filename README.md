@@ -178,10 +178,12 @@ from a list — so an unmarked row means nothing was visible, not that the messa
 soften findings about *wording* while Gmail confirms the sender really is who they claim, and never
 silences a finding about identity, links, or attachments. Nothing is hidden, and one click undoes it.
 
-**Use optional AI.** Where Chrome makes an on-device model available, it can add an assessment of the
-wording. The core checks work without it, and the model is capped: it cannot remove their findings or
-raise a score that the checks do not already support. Advanced users can point PhishLens at their own
-model server. [AI availability and setup →](docs/LOCAL-AI.md)
+**Use optional AI.** AI is off until you turn it on. Where Chrome makes an on-device model available, it
+can add an assessment of the wording. When you choose it on the welcome page, PhishLens checks whether
+Chrome's model is ready and, if it is not, shows how to switch it on in `chrome://settings/ai`. The core
+checks work without it, and the model is capped: it cannot remove their findings or raise a score that the
+checks do not already support. Advanced users can point PhishLens at their own model server.
+[AI availability and setup →](docs/LOCAL-AI.md)
 
 To save time and battery, the AI is only asked about messages where a check has already found something,
 since on other mail its view could not change the score. The card says when it was not asked and offers
