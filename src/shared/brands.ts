@@ -217,7 +217,10 @@ export const BRANDS: readonly Brand[] = [
     id: 'irs',
     label: 'IRS',
     keywords: ['irs', 'internal revenue'],
-    domains: ['irs.gov', 'treasury.gov', 'eftps.gov'],
+    // `govdelivery.com` is the platform the IRS sends its public newsletters through. It is shared, but
+    // only with government bodies, which is the one reason a shared sending platform may stand for a
+    // brand here; a general-purpose mailer (anyone can open an account) must never be listed.
+    domains: ['irs.gov', 'treasury.gov', 'eftps.gov', 'govdelivery.com'],
     lookalikeTargets: ['irs.gov'],
   },
   {

@@ -11,6 +11,7 @@
  * All geometry is in `PANEL_CSS`; this file positions nothing. See docs/ARCHITECTURE.md §5.1.
  */
 import { assessmentSignals, observedSignals } from '../analysis/engine.js';
+import { distinctForDisplay, scoreFloor } from '../analysis/scoring/aggregate.js';
 import { CATEGORY_WEIGHTS } from '../analysis/scoring/config.js';
 import type {
   AnalysisResult,
@@ -291,7 +292,7 @@ export class Panel {
 
   /** Deterministic findings: things that were measured. */
   #renderObserved(result: AnalysisResult): HTMLElement {
-    const signals = observedSignals(result);
+    const signals = distinctForDisplay(observedSignals(result));
     const scoring = signals.filter((s) => s.score > 0);
     const notes = signals.filter((s) => s.score === 0);
 
@@ -518,7 +519,16 @@ export class Panel {
     // up to less. Saying so is the difference between a breakdown and arithmetic that looks broken.
     const added = contributing.reduce((sum, [, value]) => sum + value, 0);
     if (result.score > added) {
-      chips.push(el('span', { class: 'floored', text: `minimum for this finding ${String(result.score)}` }));
+      const floor = scoreFloor(result.signals);
+      chips.push(
+        el('span', {
+          class: 'floored',
+          text:
+            floor.basis === 'convergence'
+              ? `minimum ${String(result.score)} for severe findings in ${joinCategories(floor.categories)}`
+              : `minimum for this finding ${String(result.score)}`,
+        }),
+      );
     }
 
     return el('div', {
@@ -533,6 +543,14 @@ export class Panel {
       ],
     });
   }
+}
+
+/** "Links and Wording", "Sender, Links and Wording" — the same names the chips beside it use. */
+function joinCategories(categories: readonly SignalCategory[]): string {
+  const names = categories.map((c) => CATEGORY_LABELS[c]);
+  const last = names.pop();
+  if (last === undefined) return '';
+  return names.length === 0 ? last : `${names.join(', ')} and ${last}`;
 }
 
 /**

@@ -117,27 +117,60 @@ export function scoreSignals(
   return computeTotalScore(groupByCategory(signals), config.categoryWeights, config.severityCeilings);
 }
 
+export interface ScoreFloor {
+  floor: number;
+  /**
+   * What established it: one conclusive finding, or severe findings converging from several
+   * categories. `null` when nothing did. The panel words the two differently, because "the minimum for
+   * this finding" is false when no single finding sets it.
+   */
+  basis: 'finding' | 'convergence' | null;
+  /** The categories that converged, in `ALL_CATEGORIES` order. Empty unless `basis` is `convergence`. */
+  categories: SignalCategory[];
+}
+
 /**
- * The minimum score established by the most severe *deterministic* finding present.
+ * The minimum score established by *deterministic* findings, and which rule established it.
  *
- * Returns 0 when nothing qualifies. `llm` signals are excluded by
- * `SCORE_FLOORS.eligibleCategories`, so a semantic verdict can never raise a floor — see
- * `config.ts` for why floors exist at all.
+ * `llm` signals are excluded by `SCORE_FLOORS.eligibleCategories`, so a semantic verdict can neither
+ * raise a floor nor count towards convergence — see `config.ts` for why floors exist at all.
  */
-export function severityFloor(
+export function scoreFloor(
   signals: readonly SecuritySignal[],
   floors: typeof SCORE_FLOORS = SCORE_FLOORS,
-): number {
-  let floor = 0;
+): ScoreFloor {
+  let single = 0;
+  const severe = new Set<SignalCategory>();
   for (const signal of signals) {
     if (!floors.eligibleCategories.includes(signal.category)) continue;
     // Findings borrowed from another system do not establish a floor, only our own do.
     if (floors.excludedSignalIds.includes(signal.id)) continue;
     // A signal claiming zero points is an informational note; it does not establish a floor.
     if (signal.score <= 0) continue;
-    floor = Math.max(floor, floors.bySeverity[signal.severity] ?? 0);
+    single = Math.max(single, floors.bySeverity[signal.severity] ?? 0);
+    // A dampened finding is explained by a proven sender, which is the opposite of independent evidence.
+    if (signal.dampened !== true && isAtLeast(signal.severity, floors.convergence.minSeverity)) {
+      severe.add(signal.category);
+    }
   }
-  return clamp(floor, 0, 100);
+
+  const converged = severe.size >= floors.convergence.minCategories ? floors.convergence.floor : 0;
+  // A tie goes to the single finding: it is the stronger explanation, and the one a reader can check alone.
+  if (converged > single) {
+    return {
+      floor: clamp(converged, 0, 100),
+      basis: 'convergence',
+      categories: ALL_CATEGORIES.filter((c) => severe.has(c)),
+    };
+  }
+  return { floor: clamp(single, 0, 100), basis: single > 0 ? 'finding' : null, categories: [] };
+}
+
+export function severityFloor(
+  signals: readonly SecuritySignal[],
+  floors: typeof SCORE_FLOORS = SCORE_FLOORS,
+): number {
+  return scoreFloor(signals, floors).floor;
 }
 
 /** Applies the floor to an additive total. Only ever raises it. */
@@ -181,6 +214,37 @@ export function isAtLeast(severity: Severity, minimum: Severity): boolean {
 export function lowerSeverity(severity: Severity, steps: number): Severity {
   const lowered = clamp(rank(severity) - steps, 0, SEVERITY_ORDER.length - 1);
   return SEVERITY_ORDER[lowered] ?? 'info';
+}
+
+/**
+ * Two findings read the same when everything the reader is shown matches, which leaves only where in the
+ * message they point — the id's link index and the evidence URL — to differ.
+ */
+export function displayKey(signal: SecuritySignal): string {
+  return [
+    signal.category,
+    signal.severity,
+    signal.title,
+    signal.description,
+    signal.evidence?.value ?? '',
+  ].join('\u0000');
+}
+
+/**
+ * The first of each group of findings that read the same, in order.
+ *
+ * Display only. The dropped copies still scored, and still have to: `analyze()` rescores from the full
+ * deterministic list when a model answers, so a collapsed list anywhere upstream of the panel would make
+ * the score depend on whether a model was running.
+ */
+export function distinctForDisplay(signals: readonly SecuritySignal[]): SecuritySignal[] {
+  const seen = new Set<string>();
+  return signals.filter((signal) => {
+    const key = displayKey(signal);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /** Sorts signals for presentation: most severe first, then by score, then stably by id. */

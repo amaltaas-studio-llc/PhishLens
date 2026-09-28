@@ -133,7 +133,8 @@ detectors:
 2. Signals within a category are summed, and the subtotal is capped at the category's weight.
 3. The total is the sum of subtotals, clamped to `[0, 100]`.
 4. A single **deterministic** finding of `high` or `critical` severity establishes a score *floor* of 50
-   or 75 respectively.
+   or 75 respectively, and `high` findings in two or more different categories establish a floor of 75
+   together.
 
 The weights sum to exactly 100. If they summed to more, the final clamp would fire on ordinary
 suspicious mail and compress the top of the scale until 80 and 100 meant the same thing.
@@ -147,12 +148,26 @@ links, no attachments and passing authentication. It is *entirely* a content fin
 at 15/100 and be reported as low risk. The floor stops a single-dimension attack from being diluted by
 the categories it happens not to touch.
 
-The floor is restricted to deterministic signals, so the AI cannot trigger one. It also excludes
-`authentication.gmail_warning` by id: Gmail shows that banner conditionally on the folder being viewed,
-so letting it set the verdict would make a message's score change when you moved it to Spam.
+The same blind spot has a second shape: an attack that avoids *some* dimensions on purpose. A phish that
+names no brand has nothing for the impersonation rules to compare, and one sent from a throwaway domain
+passes that domain's own SPF and DKIM, so Gmail shows nothing for authentication to report. That leaves
+identity and authentication — 35 points — empty by design. What remains lands in links and wording,
+worth 40 together, so a message with a page in a storage bucket, a demand to update payment details and
+a threat to delete the account, all `high`, stopped at 55 even with the AI's 15 on top. The findings are
+independent, though — each category is a different way of being wrong — and severe findings in two
+categories at once are what an attack looks like and what ordinary mail does not produce. So they floor
+the score at 75. Categories are counted, not findings, so three links to the same page cannot converge
+with themselves.
 
-When a floor is what produced the score, the card labels it, because a breakdown whose categories add up
-to less than the total looks like broken arithmetic otherwise.
+Both floors are restricted to deterministic signals, so the AI can neither trigger one nor count towards
+convergence. They also exclude `authentication.gmail_warning` by id: Gmail shows that banner
+conditionally on the folder being viewed, so letting it set the verdict would make a message's score
+change when you moved it to Spam. And both rest on the same tested assumption — no legitimate fixture
+produces a `high` or `critical` deterministic finding in any category.
+
+When a floor is what produced the score, the card labels it, and says which kind: "minimum for this
+finding", or the categories whose severe findings converged. A breakdown whose categories add up to less
+than the total looks like broken arithmetic otherwise.
 
 ## Holding down false positives
 
@@ -189,7 +204,18 @@ mechanisms exist purely to keep legitimate mail at zero.
   claim. Both exemptions yield when the message claims to *be* the brand in question, which is where
   reputation is genuinely being borrowed.
 - **Word-boundary brand matching.** Short brand keywords (`irs`, `aws`) must match as whole folded words,
-  or "first" and "lawsuit" become brand claims once separators are stripped for comparison.
+  or "first" and "lawsuit" become brand claims once separators are stripped for comparison. A long keyword
+  may sit inside a word (`SecurePayPal`) or be spread across several (`P a y P a l`), but may only span
+  words if it begins at one: folding turns `rn` into `m`, so "Miriam Stearns" runs together as
+  `mlrlamsteams`, which contains Microsoft's `msteams`.
+- **Severe wording needs its object.** The `high` content rules set a severity floor alone, so each pattern
+  has to describe the attack rather than share its vocabulary. A sextortion claim is "I have recorded
+  *you*", not "I have captured the trace"; a payroll diversion is *my* salary, not payroll's own
+  announcement about "your payroll information"; a gift-card request is addressed to the reader or asks
+  for several cards, not "spend $50 and get a gift certificate"; a wallet address carries a letter past
+  `f` and no `0`, which no hex checksum or Message-ID does. Each boundary came from running the rules over
+  a public corpus of genuine mailing-list, corporate and newsletter mail, and each is tested with the
+  ordinary sentence it used to misread.
 - **Destinations inside a tracker's path.** The click trackers of the large sending platforms put the real
   destination in the path with its separators percent-encoded — `…/L0/https:%2F%2Fexample.com%2Fpath` —
   and `URL` leaves `%2F` encoded in a pathname, correctly, since decoding it would change the path's
@@ -309,8 +335,8 @@ it is the marker that gets the feature switched off.
 
 ## Confidence in the numbers
 
-1123 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
-`test/fixtures/` holds 25 messages: a plain legitimate message, a legitimate password reset, a legitimate
+1200 tests run the real pipeline in plain Node — no Chrome, no Gmail, no network. The corpus in
+`test/fixtures/` holds 26 messages: a plain legitimate message, a legitimate password reset, a legitimate
 one-time code being delivered, a legitimate reply into an existing thread, a newsletter with many links, a
 newsletter whose links are all rewritten through its platform's click tracker, an institutional newsletter
 whose social footer names each network it links to, an invoice, a developer notice whose display name
@@ -320,9 +346,10 @@ PayPal phishing, a Microsoft lookalike
 domain, a brand spoof from an unlisted lead-generation sender, an anchor-URL mismatch, a punycode link, an
 IP-address URL,
 a ZIP attachment, an executable attachment, a gift-card scam, a fake payroll change, an MFA-code request,
-two reply-chain hijacks — one by a lookalike domain, one reusing a participant's name — and a storage-quota
+two reply-chain hijacks — one by a lookalike domain, one reusing a participant's name — a storage-quota
 lure built so that every field has an innocent answer, which is the fixture that documents the most about
-how the categories interact.
+how the categories interact, and a storage-bucket payment lure that names no brand and passes its own
+authentication, which is the one the convergence floor exists for.
 
 Fixtures store what a human would write down — anchor text, href, filename — and the loader derives
 `normalizedDomain` and `extension` using the same helpers the Gmail adapter uses. If fixtures hard-coded

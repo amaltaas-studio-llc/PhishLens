@@ -87,6 +87,15 @@ export interface ScoreFloorConfig {
    * additively; they just may not set the verdict on their own.
    */
   readonly excludedSignalIds: readonly string[];
+  /**
+   * The floor established by severe findings in several categories at once, none of which is
+   * conclusive alone. The same eligibility rules apply to each finding as to a single-finding floor.
+   */
+  readonly convergence: {
+    readonly minCategories: number;
+    readonly minSeverity: Severity;
+    readonly floor: number;
+  };
 }
 
 const FLOOR_ELIGIBLE_CATEGORIES: readonly SignalCategory[] = Object.freeze([
@@ -108,6 +117,30 @@ const FLOOR_ELIGIBLE_CATEGORIES: readonly SignalCategory[] = Object.freeze([
  */
 const FLOOR_EXCLUDED_SIGNAL_IDS: readonly string[] = Object.freeze(['authentication.gmail_warning']);
 
+/**
+ * Severe findings in two independent categories are conclusive together, though neither is alone.
+ *
+ * The single-finding floor closes the one-dimension gap; this closes the one it leaves. A phish that
+ * invents no brand and sends from a throwaway domain that passes its own SPF and DKIM leaves identity
+ * and authentication — 35 of the 100 points — with nothing to find. Everything it does wrong then lands
+ * in links and wording, whose weights sum to 40, so with the model's 15 on top it stops at 55: a page
+ * served from a storage bucket, a demand to change payment details and a threat to delete the account,
+ * all at `high`, reported as merely Suspicious. The additive sum cannot express that the findings are
+ * *independent* — each category is a different way of being wrong, and two at once is what an attack
+ * looks like and what ordinary mail does not.
+ *
+ * It needs a floor rather than a larger weight because any weight large enough to reach 75 from two
+ * categories would also inflate ordinary mail with medium findings in both. `high` is the threshold for
+ * the same reason the single-finding floor is safe: no legitimate fixture produces a `high` finding in
+ * *any* category, so none can produce one in two. Counting categories rather than findings is what
+ * stops one fact — three links to the same page — from converging with itself.
+ */
+const CONVERGENCE_FLOOR: ScoreFloorConfig['convergence'] = Object.freeze({
+  minCategories: 2,
+  minSeverity: 'high',
+  floor: 75,
+});
+
 export const SCORE_FLOORS: ScoreFloorConfig = Object.freeze({
   eligibleCategories: FLOOR_ELIGIBLE_CATEGORIES,
   bySeverity: Object.freeze({
@@ -115,6 +148,7 @@ export const SCORE_FLOORS: ScoreFloorConfig = Object.freeze({
     high: 50,
   }),
   excludedSignalIds: FLOOR_EXCLUDED_SIGNAL_IDS,
+  convergence: CONVERGENCE_FLOOR,
 });
 
 /**

@@ -115,20 +115,28 @@ export function semanticToSignals(
    * A rating in the routine band outranks the category entirely: see `routineRiskCeiling`. Reporting the
    * tag anyway would be more faithful to the response and worse for the reader, who cannot act on a
    * contradiction and would learn to disregard the section.
+   *
+   * "Found nothing of concern" is an all-clear, so it is reserved for mail the checks found nothing on
+   * either. Beside a standing technical finding it reads as the model vouching for the message under a
+   * Suspicious verdict — and a model that missed a phish is the common case, not the exotic one: a small
+   * model can rate an account-blocking threat with a sign-in link at 16/100. What is true in that case is
+   * narrower, and it is what the headline says instead.
    */
   const routine = analysis.risk <= SEMANTIC_SCORING.routineRiskCeiling;
   const hedged =
     analysis.risk < SEMANTIC_SCORING.minRiskForScoring ||
     analysis.confidence < SEMANTIC_SCORING.minConfidenceForScoring;
+  const noConcern = meaningfulCategories.length === 0 || routine;
 
-  const headline =
-    meaningfulCategories.length === 0 || routine
-      ? 'Language analysis found nothing of concern'
-      : categoryText === ''
-        ? 'Wording shows signs of social engineering'
-        : hedged
-          ? `Wording mildly resembles ${categoryText}`
-          : `Wording resembles ${categoryText}`;
+  const headline = noConcern
+    ? corroborated
+      ? 'Language analysis added nothing to the technical findings'
+      : 'Language analysis found nothing of concern'
+    : categoryText === ''
+      ? 'Wording shows signs of social engineering'
+      : hedged
+        ? `Wording mildly resembles ${categoryText}`
+        : `Wording resembles ${categoryText}`;
 
   const confidenceText = `${String(Math.round(analysis.confidence * 100))}% confidence`;
 
@@ -136,6 +144,14 @@ export function semanticToSignals(
     `This is a language assessment by the ${sourceLabel}, not a verified technical finding.`,
     `It rated the message ${String(analysis.risk)}/100 for fraud intent at ${confidenceText}.`,
   ];
+
+  // The first containment guarantee in docs/LOCAL-AI.md, stated where a reader needs it: the natural
+  // inference from a low rating is that the model has weighed in on the message's side.
+  if (noConcern && corroborated) {
+    parts.push(
+      'That reading neither clears the message nor lowers its score: the technical findings stand on their own.',
+    );
+  }
 
   // Say plainly why a confident-sounding rating contributed little or nothing. Without this the panel
   // shows "rated 60/100" beside a score of 0 and looks broken rather than deliberate.

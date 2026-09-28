@@ -442,26 +442,55 @@ const MIN_UNANCHORED_KEYWORD = 6;
 /** One place a brand can be named, pre-folded both ways. */
 interface ClaimSource {
   origin: BrandClaim['source'];
-  /** Separator-stripped, so `p-a-y-p-a-l` reads as `paypal`. */
-  stripped: string;
+  /** The folded words run together, so `p a y p a l` reads as `paypal`. */
+  joined: string;
+  /** Where each word begins in `joined`. */
+  wordStarts: ReadonlySet<number>;
   /** Folded word by word, so a short keyword can be required to be a word of its own. */
   words: readonly string[];
 }
 
 function claimSource(origin: BrandClaim['source'], text: string): ClaimSource {
-  return {
-    origin,
-    stripped: skeleton(text),
-    words: text.split(/\s+/u).map((word) => skeleton(word)),
-  };
+  const words = text.split(/\s+/u).map((word) => skeleton(word));
+  const wordStarts = new Set<number>();
+  let offset = 0;
+  for (const word of words) {
+    wordStarts.add(offset);
+    offset += word.length;
+  }
+  return { origin, joined: words.join(''), wordStarts, words };
+}
+
+/** How many occurrences of one keyword to try before concluding none begins a word. */
+const MAX_KEYWORD_OCCURRENCES = 16;
+
+/**
+ * Whether a long keyword appears either inside one word, or spread over several starting at the first.
+ *
+ * Running the words together is what reads `p a y p a l` and `Micro Soft` as the brands they spell, but
+ * a match allowed to *start* mid-word reads names that spell nothing: "Miriam Stearns" folds (`rn`→`m`)
+ * and joins to `mlrlamsteams`, which contains `msteams`, and a list regular was reported at `high` as
+ * Microsoft impersonation. Spacing a brand out starts it at a word; a person's name that happens to
+ * straddle one does not. Inside a single word anything goes, because `SecurePayPal` is a claim.
+ */
+function containsKeyword(source: ClaimSource, folded: string): boolean {
+  if (source.words.some((word) => word.includes(folded))) return true;
+  let from = 0;
+  for (let seen = 0; seen < MAX_KEYWORD_OCCURRENCES; seen++) {
+    const at = source.joined.indexOf(folded, from);
+    if (at === -1) return false;
+    if (source.wordStarts.has(at)) return true;
+    from = at + 1;
+  }
+  return false;
 }
 
 /**
  * Finds which brands the message presents itself as, in order of how strongly each place claims one.
  *
  * Matching is on confusable-folded text, so `PayPaI`, `p-a-y-p-a-l` and `pаypal` all resolve to the
- * same claim. Since folding strips separators, a match is a substring match — safe for a long keyword
- * and wrong for a short one, because `irs` sits inside "first" and "chairs" and `aws` inside "lawsuit".
+ * same claim. Since folding strips separators, a match is a substring match (one that may not begin
+ * mid-word, see `containsKeyword`) — safe for a long keyword and wrong for a short one, because `irs` sits inside "first" and "chairs" and `aws` inside "lawsuit".
  * Short keywords therefore have to be a whole folded word. The cost is missing `I.R.S.`, which no rule
  * relies on; the benefit is that ordinary prose no longer claims to be a tax authority.
  */
@@ -521,7 +550,7 @@ function strongestClaim(brand: Brand, sources: readonly ClaimSource[]): BrandCla
 
       const found =
         folded.length >= MIN_UNANCHORED_KEYWORD
-          ? source.stripped.includes(folded)
+          ? containsKeyword(source, folded)
           : source.words.includes(folded);
 
       if (found) {
@@ -531,7 +560,7 @@ function strongestClaim(brand: Brand, sources: readonly ClaimSource[]): BrandCla
           matchedKeyword: keyword,
           // Found by the word list for a short keyword, but located in the stripped text either way: the
           // two agree on which mention comes first, and only the ordering uses this.
-          position: Math.max(source.stripped.indexOf(folded), 0),
+          position: Math.max(source.joined.indexOf(folded), 0),
         };
       }
     }

@@ -5,19 +5,24 @@
 import { describe, expect, it } from 'vitest';
 import {
   aggregateCategory,
+  applyFloor,
   cappedSignalScore,
   classify,
   clamp,
   computeTotalScore,
+  distinctForDisplay,
   groupByCategory,
   isAtLeast,
   lowerSeverity,
+  scoreFloor,
   scoreSignals,
+  severityFloor,
   sortSignalsForDisplay,
 } from '../src/analysis/scoring/aggregate.js';
 import {
   ALL_CATEGORIES,
   CATEGORY_WEIGHTS,
+  SCORE_FLOORS,
   SEVERITY_CEILINGS,
   totalWeight,
 } from '../src/analysis/scoring/config.js';
@@ -316,5 +321,94 @@ describe('the LLM cannot dominate the score (arithmetic guarantee)', () => {
     const deterministic = [signal({ category: 'link', severity: 'critical', score: 100 })];
     const withLlm = [...deterministic, signal({ category: 'llm', severity: 'info', score: 0 })];
     expect(scoreSignals(withLlm).total).toBeGreaterThanOrEqual(scoreSignals(deterministic).total);
+  });
+});
+
+describe('scoreFloor: severe findings converging from independent categories', () => {
+  const high = (category: SignalCategory, extra: Partial<SecuritySignal> = {}): SecuritySignal =>
+    signal({ category, severity: 'high', score: 26, ...extra });
+
+  it('floors two categories with high findings at the convergence floor', () => {
+    const floor = scoreFloor([high('link'), high('content')]);
+    expect(floor).toEqual({
+      floor: SCORE_FLOORS.convergence.floor,
+      basis: 'convergence',
+      categories: ['link', 'content'],
+    });
+    expect(classify(floor.floor)).toBe('high-risk');
+  });
+
+  it('counts categories, not findings: one fact on three links does not converge with itself', () => {
+    const floor = scoreFloor([high('link'), high('link'), high('link')]);
+    expect(floor.basis).toBe('finding');
+    expect(floor.floor).toBe(SCORE_FLOORS.bySeverity.high);
+  });
+
+  it('needs high: medium findings in every category do not converge', () => {
+    const mediums = ALL_CATEGORIES.map((category) => signal({ category, severity: 'medium', score: 20 }));
+    expect(scoreFloor(mediums)).toEqual({ floor: 0, basis: null, categories: [] });
+  });
+
+  it('never counts the model towards convergence', () => {
+    const floor = scoreFloor([high('link'), signal({ category: 'llm', severity: 'critical', score: 15 })]);
+    expect(floor.basis).toBe('finding');
+    expect(floor.floor).toBe(SCORE_FLOORS.bySeverity.high);
+  });
+
+  it("never counts Gmail's own warning, which depends on the folder being viewed", () => {
+    const warning = high('authentication', { id: 'authentication.gmail_warning' });
+    expect(scoreFloor([high('link'), warning]).basis).toBe('finding');
+  });
+
+  it('ignores scoreless and dampened findings', () => {
+    expect(scoreFloor([high('link'), high('content', { score: 0 })]).basis).toBe('finding');
+    expect(scoreFloor([high('link'), high('content', { dampened: true })]).basis).toBe('finding');
+  });
+
+  it('attributes a tie to the single conclusive finding, and never lowers a higher floor', () => {
+    const critical = signal({ category: 'identity', severity: 'critical', score: 60 });
+    const floor = scoreFloor([critical, high('link'), high('content')]);
+    expect(floor.basis).toBe('finding');
+    expect(floor.floor).toBe(Math.max(SCORE_FLOORS.bySeverity.critical ?? 0, SCORE_FLOORS.convergence.floor));
+  });
+
+  it('agrees with severityFloor, which the engine applies', () => {
+    const signals = [high('link'), high('attachment'), signal({ category: 'content', severity: 'low', score: 5 })];
+    expect(severityFloor(signals)).toBe(scoreFloor(signals).floor);
+    expect(applyFloor(40, signals)).toBe(SCORE_FLOORS.convergence.floor);
+  });
+});
+
+describe('distinctForDisplay', () => {
+  it('keeps the first of findings that read the same, and only those', () => {
+    const repeated = (id: string, url: string): SecuritySignal =>
+      signal({
+        id,
+        category: 'link',
+        severity: 'high',
+        score: 26,
+        title: 'Same finding',
+        description: 'Same words.',
+        evidence: { value: 'bucket.example', url },
+      });
+    const other = signal({ id: 'z', category: 'link', severity: 'high', score: 26, title: 'Different' });
+
+    const shown = distinctForDisplay([
+      repeated('a.0', 'https://bucket.example/1'),
+      other,
+      repeated('a.1', 'https://bucket.example/2'),
+    ]);
+    expect(shown.map((s) => s.id)).toEqual(['a.0', 'z']);
+  });
+
+  it('keeps findings that differ in anything the reader is shown', () => {
+    const base = { category: 'link' as const, severity: 'high' as const, score: 26, title: 'T', description: 'D' };
+    const shown = distinctForDisplay([
+      signal({ ...base, id: '1', evidence: { value: 'one.example' } }),
+      signal({ ...base, id: '2', evidence: { value: 'two.example' } }),
+      signal({ ...base, id: '3', severity: 'medium' }),
+      signal({ ...base, id: '4', category: 'content' }),
+    ]);
+    expect(shown).toHaveLength(4);
   });
 });

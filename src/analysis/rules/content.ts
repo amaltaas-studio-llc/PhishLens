@@ -228,7 +228,11 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
       /\b(wire|bank|funds?|money|payment) (transfer|transmission)\b/u,
       /\b(transfer|remit|send|release|process|initiate|authori[sz]e)\b[^.!?]{0,40}\b(\$|usd|eur|gbp|€|£)\s?[\d,]{3,}/u,
       /\b(transfer|remit|send|wire)\b[^.!?]{0,30}\b(funds?|payment|money|amount)\b/u,
-      /\b(swift|iban|routing (number|code)|sort code|account (number|details))\b/u,
+      // `swift` needs its noun, or the bank code it introduces: alone it is a surname, a company name
+      // and "a swift response", and paired with any "can't talk" in the same trading update it made a
+      // `critical` combination.
+      /\b((swift|bic) (code|number|address)|swift (transfer|credit|payment|wire|copy)|iban|routing (number|code)|sort code|account (number|details))\b/u,
+      /\b(swift|bic)( code)? ?: ?[a-z]{6}[a-z0-9]{1,5}\b/u,
       /\b(beneficiary|recipient) (bank|account|details|information)\b/u,
     ],
   },
@@ -253,11 +257,16 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
       'The message asks to redirect salary or update direct-deposit details. This is a standard payroll-diversion attempt and normally belongs in an HR system, not in email.',
     severity: 'high',
     score: 30,
+    // First person throughout: the attack is an employee — or someone posing as one — asking for *their*
+    // pay to go somewhere new. Payroll's own announcements talk about the same things in the second person
+    // or none ("get your payroll information online", "to change the mailstop your paycheck goes to"),
+    // and reading those as the request put ordinary HR mail at `high`.
     patterns: [
-      /\b(payroll|salary|wage|paycheck|pay ?check|direct deposit|dd) (details|information|account|change|update|deposit)\b/u,
-      /\b(change|update|switch|redirect|amend)\b[^.!?]{0,40}\b(payroll|salary|direct deposit|paycheck|pay ?check|bank account for (my|the) (pay|salary))\b/u,
-      /\b(my|the) (new|updated) (account|bank).{0,40}\b(payroll|salary|deposit|pay)\b/u,
-      /\bwhere (my|the) (salary|pay|wages) (is|are|goes|go)\b/u,
+      /\bmy (payroll|salary|wage|paycheck|pay ?check|direct deposit|dd) (details|information|account|change|update|deposit)\b/u,
+      /\b(change|update|switch|redirect|amend)\b[^.!?]{0,30}\bmy\b[^.!?]{0,20}\b(payroll|salary|direct deposit|paycheck|pay ?check|wages)\b/u,
+      /\bbank account for my (pay|salary|wages|paycheck)\b/u,
+      /\bmy (new|updated) (account|bank).{0,40}\b(payroll|salary|deposit|pay)\b/u,
+      /\bwhere my (salary|pay|wages) (is|are|goes|go)\b/u,
     ],
   },
   {
@@ -269,10 +278,13 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
     score: 32,
     // A bare mention of "gift cards" is not a request — a shop selling them says it on every
     // newsletter. Every pattern here requires an accompanying instruction to buy them or to hand
-    // over their codes.
+    // over their codes. "Buy" alone is not that instruction either: "spend $50 and get a $10 gift
+    // certificate" and "why not buy a gift voucher" are what a shop says, so buying has to be asked of
+    // the reader, or be for several cards at once, which is what the scam needs and no promotion offers.
     patterns: [
-      /\b(purchase|buy|get|pick up|obtain|grab|order|need|want|acquire)\b[^.!?]{0,40}\b(gift|prepaid|itunes|steam|google play|e-?gift)\b ?(cards?|vouchers?|certificates?)\b/u,
-      /\b(gift|prepaid|itunes|steam|e-?gift) ?(cards?|vouchers?)\b[^.!?]{0,40}\b(worth|denomination|each|apiece|of \$?\d|at \$?\d|\$\d|\d{2,} ?(usd|eur|gbp|dollars?|pounds?|euros?))/u,
+      /\b(can you|could you|would you|i need you to|i want you to|you to|please|kindly)\b[^.!?]{0,30}\b(purchase|buy|get|pick up|obtain|grab|order|acquire)\b[^.!?]{0,40}\b(gift|prepaid|itunes|steam|google play|e-?gift)\b ?(cards?|vouchers?|certificates?)\b/u,
+      /\b(purchase|buy|get|pick up|obtain|grab|order|acquire|need)\b (\d{1,2}|some|a few|several|multiple)\b[^.!?]{0,30}\b(gift|prepaid|itunes|steam|google play|e-?gift) ?(cards|vouchers|certificates)\b/u,
+      /\b(gift|prepaid|itunes|steam|e-?gift) ?(cards|vouchers)\b[^.!?]{0,40}\b(worth|denomination|each|apiece|of \$?\d|at \$?\d|\$\d|\d{2,} ?(usd|eur|gbp|dollars?|pounds?|euros?))/u,
       /\b(scratch|reveal|photograph|scan|send|share|forward|snap)\b[^.!?]{0,40}\b(codes?|pins?)\b[^.!?]{0,40}\b(cards?|vouchers?)\b/u,
       /\b(cards?|vouchers?)\b[^.!?]{0,40}\b(scratch|behind|at the back|on the back)\b[^.!?]{0,30}\bcodes?\b/u,
       /\b(gift|prepaid) ?(cards?|vouchers?)\b[^.!?]{0,30}\b(today|urgently|asap|right away|immediately|before)\b/u,
@@ -316,7 +328,9 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
     score: 22,
     patterns: [
       /\b(bypass|skip|without|no need for|forget|ignore|override|circumvent)\b[^.!?]{0,40}\b(approval|authori[sz]ation|verification|procedure|process|protocol|paperwork|purchase order|usual channels?)\b/u,
-      /\b(can'?t|cannot|unable to|won'?t be able to)\b[^.!?]{0,40}\b(call|phone|talk|speak|meet|be reached|answer)\b/u,
+      // The object is what makes this about reaching a person: bare "call" and "answer" matched "can't
+      // call method on undefined" and "cannot answer that", and "speak for" is an idiom, not a phone.
+      /\b(can'?t|cannot|unable to|won'?t be able to)\b[^.!?]{0,40}\b(take (any |your |a )?calls?|call (you|me|back)|phone|talk|speak(?! for\b)|meet|be reached|answer (the |my |your )?(phone|calls?))\b/u,
       /\b(i'?m|i am) (currently )?(in a meeting|travel(l)?ing|on a (call|flight|plane)|abroad|unavailable|tied up)\b/u,
       /\b(handle|do) (this|it) (for me|yourself)\b[^.!?]{0,30}\b(quick|fast|now|today|discreet)/u,
       /\b(email|e-?mail) (me )?(only|instead)\b/u,
@@ -346,7 +360,14 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
     patterns: [
       /\b(bitcoin|btc|ethereum|eth|usdt|tether|crypto(currency)?|wallet address)\b[^.!?]{0,50}\b(send|transfer|pay|payment|deposit|address)\b/u,
       /\b(send|transfer|pay|deposit)\b[^.!?]{0,40}\b(bitcoin|btc|ethereum|eth|usdt|crypto)\b/u,
-      /\b(bc1|[13])[a-hj-np-z0-9]{25,39}\b/u,
+      // A wallet address standing alone, spelled the way only an address can be. A legacy address is
+      // base58, which never uses `0`, and mixes case freely, so across its length it all but always
+      // carries a letter past `f`; a bech32 address uses its own 32-character alphabet. Without those
+      // two constraints every MD5 checksum and hex Message-ID starting with 1 or 3 read as a ransom
+      // demand, since hex has no `g`–`z` and a hash of that length rarely avoids `0`. It must also stand
+      // alone: a run of base58-looking characters inside a URL path, a MIME boundary or a base64 signature
+      // block is a fragment of a longer token, joined to it by `/`, `+`, `-`, `=` or `.`.
+      /(?<![\w/+=\-@.?&%#])(?:bc1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{25,59}|[13](?=[a-z1-9]*[g-z])[a-z1-9]{25,34})(?![\w/+=\-@&%#]|\.\w)/u,
     ],
   },
   {
@@ -356,10 +377,16 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
       'The message claims to possess compromising material or device access and demands payment. These claims are sent in bulk and are not backed by any actual access.',
     severity: 'high',
     score: 30,
+    // Each claim needs its object — *you*, *your device*, *one of your passwords*. The bare verbs are
+    // the commonest first-person sentences in technical mail: "I have installed the package", "I have
+    // captured the transaction", "it tells me the passphrase is correct" were each reported at `high`.
     patterns: [
-      /\b(i (have|'ve) (been )?(recorded|filmed|captured|installed)|i (have )?(full )?(access to|control of) your (device|computer|webcam|phone))\b/u,
+      /\bi (have|'ve) (been )?(recorded|filmed|captured)\b[^.!?]{0,30}\b(you|your)\b/u,
+      /\bi (have|'ve) installed\b[^.!?]{0,40}\b(on|in|into) your (device|computer|system|phone|pc|laptop|browser|webcam)\b/u,
+      /\bi (have )?(full )?(access to|control of|control over) your (device|computer|webcam|phone|system|accounts?)\b/u,
       /\b(webcam|camera|screen) (recording|footage|video)\b[^.!?]{0,40}\b(send|release|publish|share|contacts)\b/u,
-      /\b(your )?(password|passphrase) is\b[^.!?]{0,20}\b(one of|correct|right)\b/u,
+      /\b(i know|i have)\b[^.!?]{0,30}\byour (password|passphrase)\b/u,
+      /\bis one of your (passwords?|passphrases?)\b/u,
       /\b(pay|send)\b[^.!?]{0,40}\b(or (i|we) (will|'ll) (send|release|publish|share|expose))\b/u,
     ],
   },

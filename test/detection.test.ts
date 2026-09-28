@@ -18,7 +18,7 @@ import {
   isCaseScrambled,
   repeatedUnitCount,
 } from '../src/analysis/rules/identity.js';
-import { severityFloor } from '../src/analysis/scoring/aggregate.js';
+import { distinctForDisplay, scoreFloor, severityFloor } from '../src/analysis/scoring/aggregate.js';
 import { triageSender } from '../src/analysis/triage.js';
 import { BRANDS, brandOwningDomain } from '../src/shared/brands.js';
 import { hasUnknownTld } from '../src/shared/url.js';
@@ -75,6 +75,7 @@ const MALICIOUS_FIXTURES = [
   'thread-hijack-lookalike',
   'thread-hijack-name-reuse',
   'storage-quota-bucket-page',
+  'storage-payment-bucket-page',
 ];
 
 const FIXED_NOW = 1_760_000_000_000;
@@ -1001,6 +1002,142 @@ describe('threats to account access versus a sender closing an account', () => {
 });
 
 /**
+ * The `high` wording rules each set a severity floor on their own, so a pattern that reads an ordinary
+ * sentence as the attack puts honest mail at Suspicious with nothing else wrong. Every silent case below
+ * is the shape of a sentence that did exactly that in a corpus of genuine mailing-list, corporate and
+ * newsletter mail; every firing case is the attack the rule exists for, worded as it is sent.
+ */
+describe('severe wording rules against the ordinary sentences that share their words', () => {
+  const fires = (bodyText: string, id: string): boolean =>
+    hasSignal(
+      analyzeDeterministic(
+        { senderEmail: 'anna@harbourline-freight.com', bodyText, links: [], attachments: [] },
+        { now: FIXED_NOW },
+      ),
+      id,
+    );
+
+  describe('sextortion', () => {
+    it.each([
+      'I have installed the updated package on the build server and the tests pass.',
+      'I have captured the network trace from the router, attached.',
+      'The tool tells me the passphrase is correct but the key still will not import.',
+      'I have been filming the conference talks all week.',
+    ])('stays silent on %s', (text) => {
+      expect(fires(text, 'content.sextortion')).toBe(false);
+    });
+
+    it.each([
+      'I have recorded you through your webcam while you were browsing.',
+      'I have installed a trojan on your computer and I see everything.',
+      'I have full control of your device.',
+      'I know your password and I know what you have been doing.',
+      'swordfish41 is one of your passwords.',
+    ])('still fires on %s', (text) => {
+      expect(fires(text, 'content.sextortion')).toBe(true);
+    });
+  });
+
+  describe('crypto_demand', () => {
+    it.each([
+      'Checksum 3f2a9b1c4d4e5f62718293a4b5c6d7e8 for the tarball.',
+      'Message-ID 1a2b3c4d5e6f7a8b9c9d1e2f3a4b5c6d.',
+      'Ticket 1234567891234567891234567891 has been closed.',
+      'Track it at https://shop.northwind-retail.com/gp/o/1rkwtzqpmd58hcvxsn7gjey3dfb26ku-7bnnpc8w52jr today.',
+      'boundary="3kqvwrtnmhyzpdsxgle4bnjuftcaw-8rq2-71k"',
+      'iD8DBQBHqk2+3rt7wmzpkv5TYnaqLKjvdhgs5e6hhxq/k8PN5bwyoe3cqDfHrk',
+    ])('does not read a hash or an identifier as a wallet: %s', (text) => {
+      expect(fires(text, 'content.crypto_demand')).toBe(false);
+    });
+
+    it.each([
+      'Payment address: 1NwKq7rTmYp3ZbV8xJcF2hDsGe9LuA4Wo6',
+      'Payment address: 3Hk8mPq2WnRt7YvB5xZcJ4dFgL9sA6eUo1',
+      'Payment address: bc1qx9t2l7wz8m4k3r5y6p0s9u2n7h4j8c3v5d6gf',
+      'Send it to 1NwKq7rTmYp3ZbV8xJcF2hDsGe9LuA4Wo6. You have 48 hours.',
+    ])('still recognises a wallet address: %s', (text) => {
+      expect(fires(text, 'content.crypto_demand')).toBe(true);
+    });
+  });
+
+  describe('gift_card', () => {
+    it.each([
+      'Spend $50 this weekend and get a $10 gift certificate.',
+      'Why not buy a gift voucher for someone special this year?',
+      'Every new member receives a prepaid card valued at $75.',
+    ])('stays silent on a shop offering one: %s', (text) => {
+      expect(fires(text, 'content.gift_card')).toBe(false);
+    });
+
+    it.each([
+      'Can you buy some gift cards for the client event today?',
+      'I need you to purchase Apple gift cards for me.',
+      'Please pick up 6 Steam gift cards on your way in.',
+      'Get 5 gift cards at 100 each and send me the codes.',
+    ])('still fires on a request to buy them: %s', (text) => {
+      expect(fires(text, 'content.gift_card')).toBe(true);
+    });
+  });
+
+  describe('payroll_change', () => {
+    it.each([
+      'You can now view your payroll information online through the portal.',
+      'Notification of a change of payroll status for exempt staff.',
+      'To change the mailstop your paycheck goes to, contact the payroll office.',
+      'Direct deposit account information is on the back of the form.',
+    ])('stays silent on a payroll announcement: %s', (text) => {
+      expect(fires(text, 'content.payroll_change')).toBe(false);
+    });
+
+    it.each([
+      'I need to update my direct deposit details before the next run.',
+      'Please change my payroll deposit to the new account below.',
+      'Could you switch my salary to a different bank?',
+      'My new account should be used for my salary from this month.',
+    ])('still fires on an employee asking to redirect their pay: %s', (text) => {
+      expect(fires(text, 'content.payroll_change')).toBe(true);
+    });
+  });
+
+  /** Together these make a `critical` combination, so each half is tested where it used to misread. */
+  describe('the halves of a transfer that bypasses approval', () => {
+    it.each(['Spot volumes for Swift Harbour Gas are revised below.', 'Keynote by Professor Dana Swift.'])(
+      'does not read a name as a banking term: %s',
+      (text) => {
+        expect(fires(text, 'content.wire_transfer')).toBe(false);
+      },
+    );
+
+    it('does not read "a swift response" as a banking term', () => {
+      expect(fires('Thank you for your swift response to the survey.', 'content.wire_transfer')).toBe(false);
+    });
+
+    it.each([
+      'The SWIFT code is on the attached letter.',
+      'The funds will arrive by swift transfer within two days.',
+      'Bank: Northwind Trust, SWIFT: NWTRGB2LXXX',
+    ])('still recognises SWIFT as a banking term: %s', (text) => {
+      expect(fires(text, 'content.wire_transfer')).toBe(true);
+    });
+
+    it.each([
+      "The script throws an error: can't call method on an undefined value.",
+      'I cannot speak for the others, but the prices look fair to me.',
+    ])('does not read a failed call or an idiom as avoiding contact: %s', (text) => {
+      expect(fires(text, 'content.process_bypass')).toBe(false);
+    });
+
+    it.each([
+      "I'm in a meeting with the board and cannot take calls.",
+      "I can't talk right now, just email me.",
+      "I won't be able to answer my phone today.",
+    ])('still fires on a sender making themselves unreachable: %s', (text) => {
+      expect(fires(text, 'content.process_bypass')).toBe(true);
+    });
+  });
+});
+
+/**
  * The counterweight. New senders appear in threads constantly for innocent reasons, so the rules key on
  * *resemblance* to an established party rather than unfamiliarity. This fixture contains three new
  * senders at once and must stay silent on all of them.
@@ -1113,6 +1250,24 @@ describe('short brand keywords inside ordinary words', () => {
     expect(claimsFor('Account review', 'Confirm your p-a-y-p-a-l details.')).toContain('paypal');
   });
 
+  /**
+   * A person's name can fold into a brand keyword across the space between its words: `rn` folds to
+   * `m`, so "Miriam Stearns" runs together as `mlrlamsteams`, which contains `msteams`. A match has to
+   * begin where a word does to span more than one.
+   */
+  it('does not assemble a keyword from the end of one word and the start of the next', () => {
+    expect(claimsFor('Lunch', 'See you there.', 'Miriam Stearns')).toEqual([]);
+  });
+
+  it('still recognises a brand spaced out from the start of a word', () => {
+    expect(claimsFor('Lunch', 'See you there.', 'Micro Soft Account Team')).toContain('microsoft');
+    expect(claimsFor('Lunch', 'See you there.', 'P a y P a l')).toContain('paypal');
+  });
+
+  it('still recognises a brand fused into a longer word', () => {
+    expect(claimsFor('Lunch', 'See you there.', 'SecurePayPal Team')).toContain('paypal');
+  });
+
   it('records a keyword in the display name as an identity claim, not a body mention', () => {
     const context = buildContext({
       senderName: 'PayPal Service',
@@ -1123,6 +1278,36 @@ describe('short brand keywords inside ordinary words', () => {
       attachments: [],
     });
     expect(context.primaryClaim?.source).toBe('sender-name');
+  });
+});
+
+/**
+ * A government newsletter platform is the one shared sender allowed to stand for a brand, because it
+ * accepts only government bodies. The same name from anywhere else is still the claim it looks like.
+ */
+describe('a tax authority newsletter from its government sending platform', () => {
+  const analyzeFrom = (senderEmail: string) =>
+    analyzeDeterministic(
+      {
+        senderName: 'IRS e-News for Small Businesses',
+        senderEmail,
+        subject: 'IRS e-News for Small Businesses',
+        bodyText: 'This issue covers the new filing season. Log in to your account to review your details.',
+        links: [],
+        attachments: [],
+      },
+      { now: FIXED_NOW },
+    );
+
+  it('is not reported as impersonation from the platform', () => {
+    const result = analyzeFrom('irs@service.govdelivery.com');
+    expect(hasSignal(result, 'identity.display_name_impersonation')).toBe(false);
+    expect(hasSignal(result, 'identity.impersonation_with_credential_request')).toBe(false);
+  });
+
+  it('is still reported from a domain the IRS does not send from', () => {
+    const result = analyzeFrom('irs@service.northwind-notices.com');
+    expect(hasSignal(result, 'identity.display_name_impersonation')).toBe(true);
   });
 });
 
@@ -1684,6 +1869,57 @@ describe('subject formatting markers', () => {
  * plausibly, the destination host belongs to Google, the display name reads as English, and the body
  * carries a working unsubscribe line. It originally scored 30/100 on one content finding.
  */
+/**
+ * A phish that leaves identity and authentication empty on purpose: no brand to impersonate, and a
+ * throwaway domain whose own SPF and DKIM pass. Everything it does wrong lands in links and wording, whose
+ * weights sum to 40, so the additive score alone could not express how sure the findings are.
+ */
+describe('severe findings from the two categories a phish could not avoid', () => {
+  const result = analyzeFixture('storage-payment-bucket-page');
+
+  it('leaves identity and authentication with nothing to score', () => {
+    expect(result.categoryScores.identity).toBe(0);
+    expect(result.categoryScores.authentication).toBe(0);
+  });
+
+  it('reaches high risk on the checks alone, because links and wording converge', () => {
+    const sum = Object.values(result.categoryScores).reduce((a, b) => a + b, 0);
+
+    expect(sum).toBeLessThan(75);
+    expect(scoreFloor(result.signals)).toEqual({
+      floor: 75,
+      basis: 'convergence',
+      categories: ['link', 'content'],
+    });
+    expect(result.classification).toBe('high-risk');
+    expect(result.categoryScores.llm).toBe(0);
+  });
+
+  it('shows the storage-bucket finding once, saying how many links it covers', () => {
+    const shown = distinctForDisplay(result.signals).filter((s) => s.id.startsWith('link.page_in_open_storage'));
+
+    expect(shown).toHaveLength(1);
+    expect(shown[0]?.description).toContain('This applies to 3 links in the message.');
+  });
+
+  it('keeps every copy for scoring, so the collapse changes what is shown and nothing else', () => {
+    expect(result.signals.filter((s) => s.id.startsWith('link.page_in_open_storage'))).toHaveLength(3);
+  });
+
+  it('does not add a count to a finding about one link', () => {
+    const single = analyzeDeterministic({
+      ...loadFixture('storage-payment-bucket-page').email,
+      links: [
+        toEmailLink({
+          text: 'UPDATE MY PAYMENT DETAILS',
+          href: 'https://storage.googleapis.com/nw-bucket-41c/cloud_v2.html',
+        }),
+      ],
+    });
+    expect(signalFor(single, 'link.page_in_open_storage')?.description).not.toContain('This applies to');
+  });
+});
+
 describe('phishing that is innocent one field at a time', () => {
   const result = analyzeFixture('storage-quota-bucket-page');
   const base = loadFixture('storage-quota-bucket-page').email;
@@ -1703,26 +1939,30 @@ describe('phishing that is innocent one field at a time', () => {
     analyze: () => Promise.resolve(analysis),
   });
 
-  it('scores well into the suspicious band on deterministic findings alone', () => {
-    expect(result.classification).toBe('suspicious');
-    expect(result.score).toBeGreaterThanOrEqual(60);
+  /**
+   * Three categories are saturated at their weights, so the additive sum stops in the suspicious band
+   * however much more is wrong. What carries it to high risk is that the severe findings are independent:
+   * each category is a different way for the message to be wrong. The checks reach the verdict themselves
+   * — the model is not what gets a message like this over the line.
+   */
+  it('reaches high risk on deterministic findings alone, because severe findings converge', () => {
+    const sum = Object.values(result.categoryScores).reduce((a, b) => a + b, 0);
+    const floor = scoreFloor(result.signals);
+
+    expect(sum).toBeLessThan(75);
+    expect(floor.basis).toBe('convergence');
+    expect(floor.categories.length).toBeGreaterThanOrEqual(2);
+    expect(result.score).toBe(75);
+    expect(result.classification).toBe('high-risk');
     expect(result.categoryScores.llm).toBe(0);
   });
 
-  /**
-   * Why it stops short of high risk without the model, and why that is the intended shape rather than a
-   * gap. Three of the six categories are saturated at their weights — identity, links and content all
-   * scored more than they are allowed to contribute — so further findings in them cannot raise the total.
-   * The remaining headroom is authentication, and Gmail's interface exposed nothing of it here: the relay
-   * annotation is reported at zero precisely because it is equally common on honest mail. The model's
-   * capped 15 then carries the message over 75, which is the intended division of labour: a refinement on
-   * top of a score the checks earned, never a verdict of its own.
-   */
-  it('crosses into high risk once a corroborated model verdict is added', async () => {
+  it('still takes the capped points from a corroborated model verdict, as a refinement', async () => {
     const withModel = await analyze(base, fixedAnalyzer(MODEL_VERDICT), { now: FIXED_NOW });
 
     expect(withModel.categoryScores.llm).toBe(CATEGORY_WEIGHTS.llm);
     expect(withModel.classification).toBe('high-risk');
+    expect(withModel.score).toBeGreaterThan(result.score);
   });
 
   describe('a From domain under a TLD that does not exist', () => {
@@ -2313,6 +2553,8 @@ describe('severity floor safety', () => {
       );
       expect(offenders.map((s) => `${s.id} (${s.severity})`)).toEqual([]);
       expect(severityFloor(result.signals)).toBe(0);
+      // Implied by the line above, and stated anyway: this is the assumption the convergence floor rests on.
+      expect(scoreFloor(result.signals).basis).toBeNull();
     });
   }
 

@@ -66,9 +66,12 @@ Four responses, in the order they apply:
   attachment types. An instruction it cannot follow is worth less than data it cannot see, and everything
   withheld is checked properly, from the real values, in `analysis/rules/`.
 - **A dead zone.** Any verdict below `minRiskForScoring` (45/100) scores zero regardless of confidence.
-  Below `routineRiskCeiling` (20/100) the finding is also *worded* as clean, because models fill the
-  category slot as a matter of form: one rated an auto-reply 10/100, explained itself with "standard
-  auto-reply", and tagged it `social_engineering` anyway.
+  Below `routineRiskCeiling` (20/100) the category is also dropped from the headline, because models fill
+  the category slot as a matter of form: one rated an auto-reply 10/100, explained itself with "standard
+  auto-reply", and tagged it `social_engineering` anyway. The headline says "nothing of concern" only when
+  the technical checks found nothing either. Beside a standing finding it says the model added nothing,
+  since a model that misses a phish rates it routine too, and an all-clear there reads as the model
+  vouching for the message.
 - **Corroboration.** Guarantee 2 above.
 - **Action-first guidance.** The prompt distinguishes reporting an event that already happened from
   asking the reader to disclose, transfer, approve, or bypass a safeguard. A routine notification can
@@ -341,3 +344,79 @@ The properties this shape is chosen for:
 - **Opt in twice.** Cloud mode requires both an explicit mode choice and a URL, and neither has a default.
 - **No fallback from local to cloud.** If the on-device model is missing, PhishLens does not quietly send
   mail to a server instead.
+
+## Decomposed questions: tried and rejected
+
+One prompt returns one `risk`, and whatever blending produced it happened inside the model. The obvious
+alternative is to ask several narrow yes/no questions and combine the answers in code, with the weights in
+`scoring/config.ts` — the shape TypeSafe's System One guidance argues for
+([docs.typesafe.ai](https://docs.typesafe.ai/concepts/how-to-build-with-system-one)), and the shape
+hosted classifier APIs such as Jev expose directly. It was built, run on the built-in model against real
+mail beside the broad prompt, and removed. This section is the record, so the next attempt starts from the
+measurements rather than from the argument, which is persuasive.
+
+**What was built.** Seven questions with contrastive criteria, each naming the ordinary case that most
+resembles the concerning one ("delivers a code and warns against sharing it" against "asks for a code").
+Six carried weights: asking the reader to disclose something 0.3, to move money 0.25, and smaller weights
+for bypassing a safeguard, manufactured pressure, and claiming an authority the message does not
+demonstrate. One question was explanatory only. Risk was the weighted sum of the answer probabilities,
+confidence was how far the answers sat from 0.5, and the result was an ordinary `SemanticAnalysis`, so
+containment was untouched. The parse was all-or-nothing, because any default reads a skipped question as
+"no".
+
+**What it did on Gemini Nano.**
+
+- **It missed both phishes that mattered.** An account-blocking threat with a sign-in link composed to
+  about 40 on one and 16 on the other. On the second, the broad prompt returned 92/100 at 95% confidence
+  and contributed its full 15 points once the checks corroborated it.
+- **The heaviest questions answered no to their own criteria.** The money question scored 0 on a message
+  whose call to action was, word for word, the question's "yes" example ("update my payment details"). The
+  likely cause is its escape clause for purchases the reader would initiate, which a small model applies
+  to anything with a button.
+- **The weakest question answered yes to everything.** The authority question returned 0.7–1.0 on every
+  message, including a genuine bank notification and a software vendor's newsletter, despite a criterion
+  saying in as many words that a company name in a newsletter is a sender, not an authority.
+- **About one inference in nine was malformed**, and answers of yes came with no evidence quote. Answers
+  were stable between runs (±2), and Nano does produce intermediate probabilities, so the problem was not
+  noise.
+
+**Why it was rejected, beyond those numbers.** The failure is structural, not a matter of wording. Pressure
+and authority — the two questions a threat-plus-link phish answers yes to most reliably — carried 0.2 of
+the weight between them, so on their own they could reach risk 20. That is `routineRiskCeiling`, which
+made the most common phish shape compose into the band the panel describes as routine. Rebalancing the
+weights to fix that makes pressure and authority drive the score, and the authority question was the one
+firing on every real message. A weighted sum is only as good as its least reliable heavy question, and a
+small model has several.
+
+A gate that reported no category below the scoring floor was tried and reverted in the same exercise. It
+was meant to keep the authority question's labels off ordinary mail, but the routine ceiling was already
+doing that, and on a real phish it turned a softened concern into an all-clear.
+
+**What did not survive the move on-device.** Neither of the two advantages of a hosted classifier carries
+over to on-device use. The first is calibration. A classifier returns a probability it was trained to
+produce, but the Prompt API exposes no token probabilities, so the number in a JSON field is a stated
+confidence — the kind [Calibration](#calibration) exists to distrust — and decomposition does not make it
+measured. The second is parallelism: sessions reject a concurrent `prompt()`, so N questions have to be N
+fields of one schema, and a larger schema costs a small model reliability.
+
+**What must not move into the model regardless.** Published examples of this pattern ask whether the
+display name conflicts with the sending domain, or whether anchor text misrepresents its destination.
+Here those are `identity.display_name_impersonation`, `link.anchor_brand_mismatch` and
+`link.displayed_url_mismatch`. They answer from the real values, cite evidence a reader can check, and can
+be *fixed* when wrong, which a model's answer cannot. Under `uncorroboratedFactor: 0`, a question with no
+deterministic counterpart also scores nothing, ever, so a future design has to decide per question whether
+it exists to move the score or to explain one.
+
+**Why not a hosted classifier instead.** It needs a bearer key in extension storage, which anyone with the
+profile can read and bill, and it retains mail by default. The arithmetic decides it anyway: the `llm`
+category is capped at 15 points from every source, so the trade is a mailbox sent to a third party for at
+most 15 points and better wording. If that trade is ever worth making, the route is the cloud design
+above — the user's own backend holding the credential — or `aiMode: 'server'` pointed at a proxy, not a
+settings field for a key.
+
+**What came out of it that shipped.** The comparison exposed a fault in the broad path that had nothing to
+do with decomposition. A small model that misses a phish rates it in the routine band, and the panel then
+headlined the AI section "Language analysis found nothing of concern" beside a Suspicious verdict — an
+all-clear from the component least able to give one. That headline is now reserved for mail the checks
+found nothing on either. Beside a standing finding the section says the model added nothing, and that the
+reading neither clears the message nor lowers its score.

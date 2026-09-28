@@ -18,7 +18,7 @@ import { semanticToSignals } from '../src/analysis/llm/semantic-signals.js';
 import { buildUserPrompt, MAX_PROMPT_BODY_CHARS, MAX_PROMPT_CHARS, SYSTEM_PROMPT } from '../src/analysis/llm/prompt.js';
 import { CATEGORY_WEIGHTS, SEMANTIC_SCORING } from '../src/analysis/scoring/config.js';
 import type { EmailMessage, SemanticAnalysis, SemanticAnalyzer } from '../src/shared/types.js';
-import { loadFixture } from './fixtures/load.js';
+import { loadAllFixtures, loadFixture } from './fixtures/load.js';
 
 // ---------------------------------------------------------------------------
 // Analyzer doubles
@@ -430,7 +430,7 @@ describe('semantic layer: containment', () => {
     );
 
     expect(vague[0]?.score).toBe(0);
-    expect(vague[0]?.title).toMatch(/nothing of concern/u);
+    expect(vague[0]?.title).toMatch(/added nothing to the technical findings/u);
   });
 
   it('ignores risk below the dead zone even with corroboration', () => {
@@ -454,13 +454,66 @@ describe('semantic layer: containment', () => {
       corroborating,
     );
 
-    expect(routine[0]?.title).toMatch(/nothing of concern/u);
+    expect(routine[0]?.title).toMatch(/added nothing to the technical findings/u);
     expect(routine[0]?.title).not.toMatch(/social engineering/u);
     expect(routine[0]?.score).toBe(0);
     // The rating and the model's own words stay visible; only the headline stops overstating them.
     expect(routine[0]?.description).toMatch(/10\/100/u);
     // Nothing to explain away, so the dead-zone note is absent.
     expect(routine[0]?.description).not.toMatch(/do not affect the score/u);
+  });
+
+  /**
+   * Observed with the on-device model on a real phish: an account-blocking threat with a sign-in link,
+   * rated 16/100, under a deterministic verdict of Suspicious. "Found nothing of concern" there reads as
+   * the model vouching for the message, which is the one reading of the card that could get a user hurt.
+   */
+  describe('a routine reading beside the checks', () => {
+    const routineReading = semantic({ risk: 16, categories: ['benign'], confidence: 0.9 });
+
+    it('never reads as an all-clear when a technical check found something', () => {
+      const corroborating = analyzeDeterministic(PHISH, { now: 0 }).signals;
+      const [assessment] = semanticToSignals(routineReading, corroborating);
+
+      expect(assessment?.title).not.toMatch(/nothing of concern/u);
+      expect(assessment?.title).toMatch(/added nothing to the technical findings/u);
+      expect(assessment?.description).toMatch(/neither clears the message nor lowers its score/u);
+      expect(assessment?.score).toBe(0);
+    });
+
+    it('never reads as an all-clear under any verdict above Low, across the corpus', () => {
+      const flagged = loadAllFixtures()
+        .map(({ name, email }) => ({ name, result: analyzeDeterministic(email, { now: 0 }) }))
+        .filter(({ result }) => result.classification !== 'low');
+      // Guards against the loop passing by having nothing to check.
+      expect(flagged.length).toBeGreaterThanOrEqual(5);
+
+      for (const { name, result } of flagged) {
+        expect(semanticToSignals(routineReading, result.signals)[0]?.title, name).not.toMatch(
+          /nothing of concern/u,
+        );
+      }
+    });
+
+    it('still reads as clean when the checks found nothing either', () => {
+      const [assessment] = semanticToSignals(routineReading, []);
+
+      expect(assessment?.title).toBe('Language analysis found nothing of concern');
+      expect(assessment?.description).not.toMatch(/neither clears/u);
+    });
+
+    it('still reads as clean when the only findings were softened for a proven sender', () => {
+      // A dampened finding is already explained by the sender, so it is no reason to withhold the
+      // all-clear — withholding it would put a caveat on exactly the genuine mail dampening protects.
+      const softened = analyzeDeterministic(loadFixture('legitimate-password-reset').email, {
+        now: 0,
+      }).signals;
+      expect(softened.some((s) => s.score > 0 && s.dampened !== true)).toBe(false);
+
+      expect(semanticToSignals(routineReading, softened)[0]?.title).toBe(
+        'Language analysis found nothing of concern',
+      );
+    });
   });
 
   it('still reports a category once the rating leaves the routine band', () => {

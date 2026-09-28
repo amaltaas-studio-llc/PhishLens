@@ -1,0 +1,28 @@
+{
+  "name": "storage-payment-bucket-page",
+  "description": "The shape of a real message that scored 55/100 (suspicious) with every category it touched saturated: links 25/25, wording 15/15, and the model's 15/15. It names no brand, so no impersonation rule has anything to compare, and it sends from a throwaway domain under a real TLD whose own SPF and DKIM pass, so Gmail shows nothing for authentication to report — identity and authentication, 35 of the 100 points, are left empty by design. What it does wrong is all in links and wording: three buttons to HTML pages in one public storage bucket, a demand to update payment details, a threat to delete the account, and a forged 'trusted sender' notice. Every name, address, bucket and relay host is invented; storage.googleapis.com is kept because it is the finding.",
+  "email": {
+    "senderName": "Verification🔔",
+    "senderEmail": "alert-2210@northwind-notices.bar",
+    "recipientEmail": "jordan.reyes@gmail.com",
+    "subject": "Your account has been blocked. All your photos and videos will be removed today",
+    "bodyText": "- This message was sent from a trusted sender.\n\nCloud®\n\nYour payment method has expired: update your payment information to keep your storage.\n\nYour account has been blocked. All your photos and videos will be removed today.\n\nIf you don't have enough Cloud space, you may lose all your data and files stored in the Cloud service.\n\nUPDATE MY PAYMENT DETAILS\n\nThis is an automatic notification. Please do not reply to this message.",
+    "auth": {
+      "via": "out3.northwind-relay.com"
+    },
+    "links": [
+      {
+        "text": "Cloud®",
+        "href": "https://storage.googleapis.com/nw-bucket-41c/cloud_v2.html#?act=cl&cid=5170"
+      },
+      {
+        "text": "UPDATE MY PAYMENT DETAILS",
+        "href": "https://storage.googleapis.com/nw-bucket-41c/cloud_v2.html#?act=cl&cid=5170&lid=2"
+      },
+      {
+        "text": "Manage storage",
+        "href": "https://storage.googleapis.com/nw-bucket-41c/cloud_v2.html#?act=cl&cid=5170&lid=3"
+      }
+    ]
+  }
+}

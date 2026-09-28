@@ -14,6 +14,7 @@ import type { SecuritySignal } from '../../shared/types.js';
 import { describeUrl, registrableDomain } from '../../shared/url.js';
 import { decodeIdnHost, hasSuspiciousScriptMixing, scriptsUsed, skeleton } from '../../shared/unicode.js';
 import type { AnalysisContext } from '../context.js';
+import { displayKey } from '../scoring/aggregate.js';
 import { DETECTION_TUNING } from '../scoring/config.js';
 import { brandNamingDomain, findLookalike } from './identity.js';
 import { signal } from './types.js';
@@ -23,9 +24,29 @@ import type { Detect } from './types.js';
 const CREDENTIAL_LINK_TERMS =
   /\b(sign\s?in|signon|log\s?in|logon|log-on|password|passwd|credential|authenticate|authentication|verify|verification|validate|confirm|secure\s?access|account\s?access|mfa|2fa|otp|sso|webmail|owa|portal|unlock|reactivate|re-?activate)\b/u;
 
-/** Take only the first N of a repeated finding so one hostile message cannot flood the panel. */
-function limit<T>(items: T[]): T[] {
-  return items.slice(0, DETECTION_TUNING.maxLinkSignalsPerRule);
+/**
+ * Take only the first N of a repeated finding so one hostile message cannot flood the panel, after
+ * saying how many links each finding applies to.
+ *
+ * Three links to pages in one storage bucket produce three findings that read identically, and the panel
+ * shows such a finding once (`distinctForDisplay`). The count is written here rather than there because
+ * only here is it true: the list is about to be capped, and a panel counting what survived the cap would
+ * report three of fifteen links. The cap and the scores are otherwise untouched — how much a repeated
+ * finding is worth is a scoring question, and collapsing a list for display is not the place to answer it.
+ */
+function limit(findings: SecuritySignal[]): SecuritySignal[] {
+  const counts = new Map<string, number>();
+  for (const finding of findings) {
+    const key = displayKey(finding);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  return findings.slice(0, DETECTION_TUNING.maxLinkSignalsPerRule).map((finding) => {
+    const count = counts.get(displayKey(finding)) ?? 1;
+    return count === 1
+      ? finding
+      : { ...finding, description: `${finding.description} This applies to ${String(count)} links in the message.` };
+  });
 }
 
 /**

@@ -487,6 +487,14 @@ in only one dimension can never exceed that dimension's weight, so a gift-card B
 attachments, real mailbox — would top out at `content: 15`. `SCORE_FLOORS` therefore lets a single
 `high` finding establish a minimum of 50 and a `critical` one 75.
 
+The second floor answers the same blind spot from the other side: an attack that *avoids* dimensions
+rather than living in one. No brand leaves identity nothing to compare, and a throwaway domain passing its
+own SPF and DKIM leaves authentication nothing to report, so everything wrong lands in links and wording
+— 40 points between them, 55 with the model. `high` findings in two or more categories therefore
+establish 75 (`SCORE_FLOORS.convergence`). A larger weight could not do this: any weight that reaches 75
+from two categories inflates ordinary mail carrying a medium finding in each. Categories are counted rather
+than findings, so repetition of one fact never converges with itself.
+
 That is only sound because a floor is justified by **a conclusive finding this extension established
 itself**. Two exclusions follow from that same sentence, not as special cases:
 
