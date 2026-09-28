@@ -376,6 +376,9 @@ export const SEMANTIC_SCORING = Object.freeze({
   highRiskThreshold: 70,
   /** Raised to sit inside the scoring band, since nothing below `minRiskForScoring` scores at all. */
   mediumRiskThreshold: 55,
-  /** Maximum reasons rendered, to bound panel size and prompt-injection payload visibility. */
-  maxReasons: 4,
+  /**
+   * Maximum reasons rendered, to bound panel size and prompt-injection payload visibility. The prompt asks
+   * for the same number, since on-device decoding time grows with every reason the model writes.
+   */
+  maxReasons: 3,
 });

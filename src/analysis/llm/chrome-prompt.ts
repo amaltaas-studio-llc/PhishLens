@@ -29,6 +29,16 @@ const INFERENCE_TIMEOUT_MS = 20_000;
 /** Deterministic settings where the API supports them. */
 const DETERMINISTIC_OPTIONS = { temperature: 0, topK: 1 };
 
+/**
+ * Per-prompt options, most useful first: a schema constraint that keeps the schema out of the input,
+ * the constraint alone, then nothing. Each has been the only one some Chrome version accepts.
+ */
+const PROMPT_SHAPES: readonly (UnknownRecord | undefined)[] = [
+  { responseConstraint: RESPONSE_SCHEMA, omitResponseConstraintInput: true },
+  { responseConstraint: RESPONSE_SCHEMA },
+  undefined,
+];
+
 // ---------------------------------------------------------------------------
 // Structural probing (no `any`, no optimistic casts)
 // ---------------------------------------------------------------------------
@@ -201,6 +211,8 @@ export class ChromePromptAnalyzer implements SemanticAnalyzer {
   #factoryLabel = '';
   /** Set once availability has been determined, to avoid re-probing on every message. */
   #availability: 'ready' | 'needs-download' | 'no' | 'unknown' = 'unknown';
+  /** Index into `PROMPT_SHAPES` of the options this browser last accepted, once one has been. */
+  #promptShape: number | null = null;
 
   /**
    * Tail of the queue of pending model work. Every use of the session goes through `#enqueue`.
@@ -412,21 +424,19 @@ export class ChromePromptAnalyzer implements SemanticAnalyzer {
     prompt: string,
     signal?: AbortSignal,
   ): Promise<string | null> {
-    const attempts: (UnknownRecord | undefined)[] = [
-      { responseConstraint: RESPONSE_SCHEMA, omitResponseConstraintInput: true },
-      { responseConstraint: RESPONSE_SCHEMA },
-      undefined,
-    ];
-
-    for (const options of attempts) {
+    for (const index of this.#shapeOrder()) {
       if (isAborted(signal)) return null;
+      const options = PROMPT_SHAPES[index];
       // Passed to the API as well as checked here: the API can stop work already in progress, which
       // this loop cannot.
       const withSignal = signal === undefined ? options : { ...options, signal };
 
       try {
         const result = await withTimeout(session.prompt(prompt, withSignal), INFERENCE_TIMEOUT_MS);
-        if (typeof result === 'string' && result.trim() !== '') return result;
+        if (typeof result === 'string' && result.trim() !== '') {
+          this.#promptShape = index;
+          return result;
+        }
       } catch (error) {
         if (isAborted(signal)) return null;
         if (error instanceof TimeoutError) {
@@ -437,6 +447,20 @@ export class ChromePromptAnalyzer implements SemanticAnalyzer {
       }
     }
     return null;
+  }
+
+  /**
+   * The shapes to try, the one that last worked first.
+   *
+   * The browser does not change under a tab, so a shape it rejected once it will reject every time — and
+   * a rejection is not free: an unsupported option can be refused only after the input has been read.
+   * The rest of the ladder is kept behind it rather than dropped, because the remembered shape can also
+   * fail for a reason that is about the message, and a fallback that has stopped existing cannot help.
+   */
+  #shapeOrder(): number[] {
+    const all = PROMPT_SHAPES.map((_shape, index) => index);
+    const known = this.#promptShape;
+    return known === null ? all : [known, ...all.filter((index) => index !== known)];
   }
 
   /**

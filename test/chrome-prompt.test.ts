@@ -283,6 +283,33 @@ describe('on-device adapter: inference', () => {
     expect(analysis?.risk).toBe(78);
   });
 
+  /**
+   * The browser does not change under a tab, so the shapes it refused on the first message it refuses on
+   * every one — and each refusal can come after the model has read the input. Paying that once per tab
+   * rather than once per message is the point; the ladder stays behind the remembered shape.
+   */
+  it('tries the option shape this browser accepted first on later messages', async () => {
+    const prompt = vi.fn((_input: string, options?: unknown) => {
+      if (options !== undefined) return Promise.reject(new TypeError('responseConstraint not supported'));
+      return Promise.resolve(VALID_JSON);
+    });
+    install({
+      LanguageModel: {
+        availability: () => Promise.resolve('available'),
+        create: () => Promise.resolve({ prompt }),
+      },
+    });
+
+    const analyzer = new ChromePromptAnalyzer();
+    await analyzer.analyze(EMAIL);
+    const firstMessage = prompt.mock.calls.length;
+    expect(firstMessage).toBe(3);
+
+    const second = await analyzer.analyze(EMAIL);
+    expect(second?.risk).toBe(78);
+    expect(prompt.mock.calls.length - firstMessage).toBe(1);
+  });
+
   it.each([
     ['prose instead of JSON', 'I think this is probably phishing, be careful!'],
     ['an empty response', ''],
