@@ -129,6 +129,7 @@ describe('aiRow', () => {
       'ready',
       'pending',
       'off',
+      'skipped',
       'unavailable',
       'no-output',
       'error',
@@ -138,6 +139,16 @@ describe('aiRow', () => {
       const row = aiRow(settings({ aiMode: 'local' }), scored({ semantic }));
       expect(row.detail).not.toBe('');
     }
+  });
+
+  /**
+   * A model that was not asked has said nothing, and the row must not read as though it looked and
+   * approved. "Not asked" with its reason is the whole of what is true.
+   */
+  it('words a skipped reading as not asked, never as an all-clear', () => {
+    const row = aiRow(settings({ aiMode: 'local' }), scored({ semantic: 'skipped', score: 0 }));
+    expect(row.detail).toMatch(/not asked/iu);
+    expect(row.detail).not.toMatch(/safe|clean|nothing of concern|approved/iu);
   });
 
   it('points a failing model server at the connection test', () => {

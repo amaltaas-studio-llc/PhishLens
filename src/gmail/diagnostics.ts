@@ -20,6 +20,7 @@
  */
 import type {
   AnalysisResult,
+  AnalysisTiming,
   Classification,
   EmailMessage,
   MessagePart,
@@ -166,6 +167,11 @@ export interface ScoringSummary {
   /** Concealed characters and the CSS techniques found, when the scan found any. */
   hidden: { chars: number; techniques: readonly string[] } | null;
   checks: readonly CheckSummary[];
+  /**
+   * How long the checks and the model took. Durations only: they say how slow this machine and model
+   * are, which is what a "PhishLens is slow" report needs and nothing about the mail.
+   */
+  timing: AnalysisTiming | null;
 }
 
 /**
@@ -179,6 +185,7 @@ export function summarizeScoring(
   result: AnalysisResult,
   email: EmailMessage,
   semantic: SemanticStatus,
+  timing: AnalysisTiming | null = null,
 ): ScoringSummary {
   const hidden = email.hiddenText;
   return {
@@ -196,6 +203,15 @@ export function summarizeScoring(
       score: signal.score,
       dampened: signal.dampened === true,
     })),
+    timing:
+      timing === null
+        ? null
+        : {
+            checksMs: timing.checksMs,
+            aiReused: timing.aiReused,
+            cached: timing.cached,
+            ...(timing.aiMs === undefined ? {} : { aiMs: timing.aiMs }),
+          },
   };
 }
 
@@ -286,6 +302,7 @@ function scoringLines(scoring: ScoringSummary | null): string[] {
   const lines = [
     `message:     ${String(scoring.score)}/100 ${scoring.classification}, semantic ${scoring.semantic}`,
     `read:        body ${String(scoring.bodyChars)}c, ${String(scoring.links)} links, ${String(scoring.attachments)} attachments`,
+    `timing:      ${describeTiming(scoring.timing)}`,
   ];
 
   if (scoring.hidden !== null) {
@@ -306,6 +323,16 @@ function scoringLines(scoring: ScoringSummary | null): string[] {
     );
   }
   return lines;
+}
+
+/** Whole milliseconds; finer precision is noise in a report pasted by hand. */
+function describeTiming(timing: AnalysisTiming | null): string {
+  if (timing === null) return 'not measured';
+  if (timing.cached) return 'replayed from this session';
+  const checks = `checks ${String(Math.round(timing.checksMs))}ms`;
+  if (timing.aiMs === undefined) return checks;
+  const ai = `ai ${String(Math.round(timing.aiMs))}ms`;
+  return `${checks}, ${ai}${timing.aiReused ? ' (reused reading)' : ''}`;
 }
 
 /** The browser version, without the rest of a user-agent string's fingerprinting surface. */

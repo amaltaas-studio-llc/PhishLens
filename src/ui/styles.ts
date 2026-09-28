@@ -83,53 +83,65 @@ export const PANEL_CSS = `
 :host { all: initial; }
 * { box-sizing: border-box; }
 
+/*
+ * One colour per category, set as a custom property wherever a \`data-category\` appears, so the ring
+ * slice, the group's dot, the breakdown bar and a quotation's rule all name the same category by the
+ * same colour without four copies of the palette. Chosen to stay apart from the risk palette's
+ * green-amber-red: a category is not a severity, and a red slice would read as one.
+ */
+[data-category="identity"] { --cat: #8e24aa; }
+[data-category="link"] { --cat: #1a73e8; }
+[data-category="authentication"] { --cat: #00897b; }
+[data-category="content"] { --cat: #e37400; }
+[data-category="attachment"] { --cat: #d81b60; }
+[data-category="llm"] { --cat: #5c6bc0; }
+
 .panel {
+  --state: #9aa0a6;
   position: fixed;
   right: 16px;
   bottom: 16px;
   z-index: 2147483001;
   display: flex;
   flex-direction: column;
-  width: 380px;
+  width: 392px;
   max-width: calc(100vw - 32px);
-  max-height: min(72vh, 620px);
+  max-height: min(76vh, 660px);
   /* The state colour lives in this 4px strip, so the card itself stays neutral and legible. */
   padding-left: 4px;
   overflow: hidden;
   background: #ffffff;
   color: #202124;
   border: 1px solid #dadce0;
-  border-radius: 12px;
-  box-shadow: 0 6px 24px rgb(0 0 0 / 18%), 0 2px 6px rgb(0 0 0 / 8%);
+  border-radius: 14px;
+  box-shadow: 0 10px 32px rgb(0 0 0 / 16%), 0 2px 6px rgb(0 0 0 / 8%);
   font-family: 'Google Sans', Roboto, system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-size: 13px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
+.panel[data-state="low"] { --state: #34a853; }
+.panel[data-state="caution"] { --state: #f9ab00; }
+.panel[data-state="suspicious"] { --state: #ea4335; }
+.panel[data-state="high-risk"] { --state: #b3261e; }
 
 .panel::before {
   content: '';
   position: absolute;
   inset: 0 auto 0 0;
   width: 4px;
-  background: #dadce0;
+  /* Neutral for "not checked", for the same reason as the badge: there is no reading to colour. */
+  background: var(--state);
 }
-.panel[data-state="low"]::before { background: #34a853; }
-.panel[data-state="caution"]::before { background: #f9ab00; }
-.panel[data-state="suspicious"]::before { background: #ea4335; }
-.panel[data-state="high-risk"]::before { background: #b3261e; }
-/* Neutral, for the same reason as the badge: there is no reading to colour. */
-.panel[data-state="unreadable"]::before { background: #9aa0a6; }
 
 /* Head is fixed; only the findings scroll. */
-.head { flex: none; padding: 12px 16px; border-bottom: 1px solid #f1f3f4; }
+.head { flex: none; padding: 12px 16px 12px; border-bottom: 1px solid #f1f3f4; }
 .scroll { flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; }
 
 /*
  * Scrollbar, restyled to belong to the card. Chromium's default is a 15px grey channel with a hard
- * inner edge and arrow buttons, which inside a 380px rounded card reads as a seam pinned to the right
- * side — and it runs straight through the rounded bottom corner, because the footer scrolls with the
- * findings.
+ * inner edge and arrow buttons, which inside a rounded card reads as a seam pinned to the right side —
+ * and it runs straight through the rounded bottom corner, because the footer scrolls with the findings.
  *
  * Drawn instead as an overlay over the card's own surface: transparent track, and a thin thumb inset
  * from the edge so it floats clear of both the border and the corner radius. The inset comes from a
@@ -159,32 +171,62 @@ export const PANEL_CSS = `
 .scroll::-webkit-scrollbar-button, .scroll::-webkit-scrollbar-corner { display: none; }
 
 .head-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.brand { font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: #80868b; }
+.brand { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #80868b; }
 
-.score-row { display: flex; align-items: baseline; gap: 6px; margin-top: 6px; }
-.score-value { font-size: 26px; font-weight: 500; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
-.score-max { font-size: 13px; color: #5f6368; }
-.verdict { margin-left: auto; font-size: 13px; font-weight: 500; }
 /*
- * Alone in the row, the verdict *is* the headline — there is no score for it to sit beside. Without
- * this it keeps the \`margin-left: auto\` that right-aligns it against a number, and reads as a label
- * stranded in the corner rather than the card's answer.
+ * The score as a ring with the number inside, beside the verdict. The ring replaces a flat meter: a
+ * bar can say how much, but not what it is made of, and "made of links" is the first thing a reader
+ * wants to know after "how bad".
  */
-.score-row .verdict:only-child { margin-left: 0; font-size: 18px; }
+.hero { display: grid; grid-template-columns: 72px 1fr; align-items: center; gap: 14px; margin-top: 4px; }
+.ring { position: relative; width: 72px; height: 72px; color: var(--state); }
+.ring svg { display: block; width: 100%; height: 100%; }
+.ring .track { stroke: #eef0f2; }
+.ring .seg { stroke: var(--cat); }
+.ring-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.score-value { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.score-max { margin-top: 3px; font-size: 9px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #80868b; }
+
+.hero-text { min-width: 0; }
+.verdict {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  background: #f1f3f4;
+  color: #3c4043;
+}
+.verdict[data-state="low"] { background: #e6f4ea; color: #137333; }
+.verdict[data-state="caution"] { background: #fef7e0; color: #8a5300; }
+.verdict[data-state="suspicious"] { background: #fce8e6; color: #b3261e; }
+.verdict[data-state="high-risk"] { background: #b3261e; color: #ffffff; }
+.summary { margin: 6px 0 0; font-size: 12px; color: #3c4043; }
 
 /*
- * Which message this is about. The card no longer sits beside the header it describes, so it has to
+ * The "not checked" head. Alone in the row, the verdict *is* the headline — there is no score for it to
+ * sit beside — so it is set as a heading rather than as a pill that would read like a risk level.
+ */
+.score-row { display: flex; align-items: baseline; gap: 6px; margin-top: 6px; }
+.score-row .verdict:only-child { padding: 0; background: none; font-size: 18px; font-weight: 500; color: inherit; }
+
+/*
+ * Which message this is about. The card does not sit beside the header it describes, so it has to
  * say — otherwise a stale card in the corner is indistinguishable from a current one.
  */
-.ref { margin-top: 10px; display: grid; gap: 1px; }
+.ref { margin-top: 12px; display: grid; gap: 1px; }
 .ref-line { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ref-subject { color: #3c4043; font-weight: 500; }
 .ref-sender { color: #80868b; }
-
-.verdict[data-state="low"] { color: #137333; }
-.verdict[data-state="caution"] { color: #8a5300; }
-.verdict[data-state="suspicious"] { color: #b3261e; }
-.verdict[data-state="high-risk"] { color: #b3261e; }
 
 .close {
   flex: none;
@@ -201,51 +243,53 @@ export const PANEL_CSS = `
 .close:hover { background: #f1f3f4; }
 .close:focus-visible { outline: 2px solid #1a73e8; outline-offset: 1px; }
 
-.meter { height: 4px; border-radius: 2px; background: #f1f3f4; overflow: hidden; margin-top: 8px; }
-.meter-fill { height: 100%; border-radius: 2px; }
-.meter-fill[data-state="low"] { background: #34a853; }
-.meter-fill[data-state="caution"] { background: #f9ab00; }
-.meter-fill[data-state="suspicious"] { background: #ea4335; }
-.meter-fill[data-state="high-risk"] { background: #b3261e; }
-
-section { padding: 12px 16px; border-bottom: 1px solid #f1f3f4; }
-section:last-of-type { border-bottom: none; }
+section { padding: 14px 16px; border-bottom: 1px solid #f1f3f4; }
 
 .section-title {
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #5f6368;
-  margin: 0 0 4px;
+  margin: 0 0 2px;
 }
-.section-note { font-size: 11px; color: #80868b; margin: 0 0 10px; }
+.section-note { font-size: 11px; color: #80868b; margin: 0; }
+.empty { color: #5f6368; margin: 8px 0 0; }
+
+.dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--cat, #9aa0a6); }
+/* The floor's marker, matching the hatched part of the ring. Square, because a hatched circle at this size
+   reads as a "prohibited" sign. */
+.dot.hatch {
+  border-radius: 2px;
+  background: repeating-linear-gradient(45deg, var(--state) 0 1.5px, transparent 1.5px 3px);
+  box-shadow: inset 0 0 0 1px var(--state);
+}
+
+/* Findings, grouped by category. */
+.group { margin-top: 12px; }
+.group-head { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: #3c4043; }
+.group-points { margin-left: auto; font-weight: 500; color: #80868b; font-variant-numeric: tabular-nums; }
 
 ul { list-style: none; margin: 0; padding: 0; }
+ul.findings { display: grid; gap: 2px; margin-top: 4px; }
 
-li.finding {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 8px;
-  padding: 8px;
-  margin: 0 -8px;
-  border-radius: 8px;
-}
+li.finding { padding: 8px 10px; margin: 0 -10px; border-radius: 10px; }
 li.finding[data-locatable="true"] { cursor: pointer; }
 li.finding[data-locatable="true"]:hover { background: #f8f9fa; }
 li.finding:focus-visible { outline: 2px solid #1a73e8; outline-offset: -2px; }
 
+.finding-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.finding-title { margin: 0; font-weight: 600; line-height: 1.4; }
+.finding-desc { margin: 4px 0 0; font-size: 12.5px; line-height: 1.55; color: #5f6368; }
+
 .sev {
   flex: none;
-  align-self: start;
   margin-top: 1px;
+  padding: 2px 7px;
+  border-radius: 999px;
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.05em;
-  padding: 3px 5px;
-  border-radius: 4px;
-  min-width: 52px;
-  text-align: center;
 }
 .sev[data-severity="critical"] { background: #b3261e; color: #fff; }
 .sev[data-severity="high"] { background: #fce8e6; color: #b3261e; }
@@ -253,39 +297,58 @@ li.finding:focus-visible { outline: 2px solid #1a73e8; outline-offset: -2px; }
 .sev[data-severity="low"] { background: #e8f0fe; color: #1967d2; }
 .sev[data-severity="info"] { background: #f1f3f4; color: #5f6368; }
 
-.finding-title { font-weight: 500; margin: 0; }
-.finding-desc { margin: 3px 0 0; color: #3c4043; }
-
-.evidence {
-  margin: 6px 0 0;
-  padding: 6px 8px;
-  background: #f8f9fa;
-  border-left: 2px solid #dadce0;
-  border-radius: 0 4px 4px 0;
+/*
+ * Evidence, in two shapes. A measured value — a domain, where a link goes, a filename — is code: exact,
+ * monospaced, breakable anywhere, and never mistaken for a sentence. Words from the email are a
+ * quotation, ruled in the category's colour, so the sender's voice is never mistaken for PhishLens's.
+ */
+.evidence { margin: 8px 0 0; display: grid; gap: 3px; }
+.evidence-label { font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #80868b; }
+.code {
+  display: block;
+  padding: 5px 8px;
+  background: #f1f3f4;
+  border-radius: 6px;
   font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 11px;
-  color: #3c4043;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #202124;
   word-break: break-all;
   white-space: pre-wrap;
 }
-.evidence-label { display: block; font-family: inherit; font-size: 10px; color: #80868b; margin-bottom: 2px; }
+.quote-block { padding: 2px 0 2px 10px; border-left: 3px solid var(--cat, #dadce0); }
+.quote-block blockquote {
+  margin: 0;
+  font-size: 12.5px;
+  font-style: italic;
+  line-height: 1.5;
+  color: #3c4043;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.quote-block blockquote::before { content: '\\201C'; }
+.quote-block blockquote::after { content: '\\201D'; }
 
-.locate-hint { margin-top: 4px; font-size: 11px; color: #1a73e8; }
+.locate { margin: 6px 0 0; font-size: 11.5px; font-weight: 500; color: #1a73e8; }
+.locate::after { content: ' \\2192'; }
 
+/* The AI section. */
 .ai-note {
-  margin: 0 0 8px;
+  margin: 8px 0 0;
   padding: 8px 10px;
   background: #f8f9fa;
-  border-radius: 6px;
-  font-size: 11px;
+  border-radius: 8px;
+  font-size: 11.5px;
   color: #5f6368;
 }
 
 /*
  * Waiting on the model. Deliberately understated — the deterministic verdict is already on screen and
- * complete, so this is a footnote about a refinement, not a "loading" screen for the card.
+ * complete, so this is a footnote about a refinement, not a "loading" screen for the card. The counter
+ * is what turns "is it stuck?" into "it is working, and this is how long it takes on this machine".
  */
-.pending { display: flex; align-items: center; gap: 8px; margin: 2px 0 8px; color: #3c4043; }
+.pending { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; color: #3c4043; }
+.elapsed { margin-left: auto; font-size: 11.5px; color: #80868b; font-variant-numeric: tabular-nums; }
 .spinner {
   flex: none;
   width: 12px;
@@ -303,13 +366,70 @@ li.finding:focus-visible { outline: 2px solid #1a73e8; outline-offset: -2px; }
   @keyframes phishlens-spin { to { transform: rotate(360deg); } }
 }
 
-.empty { color: #5f6368; margin: 0; }
+.action {
+  margin-top: 10px;
+  padding: 7px 14px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #ffffff;
+  background: #1a73e8;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.action:hover { background: #1765cc; }
+.action:disabled { opacity: 0.6; cursor: default; }
+.action:focus-visible { outline: 2px solid #1a73e8; outline-offset: 2px; }
+
+.reading { margin-top: 12px; }
+.reading-title { margin: 0; font-weight: 600; line-height: 1.4; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 2px; }
+.chip {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #f1f3f4;
+  color: #3c4043;
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.chip[data-scored="true"] { background: #e8eaf6; color: #3949ab; }
+.reasons-label { margin: 12px 0 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #80868b; }
+ul.reasons { list-style: disc; padding-left: 18px; display: grid; gap: 4px; }
+ul.reasons li { font-size: 12.5px; line-height: 1.5; color: #3c4043; }
+ul.reasons li::marker { color: var(--cat, #9aa0a6); }
+.reasons { --cat: #5c6bc0; }
+.quote { font-style: italic; color: #202124; background: #f1f3f4; padding: 0 3px; border-radius: 3px; }
+.quote::before { content: '\\201C'; }
+.quote::after { content: '\\201D'; }
+
+/* How the score adds up. */
+ul.rows { display: grid; gap: 8px; margin-top: 10px; }
+li.row { display: grid; grid-template-columns: 8px 92px 1fr auto; align-items: center; gap: 8px; font-size: 12px; }
+li.row.floor { grid-template-columns: 8px 1fr auto; }
+.row-name { color: #3c4043; }
+.bar { height: 6px; border-radius: 3px; background: #eef0f2; overflow: hidden; }
+.bar-fill { display: block; height: 100%; border-radius: 3px; background: var(--cat); }
+.row-value { min-width: 44px; text-align: right; font-size: 11.5px; color: #5f6368; font-variant-numeric: tabular-nums; }
+.total {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed #e0e3e5;
+  font-size: 12px;
+  font-weight: 600;
+}
+.total-value { font-variant-numeric: tabular-nums; }
+.silent { margin-top: 8px; }
 
 /*
- * The "not checked" card. No score, no meter, no findings — so the explanation is the content, at body
+ * The "not checked" card. No score, no ring, no findings — so the explanation is the content, at body
  * size rather than the 11px used for notes, because it is the only thing there is to read.
  */
-.notes { margin: 0; padding: 0; }
+.notes { margin: 8px 0 0; padding: 0; }
 .notes p { margin: 0 0 8px; }
 .notes p:last-child { margin-bottom: 0; }
 /* The sentence that says an absent warning is not an all-clear. Weighted so it is not skimmed past. */
@@ -335,6 +455,7 @@ li.finding:focus-visible { outline: 2px solid #1a73e8; outline-offset: -2px; }
   user-select: text;
 }
 
+.trust .section-note { margin-top: 4px; }
 .copy {
   margin-top: 10px;
   padding: 6px 12px;
@@ -343,27 +464,21 @@ li.finding:focus-visible { outline: 2px solid #1a73e8; outline-offset: -2px; }
   color: #1a73e8;
   background: transparent;
   border: 1px solid #dadce0;
-  border-radius: 6px;
+  border-radius: 999px;
   cursor: pointer;
 }
 .copy:hover { background: #f8f9fa; }
 .copy:focus-visible { outline: 2px solid #1a73e8; outline-offset: 1px; }
 
 .foot {
-  padding: 10px 16px 12px;
+  padding: 10px 16px 14px;
   font-size: 11px;
   color: #80868b;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
-.foot a { color: #1a73e8; text-decoration: none; }
-.foot a:hover { text-decoration: underline; }
-
-.breakdown { display: flex; flex-wrap: wrap; gap: 4px 10px; }
-.breakdown span { font-variant-numeric: tabular-nums; }
-/* Reads as a note on the sum rather than another term in it. */
-.breakdown .floored { font-style: italic; opacity: 0.85; }
+.timing { color: #5f6368; font-variant-numeric: tabular-nums; }
 
 /*
  * Entrance. Notification-like rather than decorative: it rises 8px and fades in once, which is what
@@ -387,34 +502,55 @@ li.finding:focus-visible { outline: 2px solid #1a73e8; outline-offset: -2px; }
     bottom: 12px;
     width: auto;
     max-width: none;
-    max-height: 78vh;
+    max-height: 80vh;
   }
 }
 
 @media (prefers-color-scheme: dark) {
-  .panel { background: #292a2d; color: #e8eaed; border-color: #3c4043; }
-  .panel::before { background: #5f6368; }
+  [data-category="identity"] { --cat: #ce93d8; }
+  [data-category="link"] { --cat: #8ab4f8; }
+  [data-category="authentication"] { --cat: #4db6ac; }
+  [data-category="content"] { --cat: #fcad70; }
+  [data-category="attachment"] { --cat: #f48fb1; }
+  [data-category="llm"] { --cat: #9fa8da; }
+  .reasons { --cat: #9fa8da; }
+
+  .panel { background: #292a2d; color: #e8eaed; border-color: #3c4043; --state: #5f6368; }
+  .panel[data-state="low"] { --state: #81c995; }
+  .panel[data-state="caution"] { --state: #fdd663; }
+  .panel[data-state="suspicious"] { --state: #f28b82; }
+  .panel[data-state="high-risk"] { --state: #ee675c; }
   .head { border-bottom-color: #3c4043; }
   section { border-bottom-color: #3c4043; }
-  .score-max, .section-title, .section-note, .foot, .empty, .brand, .ref-sender { color: #9aa0a6; }
-  .ref-subject { color: #e8eaed; }
-  .finding-desc { color: #bdc1c6; }
+  .score-max, .section-title, .section-note, .foot, .empty, .brand, .ref-sender, .group-points,
+  .evidence-label, .reasons-label, .elapsed { color: #9aa0a6; }
+  .ref-subject, .summary, .group-head, .row-name, .quote { color: #e8eaed; }
+  .finding-desc, .ai-note, .row-value, .timing, ul.reasons li, .quote-block blockquote { color: #bdc1c6; }
+  .ring .track, .bar { stroke: #3c4043; background: #3c4043; }
+  .verdict { background: #3c4043; color: #e8eaed; }
+  .verdict[data-state="low"] { background: #1e3a28; color: #81c995; }
+  .verdict[data-state="caution"] { background: #3d3122; color: #fdd663; }
+  .verdict[data-state="suspicious"] { background: #452420; color: #f28b82; }
+  .verdict[data-state="high-risk"] { background: #b3261e; color: #ffffff; }
+  .score-row .verdict:only-child { background: none; color: inherit; }
   .close { color: #9aa0a6; }
   .close:hover { background: #3c4043; }
-  .meter { background: #3c4043; }
   .scroll::-webkit-scrollbar-thumb { background-color: #5f6368; }
   .scroll::-webkit-scrollbar-thumb:hover { background-color: #80868b; }
   li.finding[data-locatable="true"]:hover { background: #35363a; }
-  .evidence, .ai-note { background: #202124; border-left-color: #5f6368; color: #bdc1c6; }
+  .code, .chip, .quote { background: #202124; color: #e8eaed; }
+  .chip[data-scored="true"] { background: #283046; color: #aecbfa; }
+  .ai-note { background: #202124; }
+  .total { border-top-color: #5f6368; }
+  .locate, .diagnostic summary { color: #8ab4f8; }
   .notes p.emphatic { color: #e8eaed; }
   .diagnostic pre { background: #202124; border-color: #3c4043; color: #bdc1c6; }
   .copy { color: #8ab4f8; border-color: #5f6368; }
   .copy:hover { background: #35363a; }
+  .action { background: #8ab4f8; color: #202124; }
+  .action:hover { background: #aecbfa; }
   .pending { color: #e8eaed; }
   .spinner { border-color: #3c4043; border-top-color: #8ab4f8; }
-  .verdict[data-state="low"] { color: #81c995; }
-  .verdict[data-state="caution"] { color: #fdd663; }
-  .verdict[data-state="suspicious"], .verdict[data-state="high-risk"] { color: #f28b82; }
   .sev[data-severity="high"] { background: #452420; color: #f28b82; }
   .sev[data-severity="medium"] { background: #3d3122; color: #fdd663; }
   .sev[data-severity="low"] { background: #1f3047; color: #8ab4f8; }

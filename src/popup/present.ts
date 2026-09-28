@@ -261,6 +261,8 @@ const STATUS_TEXT: Readonly<Record<SemanticStatus, string>> = {
   ready: 'Assessment ready',
   pending: 'Reading the message…',
   off: 'Switched off — technical checks only',
+  // Says why and what it means, because "skipped" alone reads as either a fault or an all-clear.
+  skipped: 'Not asked — no technical finding for it to weigh',
   unavailable: 'Unavailable',
   'no-output': 'Returned nothing usable for this message',
   error: 'Could not finish',

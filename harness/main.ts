@@ -19,6 +19,7 @@ import { formatDiagnostic } from '../src/gmail/diagnostics.js';
 import type {
   AiMode,
   AnalysisResult,
+  AnalysisTiming,
   Classification,
   EmailMessage,
   MessagePart,
@@ -40,6 +41,7 @@ type View = 'full' | 'badges' | 'card' | 'list';
 const SEMANTIC_STATES: readonly SemanticStatus[] = [
   'ready',
   'pending',
+  'skipped',
   'unavailable',
   'no-output',
   'error',
@@ -267,7 +269,23 @@ const panel = new Panel({
   onTrustChange: (_entry, trusted) => {
     setParam('trust', trusted ? 'trusted' : 'offer');
   },
+  // The same for the skipped reading: asking for it moves to the state the controller would paint.
+  onRunAssessment: () => {
+    setParam('semantic', 'ready');
+  },
 });
+
+/**
+ * Timings for the footer and the running counter, in the proportions a real machine produces: the
+ * checks in milliseconds, the on-device model in seconds. `?ms=` sets the model's share, so a slow
+ * reading can be previewed without a slow model.
+ */
+function cannedTiming(semantic: SemanticStatus, aiMs: number): AnalysisTiming {
+  const base = { checksMs: 11.6, aiReused: false, cached: false };
+  if (semantic === 'pending') return { ...base, aiStartedAt: performance.now() - aiMs };
+  if (semantic === 'ready') return { ...base, aiMs };
+  return base;
+}
 
 const stage = document.querySelector<HTMLElement>('#stage');
 const listMarks = new ListMarks();
@@ -325,6 +343,7 @@ async function viewFor(state: HarnessState): Promise<PanelView> {
     aiMode,
     email: fixture.email,
     semantic,
+    timing: cannedTiming(semantic, state.aiMs),
     trust: trustFor(state.trust, fixture.email),
   };
 }
@@ -462,16 +481,18 @@ async function renderCardOnly(state: HarnessState): Promise<void> {
  *    out faint or displaced.
  *
  * The height cap is *kept*, at the value a normal window produces, so the card is the size and shape a
- * reader sees, scrolled content included.
+ * reader sees, scrolled content included. `tall=1` lifts it, for reviewing a whole card in one image;
+ * the published screenshots never use it, because no reader sees the card that way.
  */
 function flattenForStillImage(host: Element): void {
+  const tall = new URLSearchParams(location.search).get('tall') === '1';
   const style = document.createElement('style');
   style.textContent = `
     .panel {
       /* relative, not static: the state-colour strip is an absolutely positioned ::before, and a static
          panel is not its containing block, so the strip escapes to the page edge. */
       position: relative;
-      max-height: 620px;
+      max-height: ${tall ? 'none' : '620px'};
       animation: none;
     }
   `;
@@ -486,6 +507,8 @@ interface HarnessState {
   missing: readonly MessagePart[];
   trust: string;
   cardOpen: boolean;
+  /** How long the canned reading took, or has been running, in milliseconds. */
+  aiMs: number;
 }
 
 async function render(): Promise<void> {
@@ -509,6 +532,7 @@ async function render(): Promise<void> {
     missing: missingParam === 'none' ? [] : [missingParam as MessagePart],
     trust,
     cardOpen: params.get('card') === '1',
+    aiMs: boundedMs(params.get('ms')),
   };
 
   syncControls(state, view, missingParam);
@@ -523,6 +547,13 @@ async function render(): Promise<void> {
   else if (view === 'card') await renderCardOnly(state);
   else if (view === 'list') renderList();
   else await renderFull(state);
+}
+
+function boundedMs(value: string | null): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 120_000 && value !== null
+    ? parsed
+    : 4800;
 }
 
 function pick<T extends string>(value: string | null, allowed: readonly T[], fallback: T): T {

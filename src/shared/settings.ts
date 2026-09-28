@@ -7,6 +7,7 @@ import type { AiMode, Settings } from './types.js';
  */
 export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
   aiMode: 'local',
+  aiOnlyWhenFlagged: true,
   highlightEnabled: true,
   showBadgeWhenLow: true,
   listMarksEnabled: false,
@@ -36,6 +37,10 @@ export function normalizeSettings(raw: unknown): Settings {
 
   return {
     aiMode: isAiMode(source['aiMode']) ? source['aiMode'] : DEFAULT_SETTINGS.aiMode,
+    aiOnlyWhenFlagged:
+      typeof source['aiOnlyWhenFlagged'] === 'boolean'
+        ? source['aiOnlyWhenFlagged']
+        : DEFAULT_SETTINGS.aiOnlyWhenFlagged,
     highlightEnabled:
       typeof source['highlightEnabled'] === 'boolean'
         ? source['highlightEnabled']
@@ -248,7 +253,12 @@ export function settingsImpact(previous: Settings, next: Settings): SettingsImpa
 
   return {
     remodel,
-    rescore: remodel || !sameEntries(previous.trustedSenders, next.trustedSenders),
+    // The gate counts because a skipped reading is cached as settled: without it, switching the model
+    // on for all mail would leave every message already opened saying it was skipped.
+    rescore:
+      remodel ||
+      previous.aiOnlyWhenFlagged !== next.aiOnlyWhenFlagged ||
+      !sameEntries(previous.trustedSenders, next.trustedSenders),
     repaint: previous.showBadgeWhenLow !== next.showBadgeWhenLow,
     listMarks: previous.listMarksEnabled !== next.listMarksEnabled,
     highlights: previous.highlightEnabled !== next.highlightEnabled,

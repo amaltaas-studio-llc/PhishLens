@@ -63,6 +63,41 @@ export function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+export interface SvgOptions {
+  class?: string;
+  attrs?: Attrs;
+  children?: (SVGElement | null | undefined | false)[];
+}
+
+/**
+ * The same guarantee as `el()`, for the few shapes the card draws.
+ *
+ * No text parameter at all, not even a safe one: nothing the card draws in SVG is a word, and every word
+ * it shows is HTML text beside the drawing. That keeps the drawing decorative — it is marked
+ * `aria-hidden` — and keeps message content out of a namespace `el()`'s callers never have to think about.
+ */
+export function svg<K extends keyof SVGElementTagNameMap>(
+  tag: K,
+  options: SvgOptions = {},
+): SVGElementTagNameMap[K] {
+  const node = document.createElementNS(SVG_NS, tag);
+  if (options.class !== undefined) node.setAttribute('class', options.class);
+  if (options.attrs !== undefined) {
+    for (const [name, value] of Object.entries(options.attrs)) {
+      if (value === undefined || value === false) continue;
+      node.setAttribute(name, value === true ? '' : String(value));
+    }
+  }
+  if (options.children !== undefined) {
+    for (const child of options.children) {
+      if (child !== null && child !== undefined && child !== false) node.append(child);
+    }
+  }
+  return node;
+}
+
 export function text(value: string): Text {
   return document.createTextNode(value);
 }

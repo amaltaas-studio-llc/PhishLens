@@ -88,10 +88,29 @@ class FakeAdapter implements MailAdapter {
     };
   }
 
+  /** What `extract()` returns. Replaced by a test to stand in for Gmail finishing part of the page. */
+  email: EmailMessage = EMAIL;
+
   extract(): Extraction {
-    return { email: EMAIL, missing: [] };
+    return { email: this.email, missing: [] };
   }
 }
+
+/**
+ * The same message with a finding: a sign-in link whose text names one host and whose destination is
+ * another. Enough for the gate to ask the model, and nothing the tests below depend on beyond that.
+ */
+const FLAGGED: EmailMessage = {
+  ...EMAIL,
+  bodyText: `${EMAIL.bodyText} Confirm your delivery address.`,
+  links: [
+    {
+      text: 'https://northwind-logistics.com/confirm',
+      href: 'https://northwind-logistics-confirm.example/login',
+      normalizedDomain: 'northwind-logistics-confirm.example',
+    },
+  ],
+};
 
 // ---------------------------------------------------------------------------
 // Chrome
@@ -110,10 +129,15 @@ let tabListeners: ((
   respond: (response: TabResponse) => void,
 ) => boolean)[];
 
+/**
+ * The message above is clean, which the default gate would answer without asking the model. These tests
+ * are about the model round trip, so the gate is off unless a test is about the gate.
+ */
 function settings(over: Partial<Settings> = {}): Settings {
   return {
     ...DEFAULT_SETTINGS,
     aiMode: 'server',
+    aiOnlyWhenFlagged: false,
     modelBaseUrl: 'http://127.0.0.1:11434/v1',
     modelName: 'northwind-small',
     ...over,
@@ -266,6 +290,146 @@ describe('a message opened with a model configured', () => {
     expect(badgeIsOnScreen()).toBe(true);
     expect(inferences).toHaveLength(1);
     expect(tabStatus()).toMatchObject({ kind: 'scored', semantic: 'ready' });
+  });
+});
+
+/** Gmail finishing part of the message after the first pass: a new view of the same text. */
+async function gmailFinishes(email: EmailMessage): Promise<void> {
+  adapter.email = email;
+  document.body.append(document.createElement('div'));
+  await vi.advanceTimersByTimeAsync(500);
+  await flush();
+}
+
+const AUTHENTICATED: EmailMessage = {
+  ...EMAIL,
+  auth: { spf: 'pass', dkim: 'pass', dmarc: 'pass', signedBy: 'northwind-logistics.com' },
+};
+
+/**
+ * Gmail draws the authentication summary a moment after the body, and each part it finishes is a new view
+ * of the message. The model is never shown authentication, so its reading of the new view is the one
+ * already under way — and restarting it cost the on-device model its whole inference, on nearly every
+ * message, for a question whose text had not changed.
+ */
+describe('when Gmail finishes drawing a message the model is already reading', () => {
+  it('joins the reading in flight instead of asking again', async () => {
+    await gmailFinishes(AUTHENTICATED);
+    expect(inferences).toHaveLength(1);
+
+    inferences[0]?.resolve(semantic());
+    await flush();
+    expect(tabStatus()).toMatchObject({ kind: 'scored', semantic: 'ready' });
+  });
+
+  it('reuses a finished reading for a later view of the same text', async () => {
+    inferences[0]?.resolve(semantic());
+    await flush();
+
+    await gmailFinishes(AUTHENTICATED);
+    expect(inferences).toHaveLength(1);
+    expect(tabStatus()).toMatchObject({ semantic: 'ready' });
+  });
+
+  it('asks again when the text the model reads has changed', async () => {
+    await gmailFinishes({ ...EMAIL, bodyText: `${EMAIL.bodyText} Reply to confirm.` });
+    expect(inferences).toHaveLength(2);
+  });
+});
+
+/** What the popup's "copy a report" button pastes. */
+function healthReport(): string {
+  let report = '';
+  for (const listener of tabListeners) {
+    listener({ type: 'GET_HEALTH_REPORT' }, { id: 'phishlens-test' }, (response) => {
+      if (response.ok && response.type === 'HEALTH_REPORT') report = response.report;
+    });
+  }
+  return report;
+}
+
+describe('timing', () => {
+  it('reports how long the checks and the model took, in durations only', async () => {
+    expect(healthReport()).toMatch(/^timing: {6}checks \d+ms$/mu);
+
+    inferences[0]?.resolve(semantic());
+    await flush();
+    expect(healthReport()).toMatch(/^timing: {6}checks \d+ms, ai \d+ms$/mu);
+  });
+});
+
+/**
+ * The default gate: the model is asked only when a check found something, because on mail no check
+ * objects to its reading scores zero by construction. What must hold is that skipping is never presented
+ * as the model having looked, and that the reader can still ask.
+ */
+describe('with the default gate on asking the model', () => {
+  async function restart(email: EmailMessage): Promise<void> {
+    controller.stop();
+    document.body.replaceChildren();
+    stored = settings({ aiOnlyWhenFlagged: true });
+    inferences = [];
+    storageListeners = [];
+    tabListeners = [];
+    adapter = new FakeAdapter();
+    adapter.email = email;
+    controller = new Controller(adapter);
+    await controller.start();
+    await vi.advanceTimersByTimeAsync(500);
+    await flush();
+  }
+
+  function askButton(): HTMLButtonElement | null {
+    for (const listener of tabListeners) {
+      listener({ type: 'OPEN_PANEL' }, { id: 'phishlens-test' }, () => undefined);
+    }
+    const root = document.querySelector('#phishlens-panel-host')?.shadowRoot ?? null;
+    return root?.querySelector<HTMLButtonElement>('button.action') ?? null;
+  }
+
+  it('does not ask about a message no check found anything in', async () => {
+    await restart(EMAIL);
+    expect(inferences).toHaveLength(0);
+    expect(tabStatus()).toMatchObject({ kind: 'scored', semantic: 'skipped' });
+  });
+
+  it('asks about a message a check flagged', async () => {
+    await restart(FLAGGED);
+    expect(inferences).toHaveLength(1);
+    expect(tabStatus()).toMatchObject({ semantic: 'pending' });
+  });
+
+  it('asks when the reader requests a reading from the card', async () => {
+    await restart(EMAIL);
+    const button = askButton();
+    expect(button).not.toBeNull();
+
+    button?.click();
+    await flush();
+    expect(inferences).toHaveLength(1);
+    expect(tabStatus()).toMatchObject({ semantic: 'pending' });
+
+    inferences[0]?.resolve(semantic());
+    await flush();
+    expect(tabStatus()).toMatchObject({ semantic: 'ready' });
+  });
+
+  /**
+   * The on-demand reading replaces the skipped result in the cache. Were the skip still cached, the
+   * reader's next visit to the message would show the reading they asked for as never having happened.
+   */
+  it('keeps the requested reading for the next visit', async () => {
+    await restart(EMAIL);
+    askButton()?.click();
+    await flush();
+    inferences[0]?.resolve(semantic());
+    await flush();
+
+    adapter.replaceHeader();
+    await vi.advanceTimersByTimeAsync(500);
+    await flush();
+    expect(tabStatus()).toMatchObject({ semantic: 'ready' });
+    expect(inferences).toHaveLength(1);
   });
 });
 

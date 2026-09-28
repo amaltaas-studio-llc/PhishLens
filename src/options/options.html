@@ -367,6 +367,18 @@
           />
           <p class="field-error" id="backendError" role="alert"></p>
         </div>
+
+        <label class="inline" id="aiOnlyWhenFlaggedOption">
+          <input type="checkbox" id="aiOnlyWhenFlagged" />
+          <span>
+            <span class="option-title">Only ask the AI when a technical check finds something</span><br />
+            <span class="option-desc">
+              When nothing was found, the AI's reading cannot change the score, so skipping it saves
+              several seconds of work per message. The assessment card still offers a reading on any
+              message. Turn off to have every message read.
+            </span>
+          </span>
+        </label>
       </fieldset>
 
       <h2>Trusted senders</h2>

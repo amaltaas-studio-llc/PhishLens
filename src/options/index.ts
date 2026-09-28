@@ -71,6 +71,8 @@ class OptionsPage {
   readonly #serverRemoteWarning = requireElement('serverRemoteWarning', HTMLParagraphElement);
   readonly #trusted = requireElement('trusted', HTMLUListElement);
   readonly #trustedEmpty = requireElement('trustedEmpty', HTMLParagraphElement);
+  readonly #aiOnlyWhenFlaggedOption = requireElement('aiOnlyWhenFlaggedOption', HTMLLabelElement);
+  readonly #aiOnlyWhenFlagged = requireElement('aiOnlyWhenFlagged', HTMLInputElement);
   readonly #showBadgeWhenLow = requireElement('showBadgeWhenLow', HTMLInputElement);
   readonly #listMarksEnabled = requireElement('listMarksEnabled', HTMLInputElement);
   readonly #highlightEnabled = requireElement('highlightEnabled', HTMLInputElement);
@@ -104,6 +106,10 @@ class OptionsPage {
         void this.#save({ aiMode: mode });
       });
     }
+
+    this.#aiOnlyWhenFlagged.addEventListener('change', () => {
+      void this.#save({ aiOnlyWhenFlagged: this.#aiOnlyWhenFlagged.checked });
+    });
 
     this.#showBadgeWhenLow.addEventListener('change', () => {
       void this.#save({ showBadgeWhenLow: this.#showBadgeWhenLow.checked });
@@ -154,6 +160,10 @@ class OptionsPage {
     this.#serverField.hidden = settings.aiMode !== 'server';
     this.#modelBaseUrl.value = settings.modelBaseUrl;
     this.#modelName.value = settings.modelName;
+    // Hidden rather than disabled when AI is off: a greyed-out choice about a model that never runs
+    // invites the question of why it cannot be changed.
+    this.#aiOnlyWhenFlaggedOption.hidden = settings.aiMode === 'off';
+    this.#aiOnlyWhenFlagged.checked = settings.aiOnlyWhenFlagged;
     this.#showBadgeWhenLow.checked = settings.showBadgeWhenLow;
     this.#listMarksEnabled.checked = settings.listMarksEnabled;
     this.#highlightEnabled.checked = settings.highlightEnabled;

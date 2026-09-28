@@ -5,16 +5,21 @@
  * differently.** Deterministic findings state what was measured; semantic ones are framed as opinion, so
  * a model's guess never looks like a proven fact.
  */
+import { REASONING_PREFIX } from '../analysis/llm/semantic-signals.js';
+import { scoreFloor } from '../analysis/scoring/aggregate.js';
 import type {
   AiMode,
+  AnalysisResult,
+  AnalysisTiming,
   Classification,
   EmailMessage,
   MessagePart,
   SecuritySignal,
   SemanticStatus,
+  SignalCategory,
 } from '../shared/types.js';
 import { normalizeDomain } from '../shared/url.js';
-import { CLASSIFICATION_LABELS } from './labels.js';
+import { CATEGORY_LABELS, CLASSIFICATION_LABELS } from './labels.js';
 
 export function ariaLabel(classification: Classification, score: number, findings: number): string {
   const noun = findings === 1 ? 'finding' : 'findings';
@@ -107,24 +112,161 @@ export function isLocatable(signal: SecuritySignal): boolean {
 }
 
 /**
- * The evidence block: a label and the value beneath it.
+ * The evidence block: what kind of thing it is, a label, and the value beneath it.
  *
- * One function so the two cannot disagree. They were separate, with opposite precedence, so a signal
- * carrying both a URL and a value showed the value under the heading "Destination".
+ * One function so the three cannot disagree. Label and body were separate, with opposite precedence, so
+ * a signal carrying both a URL and a value showed the value under the heading for a link.
+ *
+ * The kind is what the card styles by, and the distinction is one a reader needs: `quote` is words the
+ * sender wrote, while `value` and `url` are things PhishLens measured — a domain, a filename, where a
+ * link actually goes — and are drawn as code so they are never mistaken for prose.
  */
-export function evidenceOf(signal: SecuritySignal): { label: string; body: string } | null {
+export interface Evidence {
+  kind: 'value' | 'url' | 'quote';
+  label: string;
+  body: string;
+}
+
+export function evidenceOf(signal: SecuritySignal): Evidence | null {
   const evidence = signal.evidence;
   if (evidence === undefined) return null;
   if (evidence.value !== undefined && evidence.value !== '') {
-    return { label: 'Observed', body: evidence.value };
+    return { kind: 'value', label: 'Observed', body: evidence.value };
   }
   if (evidence.url !== undefined && evidence.url !== '') {
-    return { label: 'Destination', body: evidence.url };
+    return { kind: 'url', label: 'Link goes to', body: evidence.url };
   }
   if (evidence.text !== undefined && evidence.text !== '') {
-    return { label: 'From the message', body: `“${evidence.text}”` };
+    return { kind: 'quote', label: 'From the email', body: evidence.text };
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// The score, summarised
+// ---------------------------------------------------------------------------
+
+/** Categories that added to the score, largest first — the order the ring and the breakdown share. */
+export function contributions(
+  result: Pick<AnalysisResult, 'categoryScores'>,
+): [SignalCategory, number][] {
+  return (Object.entries(result.categoryScores) as [SignalCategory, number][])
+    .filter(([, value]) => value > 0)
+    .sort((a, b) => b[1] - a[1]);
+}
+
+/** "Links", "Links and Sender", "Links, Sender and Wording". */
+export function joinCategories(categories: readonly SignalCategory[]): string {
+  const names = categories.map((c) => CATEGORY_LABELS[c]);
+  const last = names.pop();
+  if (last === undefined) return '';
+  return names.length === 0 ? last : `${names.join(', ')} and ${last}`;
+}
+
+/**
+ * One line under the verdict saying where the number came from.
+ *
+ * Two categories at most, because this is the sentence read at a glance; the breakdown lower down has
+ * every one. A score raised to a minimum says so here too, since that is the case where the categories
+ * alone would not explain the number.
+ */
+export function scoreSummary(
+  result: Pick<AnalysisResult, 'score' | 'categoryScores' | 'signals'>,
+): string {
+  const parts = contributions(result);
+  if (parts.length === 0) return 'Nothing the checks found added to the score.';
+
+  if (result.score > addedUp(result)) {
+    const floor = scoreFloor(result.signals);
+    return floor.basis === 'convergence'
+      ? `Raised to a minimum by severe findings in ${joinCategories(floor.categories)}.`
+      : 'Raised to a minimum by one severe finding.';
+  }
+  const leading = parts.slice(0, 2).map(([category]) => category);
+  if (parts.length === 1) return `All from ${joinCategories(leading)}.`;
+  return `Mostly from ${joinCategories(leading)}.`;
+}
+
+/** What the categories sum to, which is below the score only when a floor applied. */
+export function addedUp(result: Pick<AnalysisResult, 'categoryScores'>): number {
+  return contributions(result).reduce((sum, [, value]) => sum + value, 0);
+}
+
+// ---------------------------------------------------------------------------
+// The AI assessment, laid out
+// ---------------------------------------------------------------------------
+
+/**
+ * The assessment's explanation without the reasons at its end, which the card lists separately.
+ *
+ * Split at the first occurrence of the prefix, which `semanticToSignals` places after its own sentences
+ * and before the model's words — so nothing the model wrote can move the split earlier.
+ */
+export function assessmentExplanation(description: string): string {
+  const at = description.indexOf(` ${REASONING_PREFIX}`);
+  return at < 0 ? description : description.slice(0, at);
+}
+
+/**
+ * A reason, split so the excerpt it quotes can be set apart from the model's comment on it.
+ *
+ * The prompt asks every concerning reason to quote the email, and a quotation rendered like the prose
+ * around it is the one thing a reader most wants to check and cannot find. Straight and curly double
+ * quotes both, bounded so a reason full of stray quote marks costs nothing.
+ */
+export interface ReasonPart {
+  text: string;
+  quoted: boolean;
+}
+
+const QUOTED = /“[^”]{1,240}”|"[^"]{1,240}"/gu;
+const MAX_REASON_PARTS = 12;
+
+export function reasonParts(reason: string): ReasonPart[] {
+  const parts: ReasonPart[] = [];
+  let last = 0;
+  for (const match of reason.matchAll(QUOTED)) {
+    if (parts.length >= MAX_REASON_PARTS) break;
+    const start = match.index;
+    if (start > last) parts.push({ text: reason.slice(last, start), quoted: false });
+    parts.push({ text: match[0].slice(1, -1), quoted: true });
+    last = start + match[0].length;
+  }
+  if (last < reason.length) parts.push({ text: reason.slice(last), quoted: false });
+  return parts;
+}
+
+// ---------------------------------------------------------------------------
+// Timing
+// ---------------------------------------------------------------------------
+
+/** "<1 ms", "14 ms", "4.8 s". Tenths of a second above one, because that is what a reader can feel. */
+export function formatDuration(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 1) return '<1 ms';
+  if (ms < 1000) return `${String(Math.round(ms))} ms`;
+  return `${(ms / 1000).toFixed(1)} s`;
+}
+
+/**
+ * The footer's account of how long this took, or `null` when there is nothing honest to say.
+ *
+ * Present so a slow card has an explanation the reader can see: the checks are milliseconds and the
+ * model is seconds, and without the two numbers side by side every delay looks like PhishLens itself.
+ */
+export function timingLine(
+  timing: AnalysisTiming | null,
+  status: SemanticStatus,
+  aiMode: AiMode,
+): string | null {
+  if (timing === null) return null;
+  if (timing.cached) return 'Shown from earlier in this session.';
+
+  const parts = [`Checks ${formatDuration(timing.checksMs)}`];
+  if (aiMode === 'off' || status === 'off') parts.push('AI off');
+  else if (status === 'skipped') parts.push('AI not asked');
+  else if (timing.aiReused) parts.push('AI reading reused');
+  else if (timing.aiMs !== undefined) parts.push(`AI reading ${formatDuration(timing.aiMs)}`);
+  return parts.join(' · ');
 }
 
 /** Shown when there *is* an assessment: what the AI section is and is not. */
@@ -143,6 +285,13 @@ const AI_ABSENCE_NOTES: Readonly<Record<SemanticStatus, ((source: string) => str
   ready: null,
   pending: () => 'The score above may change when this finishes. Technical checks are already complete.',
   off: () => 'AI analysis is switched off, so this score is based entirely on technical checks.',
+  /*
+   * Not an all-clear, and worded so it cannot be read as one: the model was not asked, so it has said
+   * nothing about the message. The reason is given because it is also why the reading would not have
+   * counted, and the offer is there for mail whose wording worries a reader in a way no check can see.
+   */
+  skipped: (source) =>
+    `${source} was not asked, to save time: the technical checks found nothing for its reading to weigh, and on its own that reading cannot change the score. This is not a judgement that the message is safe. If the wording seems off to you, ask for a reading.`,
   unavailable: (source) =>
     `${source} is unavailable, so this score is based entirely on technical checks. No message content left this browser.`,
   'no-output': (source) =>

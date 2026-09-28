@@ -11,11 +11,13 @@
  * moment without affecting anything in flight.
  */
 import {
-  analyze,
   analyzeDeterministic,
   countedFindings,
   isSemanticSettled,
+  refine,
+  semanticCanScore,
   withSemanticStatus,
+  type DeterministicResult,
 } from '../analysis/engine.js';
 import { localAnalyzer, resolveAnalyzer } from '../analysis/llm/index.js';
 import { isScorable, type MailAdapter, type MessageHandle } from '../gmail/adapter.js';
@@ -32,6 +34,7 @@ import { DEFAULT_SETTINGS, settingsImpact } from '../shared/settings.js';
 import { trustState, withTrustedSender, withoutTrustedSender } from '../shared/trust.js';
 import type {
   AnalysisResult,
+  AnalysisTiming,
   EmailMessage,
   MessagePart,
   SecuritySignal,
@@ -43,6 +46,7 @@ import { Highlighter } from '../ui/highlight.js';
 import { Panel, type PanelView, type UnreadableView } from '../ui/panel.js';
 import { HealthLog } from './health.js';
 import { ListMarks } from './list-marks.js';
+import { Readings, readingKey } from './readings.js';
 
 /**
  * Bounded in-memory cache so revisiting a thread does not re-run the model.
@@ -68,6 +72,8 @@ interface ActiveView {
    * describes the view, while the result on screen is the deterministic one and is already complete.
    */
   semantic: SemanticStatus;
+  /** `null` until the checks have run; see `AnalysisTiming` for why this is not on the result. */
+  timing: AnalysisTiming | null;
 }
 
 export class Controller {
@@ -79,16 +85,16 @@ export class Controller {
   readonly #cache = new Map<string, AnalysisResult>();
   readonly #health = new HealthLog();
   readonly #listMarks = new ListMarks();
+  /**
+   * The model's answers, by what it was shown. The token below stops a stale result being *shown*;
+   * this is what stops the work, which matters because the model handles one request at a time.
+   */
+  readonly #readings = new Readings();
 
   #settings: Settings = { ...DEFAULT_SETTINGS };
   #active: ActiveView | null = null;
   /** Guards against a slow analysis of a previous message overwriting a newer one. */
   #analysisToken = 0;
-  /**
-   * Cancels in-flight semantic analysis when the view changes. The token above stops a stale result
-   * being *shown*; this stops the work, which matters because the model handles one request at a time.
-   */
-  #refinement: AbortController | null = null;
 
   constructor(adapter: MailAdapter) {
     this.#adapter = adapter;
@@ -112,6 +118,9 @@ export class Controller {
       onTrustChange: (entry, trusted) => {
         void this.#changeTrust(entry, trusted);
       },
+      onRunAssessment: () => {
+        void this.#runSkippedAssessment();
+      },
     });
 
     this.#observer = new GmailObserver(adapter, (event) => {
@@ -131,8 +140,7 @@ export class Controller {
   }
 
   stop(): void {
-    this.#refinement?.abort();
-    this.#refinement = null;
+    this.#readings.clear();
     this.#observer.stop();
     this.#listMarks.stop();
     chrome.storage.onChanged.removeListener(this.#handleStorageChanged);
@@ -149,10 +157,6 @@ export class Controller {
   // -------------------------------------------------------------------------
 
   async #handleObserverEvent(event: ObserverEvent): Promise<void> {
-    // Any inference still running belongs to the view being replaced, whichever kind of event this is.
-    this.#refinement?.abort();
-    this.#refinement = null;
-
     if (event.kind === 'no-message') {
       logger.debug('no message in view', { reason: event.reason });
       this.#teardownView();
@@ -168,6 +172,7 @@ export class Controller {
       missing: event.missing,
       result: null,
       semantic: aiMode === 'off' ? 'off' : 'pending',
+      timing: null,
     };
     this.#active = active;
 
@@ -191,6 +196,7 @@ export class Controller {
      */
     if (!isScorable(event.missing)) {
       logger.info('message not scored', { missing: event.missing });
+      this.#readings.cancelUnless(null);
       this.#badge.setUnreadable();
       // An open card is repainted, exactly as `#applyResult` does. Moving between messages within one
       // thread is not a route change, so nothing has closed it: without this it would go on displaying
@@ -201,6 +207,8 @@ export class Controller {
 
     const cached = this.#cache.get(event.signature);
     if (cached !== undefined) {
+      this.#readings.cancelUnless(null);
+      active.timing = { checksMs: 0, aiReused: false, cached: true };
       // Only settled results are cached, so this status is a conclusion rather than a moment in time.
       this.#applyResult(cached, token, cached.meta.semanticStatus ?? 'unavailable');
       return;
@@ -211,39 +219,101 @@ export class Controller {
     // The deterministic result is rendered first and is complete on its own. If a semantic analyzer
     // is available, the score is then refined. This ordering means the user is never waiting on a
     // model for a verdict, and an unavailable model is invisible rather than a failure state.
-    const { context: _context, ...deterministic } = analyzeDeterministic(event.email, {
+    const deterministic = this.#runChecks(active);
+    const shown = withoutContext(deterministic);
+
+    if (aiMode === 'off') {
+      this.#readings.cancelUnless(null);
+      this.#applyResult(shown, token, 'off');
+      return;
+    }
+
+    /*
+     * Nothing any check found, so nothing the model says can count: an uncorroborated reading scores
+     * zero. Asking anyway costs the reader seconds of inference per message for a sentence that cannot
+     * change the verdict, so by default the card offers the reading instead of running it. Cached as
+     * settled — it is a decision about this message under these settings, not a passing condition.
+     */
+    if (this.#settings.aiOnlyWhenFlagged && !semanticCanScore(deterministic)) {
+      this.#readings.cancelUnless(null);
+      const skipped = withSemanticStatus(shown, 'skipped');
+      this.#remember(event.signature, skipped, token);
+      this.#applyResult(skipped, token, 'skipped');
+      return;
+    }
+
+    await this.#refine(active, deterministic, token);
+  }
+
+  /** The rule engine, timed. Measured here because `analysis/` is not allowed a clock. */
+  #runChecks(active: ActiveView): DeterministicResult {
+    const started = performance.now();
+    const deterministic = analyzeDeterministic(active.email, {
       trustedSenders: this.#settings.trustedSenders,
     });
-    this.#applyResult(deterministic, token, aiMode === 'off' ? 'off' : 'pending');
+    active.timing = { checksMs: performance.now() - started, aiReused: false, cached: false };
+    return deterministic;
+  }
 
-    if (aiMode === 'off') return;
+  /**
+   * Asks the model about the view on screen and folds its answer into the score.
+   *
+   * The deterministic result is passed in rather than recomputed, so the checks run once per view and
+   * the refined score is built on exactly the findings the first paint showed — the same trust list
+   * included, without which the score would climb back up the moment the model answered.
+   */
+  async #refine(active: ActiveView, deterministic: DeterministicResult, token: number): Promise<void> {
+    const signalIds = deterministic.signals.map((s) => s.id);
+    const key = readingKey(active.email, this.#settings.aiMode, signalIds);
+    // Any other inference belongs to a view being replaced; one for this same text is about to be joined.
+    this.#readings.cancelUnless(key);
 
-    const refinement = new AbortController();
-    this.#refinement = refinement;
+    const lookup = this.#readings.lookup(key, () => resolveAnalyzer(this.#settings, signalIds));
+    const timing = active.timing ?? { checksMs: 0, aiReused: false, cached: false };
+    const started = performance.now();
+    active.timing = { ...timing, aiReused: lookup?.reused === true, aiStartedAt: started };
+    this.#applyResult(withoutContext(deterministic), token, 'pending');
+
+    const settle = (): void => {
+      if (token !== this.#analysisToken) return;
+      const { aiStartedAt: _running, ...rest } = active.timing ?? timing;
+      active.timing = { ...rest, aiMs: performance.now() - started };
+    };
 
     try {
-      const analyzer = resolveAnalyzer(
-        this.#settings,
-        deterministic.signals.map((s) => s.id),
-      );
-      // The same options as above, not just the signal: `analyze` re-runs the deterministic pass, and
-      // omitting the trust list here would make the score climb back up the moment the model answered.
-      const refined = await analyze(event.email, analyzer, {
-        signal: refinement.signal,
-        trustedSenders: this.#settings.trustedSenders,
-      });
-      this.#remember(event.signature, refined, token);
+      const refined = await refine(active.email, deterministic, lookup?.analyzer ?? null);
+      settle();
+      this.#remember(active.signature, refined, token);
       this.#applyResult(refined, token, refined.meta.semanticStatus ?? 'no-output');
     } catch (error) {
       // The deterministic result is already on screen; a semantic failure is not a user-facing error.
       // It is still reported *as* a failure rather than left pending, or the card spins forever.
       logger.debug('semantic refinement failed', error);
-      const failed = withSemanticStatus(deterministic, 'error');
-      this.#remember(event.signature, failed, token);
+      settle();
+      const failed = withSemanticStatus(withoutContext(deterministic), 'error');
+      this.#remember(active.signature, failed, token);
       this.#applyResult(failed, token, 'error');
-    } finally {
-      if (this.#refinement === refinement) this.#refinement = null;
     }
+  }
+
+  /**
+   * Runs the reading the gate skipped, because the reader asked for it from the card.
+   *
+   * Only for the view on screen and only from `skipped`, so a stray click cannot start a second
+   * inference over one already running. The checks are re-run rather than kept from the first paint:
+   * they take milliseconds, and holding every view's context for a button most views never see would
+   * cost more than it saves.
+   */
+  async #runSkippedAssessment(): Promise<void> {
+    const active = this.#active;
+    if (active?.semantic !== 'skipped' || !isScorable(active.missing)) return;
+    if (this.#settings.aiMode === 'off') return;
+
+    const token = this.#analysisToken;
+    // The skipped result was cached for this signature; it is about to stop being true.
+    this.#cache.delete(active.signature);
+    const deterministic = this.#runChecks(active);
+    await this.#refine(active, deterministic, token);
   }
 
   /** Applies a result only if it belongs to the message currently in view. */
@@ -303,8 +373,7 @@ export class Controller {
    * so the token is what actually keeps a superseded answer off the screen and out of the cache.
    */
   #supersedeAnalysis(): void {
-    this.#refinement?.abort();
-    this.#refinement = null;
+    this.#readings.cancelUnless(null);
     this.#analysisToken += 1;
   }
 
@@ -414,7 +483,7 @@ export class Controller {
     // A message that could not be read has no score to account for, and the parts it was missing are
     // already in the session tally above it.
     if (!isScorable(active.missing)) return null;
-    return summarizeScoring(active.result, active.email, active.semantic);
+    return summarizeScoring(active.result, active.email, active.semantic, active.timing);
   }
 
   #status(): TabStatus {
@@ -520,7 +589,12 @@ export class Controller {
        */
       this.#supersedeAnalysis();
       this.#cache.clear();
-      if (impact.remodel) this.#warmModel();
+      // Readings survive a trust change, which alters the score around them and not what the model
+      // was shown. A different model is a different judge, so its predecessor's answers go.
+      if (impact.remodel) {
+        this.#readings.clear();
+        this.#warmModel();
+      }
       this.#observer.refresh();
     } else if (impact.repaint) {
       /*
@@ -580,6 +654,7 @@ function viewOf(active: ActiveView, result: AnalysisResult, settings: Settings):
     aiMode: settings.aiMode,
     email: active.email,
     semantic: active.semantic,
+    timing: active.timing,
     trust: trustState(
       settings.trustedSenders,
       active.email.senderEmail ?? '',
@@ -589,6 +664,10 @@ function viewOf(active: ActiveView, result: AnalysisResult, settings: Settings):
   };
 }
 
+function withoutContext(result: DeterministicResult): AnalysisResult {
+  const { context: _context, ...rest } = result;
+  return rest;
+}
 
 /** Reads settings via the worker, falling back to defaults if it is mid-restart. */
 async function loadSettings(): Promise<Settings> {

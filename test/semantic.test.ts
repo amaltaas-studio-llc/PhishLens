@@ -12,7 +12,13 @@
  * it is the path virtually every real user will take.
  */
 import { describe, expect, it } from 'vitest';
-import { analyze, analyzeDeterministic, isSemanticSettled } from '../src/analysis/engine.js';
+import {
+  analyze,
+  analyzeDeterministic,
+  isSemanticSettled,
+  refine,
+  semanticCanScore,
+} from '../src/analysis/engine.js';
 import { extractJsonObject, parseSemanticAnalysis } from '../src/analysis/llm/parse.js';
 import { semanticToSignals } from '../src/analysis/llm/semantic-signals.js';
 import { buildUserPrompt, MAX_PROMPT_BODY_CHARS, MAX_PROMPT_CHARS, SYSTEM_PROMPT } from '../src/analysis/llm/prompt.js';
@@ -196,6 +202,7 @@ describe('semantic layer: unavailable', () => {
     it.each([
       ['ready', true],
       ['off', true],
+      ['skipped', true],
       ['cancelled', false],
       ['error', false],
       ['no-output', false],
@@ -811,5 +818,39 @@ describe('prompt construction', () => {
     // Reasons must quote the message and messages contain URLs, so requiring a quotation reopens the
     // guessing that withholding link data closed — unless the excerpt itself excludes them.
     expect(SYSTEM_PROMPT).toMatch(/never use a URL, email address, or filename/iu);
+  });
+});
+
+/**
+ * The gate on asking the model at all, and the path that reuses the first paint's checks.
+ *
+ * Both are performance changes whose only acceptable effect is on time: the gate may skip an inference
+ * only where the inference could not have scored, and reusing the checks must produce the result that
+ * running them again would.
+ */
+describe('asking the model only when it could count', () => {
+  it('says a reading could count exactly when an uncorroborated one would score nothing', async () => {
+    for (const { name, email } of loadAllFixtures()) {
+      const deterministic = analyzeDeterministic(email, { now: 0 });
+      const refined = await analyze(email, fixedAnalyzer(semantic({ risk: 95, confidence: 1 })), {
+        now: 0,
+      });
+      const scored = refined.categoryScores.llm > 0;
+      if (!semanticCanScore(deterministic)) expect(scored, name).toBe(false);
+    }
+  });
+
+  it('asks about the phishing fixture and not about the plain legitimate one', () => {
+    expect(semanticCanScore(analyzeDeterministic(PHISH, { now: 0 }))).toBe(true);
+    expect(semanticCanScore(analyzeDeterministic(LEGITIMATE, { now: 0 }))).toBe(false);
+  });
+
+  it('produces the same result from precomputed checks as from running them again', async () => {
+    const analyzer = fixedAnalyzer(semantic({ risk: 80, confidence: 0.9 }));
+    for (const { name, email } of loadAllFixtures()) {
+      const fresh = await analyze(email, analyzer, { now: 0 });
+      const reused = await refine(email, analyzeDeterministic(email, { now: 0 }), analyzer, { now: 0 });
+      expect(reused, name).toEqual(fresh);
+    }
   });
 });

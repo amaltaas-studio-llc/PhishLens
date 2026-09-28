@@ -28,6 +28,7 @@ function changed(patch: Partial<Settings>): ReturnType<typeof settingsImpact> {
  */
 const ALTERNATIVES: { [K in keyof Settings]: Settings[K] } = {
   aiMode: 'off',
+  aiOnlyWhenFlagged: false,
   highlightEnabled: false,
   showBadgeWhenLow: false,
   listMarksEnabled: true,
@@ -78,6 +79,15 @@ describe('settingsImpact', () => {
     const impact = changed({ showBadgeWhenLow: false });
     expect(impact.repaint).toBe(true);
     expect(impact.rescore).toBe(false);
+  });
+
+  /**
+   * A skipped reading is cached as settled, so switching the gate off must drop it — otherwise every
+   * message already opened keeps saying the model was not asked, under a setting that says it always is.
+   * It is not a new judge, though: the readings the model has already made are still its readings.
+   */
+  it('re-scores, without discarding the model, when the gate on asking it changes', () => {
+    expect(changed({ aiOnlyWhenFlagged: false })).toMatchObject({ rescore: true, remodel: false });
   });
 
   it('keeps the two annotations that own their own teardown separate', () => {

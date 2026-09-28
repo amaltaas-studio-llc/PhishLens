@@ -21,7 +21,7 @@ import type {
 import { isAborted } from '../shared/abort.js';
 import { logger } from '../shared/logger.js';
 import { buildContext, type AnalysisContext } from './context.js';
-import { semanticToSignals } from './llm/semantic-signals.js';
+import { isCorroborated, semanticToSignals } from './llm/semantic-signals.js';
 import { runRuleEngine } from './rules/index.js';
 import {
   applyFloor,
@@ -87,8 +87,23 @@ export async function analyze(
   analyzer: SemanticAnalyzer | null,
   options: AnalyzeOptions = {},
 ): Promise<AnalysisResult> {
+  return refine(email, analyzeDeterministic(email, options), analyzer, options);
+}
+
+/**
+ * `analyze()` for a caller that already has the deterministic result, so the rule engine runs once per
+ * message rather than once for the first paint and again under the model.
+ *
+ * `deterministic` must have been produced from `email` with the same options — in particular the same
+ * trust list, or the refined score would silently undo the trust the first paint applied.
+ */
+export async function refine(
+  email: EmailMessage,
+  deterministic: DeterministicResult,
+  analyzer: SemanticAnalyzer | null,
+  options: Pick<AnalyzeOptions, 'config' | 'now' | 'signal'> = {},
+): Promise<AnalysisResult> {
   const config = options.config ?? DEFAULT_SCORING_CONFIG;
-  const deterministic = analyzeDeterministic(email, options);
 
   if (analyzer === null) return withSemanticStatus(stripContext(deterministic), 'off');
 
@@ -114,8 +129,8 @@ export async function analyze(
 
 interface SemanticOutcome {
   analysis: SemanticAnalysis | null;
-  /** Never `pending` or `off`: this describes an attempt that has already finished. */
-  status: Exclude<SemanticStatus, 'pending' | 'off'>;
+  /** Never `pending`, `off` or `skipped`: this describes an attempt that has already finished. */
+  status: Exclude<SemanticStatus, 'pending' | 'off' | 'skipped'>;
 }
 
 /**
@@ -158,12 +173,24 @@ async function runSemanticSafely(
 /**
  * Whether the semantic stage reached an answer worth keeping for the rest of the session.
  *
- * The guard on what callers may cache. Only `ready` (the model answered) and `off` (it was deliberately
- * not asked) are conclusions about the message; the rest describe a moment — a model still downloading,
- * a timeout, an attempt cut short by navigation — and caching a moment makes it permanent.
+ * The guard on what callers may cache. Only `ready` (the model answered), `off` and `skipped` (it was
+ * deliberately not asked) are conclusions about the message; the rest describe a moment — a model still
+ * downloading, a timeout, an attempt cut short by navigation — and caching a moment makes it permanent.
  */
 export function isSemanticSettled(status: SemanticStatus | undefined): boolean {
-  return status === 'ready' || status === 'off';
+  return status === 'ready' || status === 'off' || status === 'skipped';
+}
+
+/**
+ * Whether a model's reading of this message could move its score.
+ *
+ * `false` when no technical check found anything that stands on its own, because an uncorroborated
+ * reading contributes nothing (`SEMANTIC_SCORING.uncorroboratedFactor`). The caller uses it to skip an
+ * inference whose only output would be a zero-point note — which is also why it must be the same
+ * predicate `semanticToSignals` scores by, and not a lookalike.
+ */
+export function semanticCanScore(result: Pick<AnalysisResult, 'signals'>): boolean {
+  return isCorroborated(result.signals);
 }
 
 /** Records how the semantic stage ended, without touching anything the rule engine decided. */

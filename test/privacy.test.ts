@@ -93,6 +93,12 @@ describe('normalizeSettings', () => {
     expect(normalizeSettings({ highlightEnabled: false }).highlightEnabled).toBe(false);
     expect(normalizeSettings({ showBadgeWhenLow: false }).showBadgeWhenLow).toBe(false);
     expect(normalizeSettings({ listMarksEnabled: true }).listMarksEnabled).toBe(true);
+    expect(normalizeSettings({ aiOnlyWhenFlagged: false }).aiOnlyWhenFlagged).toBe(false);
+  });
+
+  it('falls back to asking the model only about flagged mail for a malformed gate', () => {
+    expect(normalizeSettings({ aiOnlyWhenFlagged: 'no' }).aiOnlyWhenFlagged).toBe(true);
+    expect(normalizeSettings({}).aiOnlyWhenFlagged).toBe(true);
   });
 
   /**
@@ -114,6 +120,7 @@ describe('normalizeSettings', () => {
     expect(Object.keys(normalized).sort()).toEqual(
       [
         'aiMode',
+        'aiOnlyWhenFlagged',
         'backendBaseUrl',
         'highlightEnabled',
         'listMarksEnabled',

@@ -8,29 +8,46 @@
  *  - Every message-derived string reaches the DOM through `el({ text })`, i.e. `textContent`. No
  *    message content is ever parsed as HTML.
  *
+ * The card reads top to bottom in the order a reader asks their questions: how bad (the ring and the
+ * verdict), why (the findings, grouped by what they are about), what the model thought (kept apart),
+ * and how the number was reached (the breakdown). Three kinds of text are drawn three ways so they
+ * cannot be confused — PhishLens's own statements in plain prose, words from the email as quotations,
+ * and measured values (domains, destinations, filenames) as code.
+ *
  * All geometry is in `PANEL_CSS`; this file positions nothing. See docs/ARCHITECTURE.md §5.1.
  */
 import { assessmentSignals, observedSignals } from '../analysis/engine.js';
 import { distinctForDisplay, scoreFloor } from '../analysis/scoring/aggregate.js';
-import { CATEGORY_WEIGHTS } from '../analysis/scoring/config.js';
+import { ALL_CATEGORIES, CATEGORY_WEIGHTS } from '../analysis/scoring/config.js';
+import { truncate } from '../shared/text.js';
 import type {
   AnalysisResult,
+  AnalysisTiming,
   AiMode,
   EmailMessage,
   MessagePart,
   SecuritySignal,
+  SemanticAnalysis,
   SemanticStatus,
   SignalCategory,
 } from '../shared/types.js';
 import type { TrustState } from '../shared/trust.js';
-import { createShadowHost, el } from './dom.js';
+import { createShadowHost, el, svg } from './dom.js';
 import {
   AI_DISCLAIMER,
+  addedUp,
   aiAbsenceNote,
+  assessmentExplanation,
+  contributions,
   evidenceOf,
+  formatDuration,
   isLocatable,
+  joinCategories,
   messageReference,
   pendingLabel,
+  reasonParts,
+  scoreSummary,
+  timingLine,
   unreadableNotes,
 } from './format.js';
 import {
@@ -42,6 +59,12 @@ import {
 import { PANEL_CSS } from './styles.js';
 
 const HOST_ID = 'phishlens-panel-host';
+
+/** How often the running counter beside a pending reading is redrawn. */
+const ELAPSED_TICK_MS = 200;
+
+/** Ring geometry, in the SVG's own units. The rendered size is set in `PANEL_CSS`. */
+const RING = { size: 72, radius: 30, stroke: 8, gap: 1.6 } as const;
 
 /**
  * What trust means, at the moment the user is deciding.
@@ -59,6 +82,14 @@ const TRUST_NOTES: Readonly<Record<Exclude<TrustState['kind'], 'none'>, (entry: 
     `You trust ${entry}, but Gmail could not confirm that this message actually came from there — so that trust was not applied, and this score is exactly what it would be for any other sender.`,
 };
 
+/** The on-demand button, named for whatever would do the reading. */
+const ASK_LABELS: Readonly<Record<AiMode, string>> = {
+  off: 'Ask the on-device model',
+  local: 'Ask the on-device model',
+  cloud: 'Ask the analysis service',
+  server: 'Ask your model server',
+};
+
 export interface PanelCallbacks {
   /** Hover/focus a finding: highlight the corresponding item in the message. */
   onFocusSignal: (signal: SecuritySignal) => void;
@@ -66,6 +97,8 @@ export interface PanelCallbacks {
   onClose: () => void;
   /** Add or remove a trust entry. The card only ever offers the entry it was given. */
   onTrustChange: (entry: string, trusted: boolean) => void;
+  /** The reader asked for the AI reading the default settings skipped. */
+  onRunAssessment: () => void;
 }
 
 /**
@@ -81,6 +114,8 @@ export interface ResultView {
   aiMode: AiMode;
   email: EmailMessage;
   semantic: SemanticStatus;
+  /** How long the checks and the model took for this view, or `null` where nothing was measured. */
+  timing: AnalysisTiming | null;
   /** Whether this sender is trusted, could be, or neither. See `shared/trust.ts`. */
   trust: TrustState;
 }
@@ -111,6 +146,8 @@ export class Panel {
   #head: HTMLElement | null = null;
   #scroll: HTMLElement | null = null;
   #open = false;
+  /** Redraws the running counter while a reading is in flight. Owned here so closing stops it. */
+  #ticker: ReturnType<typeof setInterval> | null = null;
 
   constructor(callbacks: PanelCallbacks) {
     this.#callbacks = callbacks;
@@ -147,6 +184,7 @@ export class Panel {
   }
 
   close(): void {
+    this.#stopTicker();
     document.removeEventListener('keydown', this.#handleKeydown, true);
     this.#callbacks.onBlurSignal();
     this.#host?.remove();
@@ -185,6 +223,7 @@ export class Panel {
     const scroll = this.#scroll;
     if (panel === null || head === null || scroll === null) return;
 
+    this.#stopTicker();
     panel.setAttribute('data-state', view.kind === 'result' ? view.result.classification : 'unreadable');
 
     const offset = scroll.scrollTop;
@@ -194,14 +233,41 @@ export class Panel {
       scroll.replaceChildren(
         this.#renderObserved(view.result),
         this.#renderAssessment(view),
+        this.#renderBreakdown(view.result),
         ...(trust === null ? [] : [trust]),
-        this.#renderFoot(view.result),
+        this.#renderFoot(view),
       );
+      this.#startTicker(view);
     } else {
       head.replaceChildren(...this.#renderUnreadableHead(view.email));
       scroll.replaceChildren(this.#renderUnreadable(view));
     }
     scroll.scrollTop = offset;
+  }
+
+  /**
+   * Counts up beside a reading in flight, so a slow model reads as working rather than stuck.
+   *
+   * Driven from the start time on the view rather than from when this paint happened, so a repaint
+   * mid-reading — the reader toggling the card, a trust click — carries on from the true elapsed time
+   * instead of restarting from zero.
+   */
+  #startTicker(view: ResultView): void {
+    const started = view.timing?.aiStartedAt;
+    if (view.semantic !== 'pending' || started === undefined) return;
+    const counter = this.#root?.querySelector<HTMLElement>('.elapsed') ?? null;
+    if (counter === null) return;
+
+    const tick = (): void => {
+      counter.textContent = formatDuration(performance.now() - started);
+    };
+    tick();
+    this.#ticker = setInterval(tick, ELAPSED_TICK_MS);
+  }
+
+  #stopTicker(): void {
+    if (this.#ticker !== null) clearInterval(this.#ticker);
+    this.#ticker = null;
   }
 
   readonly #handleKeydown = (event: KeyboardEvent): void => {
@@ -211,11 +277,11 @@ export class Panel {
   };
 
   // -------------------------------------------------------------------------
-  // Sections
+  // Head
   // -------------------------------------------------------------------------
 
   /**
-   * Score, verdict, and which message this is about.
+   * Score, verdict, where the score came from, and which message this is about.
    *
    * The message reference is load-bearing: a card fixed in the corner is not visually attached to the
    * header it describes, so without naming the message a stale assessment looks like a current one.
@@ -226,25 +292,19 @@ export class Panel {
     return [
       this.#renderHeadTop(),
       el('div', {
-        class: 'score-row',
+        class: 'hero',
         children: [
-          el('span', { class: 'score-value', text: String(result.score) }),
-          el('span', { class: 'score-max', text: '/ 100' }),
-          el('span', {
-            class: 'verdict',
-            text: CLASSIFICATION_LABELS[state],
-            attrs: { 'data-state': state },
-          }),
-        ],
-      }),
-      el('div', {
-        class: 'meter',
-        attrs: { role: 'presentation' },
-        children: [
+          renderRing(result),
           el('div', {
-            class: 'meter-fill',
-            attrs: { 'data-state': state },
-            style: { width: `${String(result.score)}%` },
+            class: 'hero-text',
+            children: [
+              el('span', {
+                class: 'verdict',
+                text: CLASSIFICATION_LABELS[state],
+                attrs: { 'data-state': state },
+              }),
+              el('p', { class: 'summary', text: scoreSummary(result) }),
+            ],
           }),
         ],
       }),
@@ -275,7 +335,7 @@ export class Panel {
   /**
    * The head of a card with no score: the verdict slot says what did not happen instead.
    *
-   * No score number and no meter, rather than a zero and an empty bar. A 0/100 with an empty meter is
+   * No score number and no ring, rather than a zero and an empty circle. A 0/100 beside an empty ring is
    * the most reassuring thing this card could possibly display, and it would be showing it at the exact
    * moment the extension knows least about the message.
    */
@@ -290,15 +350,32 @@ export class Panel {
     ];
   }
 
-  /** Deterministic findings: things that were measured. */
+  // -------------------------------------------------------------------------
+  // What the checks found
+  // -------------------------------------------------------------------------
+
+  /**
+   * Deterministic findings: things that were measured.
+   *
+   * Grouped by category, in the order the ring draws them, so the largest slice of the ring is the
+   * first group a reader meets and the colour beside each group names the slice it accounts for.
+   * Findings that scored nothing go last under their own heading: they are context — authentication
+   * passed, a finding softened for a verified sender — and interleaving them with what raised the score
+   * makes the reasons harder to find.
+   */
   #renderObserved(result: AnalysisResult): HTMLElement {
     const signals = distinctForDisplay(observedSignals(result));
     const scoring = signals.filter((s) => s.score > 0);
     const notes = signals.filter((s) => s.score === 0);
 
+    const groups = categoryOrder(result)
+      .map((category) => ({ category, members: scoring.filter((s) => s.category === category) }))
+      .filter((group) => group.members.length > 0);
+
     return el('section', {
+      class: 'observed',
       children: [
-        el('h3', { class: 'section-title', text: 'Why' }),
+        el('h3', { class: 'section-title', text: 'What the checks found' }),
         el('p', {
           class: 'section-note',
           // "Nothing of concern" is only true when the notes below are transparency — authentication
@@ -311,15 +388,110 @@ export class Panel {
                 ? 'Observed — nothing counted towards the score, for the reasons given.'
                 : 'Observed — technical checks found nothing of concern.',
         }),
-        el('ul', {
-          children:
-            scoring.length > 0 || notes.length > 0
-              ? [...scoring, ...notes].map((s) => this.#renderFinding(s))
-              : [el('li', { children: [el('p', { class: 'empty', text: 'No findings.' })] })],
-        }),
+        ...groups.map((group) =>
+          this.#renderGroup(
+            CATEGORY_LABELS[group.category],
+            group.category,
+            `${String(result.categoryScores[group.category])} pts`,
+            group.members,
+          ),
+        ),
+        ...(notes.length > 0
+          ? [this.#renderGroup(scoring.length > 0 ? 'Also noted' : 'Noted', null, null, notes)]
+          : []),
+        ...(signals.length === 0 ? [el('p', { class: 'empty', text: 'No findings.' })] : []),
       ],
     });
   }
+
+  #renderGroup(
+    name: string,
+    category: SignalCategory | null,
+    points: string | null,
+    members: readonly SecuritySignal[],
+  ): HTMLElement {
+    return el('div', {
+      class: 'group',
+      children: [
+        el('div', {
+          class: 'group-head',
+          children: [
+            category === null
+              ? null
+              : el('span', { class: 'dot', attrs: { 'data-category': category, 'aria-hidden': 'true' } }),
+            el('span', { class: 'group-name', text: name }),
+            points === null ? null : el('span', { class: 'group-points', text: points }),
+          ],
+        }),
+        el('ul', { class: 'findings', children: members.map((s) => this.#renderFinding(s)) }),
+      ],
+    });
+  }
+
+  #renderFinding(signal: SecuritySignal): HTMLElement {
+    const locatable = isLocatable(signal);
+
+    return el('li', {
+      class: 'finding',
+      attrs: {
+        'data-locatable': locatable,
+        'data-category': signal.category,
+        tabindex: locatable ? 0 : undefined,
+        role: locatable ? 'button' : undefined,
+      },
+      on: locatable
+        ? {
+            mouseenter: () => {
+              this.#callbacks.onFocusSignal(signal);
+            },
+            mouseleave: () => {
+              this.#callbacks.onBlurSignal();
+            },
+            focus: () => {
+              this.#callbacks.onFocusSignal(signal);
+            },
+            blur: () => {
+              this.#callbacks.onBlurSignal();
+            },
+            click: () => {
+              this.#callbacks.onFocusSignal(signal);
+            },
+            keydown: (event) => {
+              if (event instanceof KeyboardEvent && (event.key === 'Enter' || event.key === ' ')) {
+                event.preventDefault();
+                this.#callbacks.onFocusSignal(signal);
+              }
+            },
+          }
+        : {},
+      children: [
+        el('div', {
+          class: 'finding-top',
+          children: [
+            el('p', { class: 'finding-title', text: signal.title }),
+            el('span', {
+              class: 'sev',
+              text: SEVERITY_LABELS[signal.severity],
+              attrs: { 'data-severity': signal.severity },
+            }),
+          ],
+        }),
+        el('p', { class: 'finding-desc', text: signal.description }),
+        renderEvidence(signal),
+        locatable
+          ? el('p', {
+              class: 'locate',
+              text: 'Show in message',
+              attrs: { title: 'Hover, or press Enter, to highlight this in the message' },
+            })
+          : null,
+      ],
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // The AI assessment
+  // -------------------------------------------------------------------------
 
   /**
    * The AI section. It states plainly when no model ran, because silence would let a user assume the
@@ -331,31 +503,197 @@ export class Panel {
     const note = aiAbsenceNote(view.semantic, view.aiMode);
 
     return el('section', {
+      class: 'assessment',
       children: [
         el('h3', { class: 'section-title', text: 'AI assessment' }),
-        /*
-         * `role="status"` on the spinner row: the interesting moment for a screen-reader user is the
-         * transition *out* of this state, and a polite live region announces the replacement without
-         * interrupting whatever they are reading.
-         */
-        ...(view.semantic === 'pending'
-          ? [
-              el('div', {
-                class: 'pending',
-                attrs: { role: 'status' },
-                children: [
-                  el('span', { class: 'spinner', attrs: { 'aria-hidden': 'true' } }),
-                  el('span', { text: pendingLabel(view.aiMode) }),
-                ],
-              }),
-            ]
-          : []),
+        view.semantic === 'pending' ? this.#renderPending(view.aiMode) : null,
         el('p', { class: 'ai-note', text: note ?? AI_DISCLAIMER }),
+        view.semantic === 'skipped' && view.aiMode !== 'off' ? this.#renderAsk(view.aiMode) : null,
         ...(signals.length > 0
-          ? [el('ul', { children: signals.map((s) => this.#renderFinding(s)) })]
+          ? signals.map((s) =>
+              s.id === 'llm.assessment'
+                ? this.#renderReading(s, view.result.semantic, view.result.categoryScores.llm)
+                : el('ul', { class: 'findings', children: [this.#renderFinding(s)] }),
+            )
           : note === null
             ? [el('p', { class: 'empty', text: 'The model returned no assessment for this message.' })]
             : []),
+      ],
+    });
+  }
+
+  /**
+   * `role="status"` on the label: the interesting moment for a screen-reader user is the transition
+   * *out* of this state, and a polite live region announces the replacement without interrupting
+   * whatever they are reading. The counter sits outside it, or every tick would be announced.
+   */
+  #renderPending(aiMode: AiMode): HTMLElement {
+    return el('div', {
+      class: 'pending',
+      children: [
+        el('span', { class: 'spinner', attrs: { 'aria-hidden': 'true' } }),
+        el('span', { text: pendingLabel(aiMode), attrs: { role: 'status' } }),
+        el('span', { class: 'elapsed', attrs: { 'aria-hidden': 'true' } }),
+      ],
+    });
+  }
+
+  #renderAsk(aiMode: AiMode): HTMLElement {
+    return el('button', {
+      class: 'action',
+      text: ASK_LABELS[aiMode],
+      attrs: { type: 'button' },
+      on: {
+        click: (event) => {
+          const button = event.currentTarget;
+          if (button instanceof HTMLButtonElement) button.disabled = true;
+          this.#callbacks.onRunAssessment();
+        },
+      },
+    });
+  }
+
+  /**
+   * The model's reading, laid out as a verdict with its particulars rather than as one paragraph.
+   *
+   * The facts a reader weighs it by — who read it, how high it rated the message, how sure it was, what
+   * it added — are chips, because they are values to compare rather than sentences to read. The
+   * explanation stays prose, and the model's reasons become a list with each quoted excerpt set apart,
+   * which is the part a reader can check against the message.
+   */
+  #renderReading(
+    signal: SecuritySignal,
+    analysis: SemanticAnalysis | undefined,
+    points: number,
+  ): HTMLElement {
+    const reasons = analysis?.reasons ?? [];
+    return el('div', {
+      class: 'reading',
+      children: [
+        el('p', { class: 'reading-title', text: signal.title }),
+        analysis === undefined
+          ? null
+          : el('div', {
+              class: 'chips',
+              children: [
+                el('span', { class: 'chip', text: sourceChip(analysis) }),
+                el('span', { class: 'chip', text: `Rated ${String(analysis.risk)}/100` }),
+                el('span', {
+                  class: 'chip',
+                  text: `${String(Math.round(analysis.confidence * 100))}% confident`,
+                }),
+                el('span', {
+                  class: 'chip',
+                  text: points > 0 ? `+${String(points)} points` : 'No points added',
+                  attrs: { 'data-scored': points > 0 },
+                }),
+              ],
+            }),
+        el('p', { class: 'finding-desc', text: assessmentExplanation(signal.description) }),
+        ...(reasons.length > 0
+          ? [
+              el('p', { class: 'reasons-label', text: 'The model’s reasons' }),
+              el('ul', {
+                class: 'reasons',
+                children: reasons.map((reason) =>
+                  el('li', {
+                    children: reasonParts(reason).map((part) =>
+                      part.quoted
+                        ? el('span', { class: 'quote', text: part.text })
+                        : document.createTextNode(part.text),
+                    ),
+                  }),
+                ),
+              }),
+            ]
+          : []),
+      ],
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // How the score adds up
+  // -------------------------------------------------------------------------
+
+  /**
+   * Shows the arithmetic. A score whose derivation is hidden is a score nobody can argue with.
+   *
+   * Each bar is against its category's own ceiling, not against 100 — the ring already shows shares of
+   * the total — so "18 of 25" says how close that category came to the most it can add. Categories that
+   * added nothing share one line: listing five empty bars pushes the two that matter out of view.
+   */
+  #renderBreakdown(result: AnalysisResult): HTMLElement {
+    const parts = contributions(result);
+    const silent = ALL_CATEGORIES.filter((c) => result.categoryScores[c] === 0);
+    const added = addedUp(result);
+
+    const rows: HTMLElement[] = parts.map(([category, value]) =>
+      el('li', {
+        class: 'row',
+        children: [
+          el('span', { class: 'dot', attrs: { 'data-category': category, 'aria-hidden': 'true' } }),
+          el('span', { class: 'row-name', text: CATEGORY_LABELS[category] }),
+          el('span', {
+            class: 'bar',
+            attrs: { 'aria-hidden': 'true' },
+            children: [
+              el('span', {
+                class: 'bar-fill',
+                attrs: { 'data-category': category },
+                style: { width: `${String(Math.min(100, (value / CATEGORY_WEIGHTS[category]) * 100))}%` },
+              }),
+            ],
+          }),
+          el('span', {
+            class: 'row-value',
+            text: `${String(value)} of ${String(CATEGORY_WEIGHTS[category])}`,
+          }),
+        ],
+      }),
+    );
+
+    // The categories add up to the score unless a severe finding set a minimum, in which case they add
+    // up to less. Saying so is the difference between a breakdown and arithmetic that looks broken.
+    if (result.score > added) {
+      const floor = scoreFloor(result.signals);
+      rows.push(
+        el('li', {
+          class: 'row floor',
+          children: [
+            el('span', { class: 'dot hatch', attrs: { 'aria-hidden': 'true' } }),
+            el('span', {
+              class: 'row-name',
+              text:
+                floor.basis === 'convergence'
+                  ? `Minimum for severe findings in ${joinCategories(floor.categories)}`
+                  : 'Minimum for a severe finding',
+            }),
+            el('span', { class: 'row-value', text: `+${String(result.score - added)}` }),
+          ],
+        }),
+      );
+    }
+
+    return el('section', {
+      class: 'breakdown',
+      children: [
+        el('h3', { class: 'section-title', text: 'How the score adds up' }),
+        rows.length > 0
+          ? el('ul', { class: 'rows', children: rows })
+          : el('p', { class: 'empty', text: 'No category added to the score.' }),
+        el('div', {
+          class: 'total',
+          children: [
+            el('span', { text: 'Score' }),
+            el('span', { class: 'total-value', text: `${String(result.score)} of 100` }),
+          ],
+        }),
+        silent.length > 0 && parts.length > 0
+          ? el('p', {
+              class: 'section-note silent',
+              text: `Nothing from ${joinCategories(silent)}.`,
+            })
+          : null,
       ],
     });
   }
@@ -435,108 +773,12 @@ export class Panel {
     });
   }
 
-  #renderFinding(signal: SecuritySignal): HTMLElement {
-    const locatable = isLocatable(signal);
-    const evidence = evidenceOf(signal);
-
-    return el('li', {
-      class: 'finding',
-      attrs: {
-        'data-locatable': locatable,
-        'data-category': signal.category,
-        tabindex: locatable ? 0 : undefined,
-        role: locatable ? 'button' : undefined,
-      },
-      on: locatable
-        ? {
-            mouseenter: () => {
-              this.#callbacks.onFocusSignal(signal);
-            },
-            mouseleave: () => {
-              this.#callbacks.onBlurSignal();
-            },
-            focus: () => {
-              this.#callbacks.onFocusSignal(signal);
-            },
-            blur: () => {
-              this.#callbacks.onBlurSignal();
-            },
-            click: () => {
-              this.#callbacks.onFocusSignal(signal);
-            },
-            keydown: (event) => {
-              if (event instanceof KeyboardEvent && (event.key === 'Enter' || event.key === ' ')) {
-                event.preventDefault();
-                this.#callbacks.onFocusSignal(signal);
-              }
-            },
-          }
-        : {},
-      children: [
-        el('span', {
-          class: 'sev',
-          text: SEVERITY_LABELS[signal.severity],
-          attrs: { 'data-severity': signal.severity },
-        }),
-        el('div', {
-          children: [
-            el('p', { class: 'finding-title', text: signal.title }),
-            el('p', { class: 'finding-desc', text: signal.description }),
-            ...(evidence !== null
-              ? [
-                  el('div', {
-                    class: 'evidence',
-                    children: [
-                      el('span', { class: 'evidence-label', text: evidence.label }),
-                      // Message-derived text, rendered as a text node.
-                      document.createTextNode(evidence.body),
-                    ],
-                  }),
-                ]
-              : []),
-            ...(locatable
-              ? [el('p', { class: 'locate-hint', text: 'Hover or press Enter to find this in the message' })]
-              : []),
-          ],
-        }),
-      ],
-    });
-  }
-
-  /** Shows the arithmetic. A score whose derivation is hidden is a score nobody can argue with. */
-  #renderFoot(result: AnalysisResult): HTMLElement {
-    const contributing = (Object.entries(result.categoryScores) as [SignalCategory, number][])
-      .filter(([, value]) => value > 0)
-      .sort((a, b) => b[1] - a[1]);
-
-    const chips = contributing.map(([category, value]) =>
-      el('span', {
-        text: `${CATEGORY_LABELS[category]} ${String(value)}/${String(CATEGORY_WEIGHTS[category])}`,
-      }),
-    );
-
-    // The categories add up to the score unless a severe finding set a minimum, in which case they add
-    // up to less. Saying so is the difference between a breakdown and arithmetic that looks broken.
-    const added = contributing.reduce((sum, [, value]) => sum + value, 0);
-    if (result.score > added) {
-      const floor = scoreFloor(result.signals);
-      chips.push(
-        el('span', {
-          class: 'floored',
-          text:
-            floor.basis === 'convergence'
-              ? `minimum ${String(result.score)} for severe findings in ${joinCategories(floor.categories)}`
-              : `minimum for this finding ${String(result.score)}`,
-        }),
-      );
-    }
-
+  #renderFoot(view: ResultView): HTMLElement {
+    const timing = timingLine(view.timing, view.semantic, view.aiMode);
     return el('div', {
       class: 'foot',
       children: [
-        chips.length > 0
-          ? el('div', { class: 'breakdown', children: chips })
-          : el('span', { text: 'No category contributed to the score.' }),
+        timing === null ? null : el('span', { class: 'timing', text: timing }),
         el('span', {
           text: 'Advisory only. PhishLens does not block links, downloads, or replies.',
         }),
@@ -545,12 +787,144 @@ export class Panel {
   }
 }
 
-/** "Links and Wording", "Sender, Links and Wording" — the same names the chips beside it use. */
-function joinCategories(categories: readonly SignalCategory[]): string {
-  const names = categories.map((c) => CATEGORY_LABELS[c]);
-  const last = names.pop();
-  if (last === undefined) return '';
-  return names.length === 0 ? last : `${names.join(', ')} and ${last}`;
+/**
+ * The categories in the order the ring draws them: by points, largest first, then the fixed order for
+ * ties and for categories that scored nothing.
+ */
+function categoryOrder(result: AnalysisResult): SignalCategory[] {
+  const scored = contributions(result).map(([category]) => category);
+  return [...scored, ...ALL_CATEGORIES.filter((c) => !scored.includes(c))];
+}
+
+/**
+ * The score as a ring of category slices around the number.
+ *
+ * Each slice is that category's share of the 100 points, in the colour its group and breakdown row
+ * carry, so "most of this came from the links" is visible before a word is read. A score raised to a
+ * minimum draws the raised part hatched, because it came from no category — it is the floor, and the
+ * breakdown row of the same pattern says so.
+ *
+ * Decorative by construction: `aria-hidden`, and nothing in it is text. The number in the middle and
+ * every label it depends on are ordinary text beside it.
+ */
+function renderRing(result: AnalysisResult): HTMLElement {
+  const { size, radius, stroke, gap } = RING;
+  const centre = size / 2;
+  const circumference = 2 * Math.PI * radius;
+
+  const arcs: SVGElement[] = [];
+  let offset = 0;
+  const arc = (length: number, attrs: Record<string, string>): void => {
+    if (length <= 0) return;
+    const drawn = length > gap * 2 ? length - gap : length;
+    arcs.push(
+      svg('circle', {
+        attrs: {
+          cx: centre,
+          cy: centre,
+          r: radius,
+          fill: 'none',
+          'stroke-width': stroke,
+          'stroke-dasharray': `${drawn.toFixed(2)} ${circumference.toFixed(2)}`,
+          'stroke-dashoffset': (-offset).toFixed(2),
+          ...attrs,
+        },
+      }),
+    );
+    offset += length;
+  };
+
+  for (const [category, value] of contributions(result)) {
+    arc((circumference * value) / 100, { class: 'seg', 'data-category': category });
+  }
+  const raised = result.score - addedUp(result);
+  if (raised > 0) arc((circumference * raised) / 100, { class: 'seg-floor', stroke: 'url(#phishlens-hatch)' });
+
+  return el('div', {
+    class: 'ring',
+    attrs: { 'data-state': result.classification },
+    children: [
+      svg('svg', {
+        attrs: {
+          viewBox: `0 0 ${String(size)} ${String(size)}`,
+          'aria-hidden': 'true',
+          focusable: 'false',
+        },
+        children: [
+          svg('defs', {
+            children: [
+              svg('pattern', {
+                attrs: {
+                  id: 'phishlens-hatch',
+                  width: 4,
+                  height: 4,
+                  patternUnits: 'userSpaceOnUse',
+                  patternTransform: 'rotate(45)',
+                },
+                children: [svg('rect', { attrs: { width: 2, height: 4, fill: 'currentColor' } })],
+              }),
+            ],
+          }),
+          svg('circle', {
+            class: 'track',
+            attrs: { cx: centre, cy: centre, r: radius, fill: 'none', 'stroke-width': stroke },
+          }),
+          svg('g', {
+            attrs: { transform: `rotate(-90 ${String(centre)} ${String(centre)})` },
+            children: arcs,
+          }),
+        ],
+      }),
+      el('div', {
+        class: 'ring-label',
+        children: [
+          el('span', { class: 'score-value', text: String(result.score) }),
+          el('span', { class: 'score-max', text: 'of 100' }),
+        ],
+      }),
+    ],
+  });
+}
+
+/**
+ * The evidence under a finding, drawn by kind — see `evidenceOf`.
+ *
+ * Message-derived text in every branch, and set as text in every branch.
+ */
+function renderEvidence(signal: SecuritySignal): HTMLElement | null {
+  const evidence = evidenceOf(signal);
+  if (evidence === null) return null;
+
+  if (evidence.kind === 'quote') {
+    return el('figure', {
+      class: 'evidence quote-block',
+      children: [
+        el('figcaption', { class: 'evidence-label', text: evidence.label }),
+        el('blockquote', { text: evidence.body }),
+      ],
+    });
+  }
+  return el('div', {
+    class: 'evidence',
+    children: [
+      el('span', { class: 'evidence-label', text: evidence.label }),
+      el('code', { class: 'code', text: evidence.body }),
+    ],
+  });
+}
+
+/** Who did the reading, short enough for a chip. The name comes from settings, never the response. */
+function sourceChip(analysis: SemanticAnalysis): string {
+  switch (analysis.source) {
+    case 'local':
+      return 'On-device model';
+    case 'cloud':
+      return 'Analysis service';
+    case 'server':
+      return analysis.model === undefined || analysis.model === ''
+        ? 'Your model server'
+        : truncate(analysis.model, 40);
+  }
 }
 
 /**

@@ -270,6 +270,12 @@ export type SemanticStatus =
   | 'pending'
   /** The user switched AI analysis off. */
   | 'off'
+  /**
+   * Not asked, because no technical check found anything for a reading to corroborate — and an
+   * uncorroborated reading scores nothing. A decision about cost, never a verdict: see
+   * `Settings.aiOnlyWhenFlagged`.
+   */
+  | 'skipped'
   /** No model in this browser, or the cloud backend is not configured. */
   | 'unavailable'
   /** The model ran but returned nothing that passed schema validation. */
@@ -282,6 +288,26 @@ export type SemanticStatus =
    * `isSemanticSettled`.
    */
   | 'cancelled';
+
+/**
+ * How long a view's analysis took, as the reader is shown it.
+ *
+ * Belongs to the view rather than to `AnalysisResult`: a result replayed from the session cache took
+ * no time at all the second time, and stamping the first visit's timings on it would report work that
+ * did not happen.
+ */
+export interface AnalysisTiming {
+  /** Milliseconds the technical checks took. */
+  checksMs: number;
+  /** Milliseconds the AI reading took, once it has finished. */
+  aiMs?: number;
+  /** `performance.now()` when the AI reading started, set only while it is running. */
+  aiStartedAt?: number;
+  /** The AI reading was one already made for identical text, rather than a new inference. */
+  aiReused: boolean;
+  /** The whole result was replayed from earlier in the session; nothing ran for this view. */
+  cached: boolean;
+}
 
 export interface SemanticAnalyzeOptions {
   /**
@@ -311,6 +337,15 @@ export type AiMode = 'off' | 'local' | 'cloud' | 'server';
 export interface Settings {
   /** Default is `local`: on-device only. Neither network mode is ever the default. */
   aiMode: AiMode;
+  /**
+   * Ask the model only when a technical check found something.
+   *
+   * On by default because on mail no check objects to, the model's reading is worth zero points by
+   * construction (`SEMANTIC_SCORING.uncorroboratedFactor`), and an on-device inference costs seconds of
+   * a laptop's CPU or GPU on every message opened. The card offers the reading on demand, so the only
+   * thing the default gives up is a sentence the reader did not ask for.
+   */
+  aiOnlyWhenFlagged: boolean;
   /** Highlight suspicious links/text in the message when a finding is focused. */
   highlightEnabled: boolean;
   /** Show the badge even for low-risk messages. */

@@ -19,6 +19,15 @@ import type { SecuritySignal, SemanticAnalysis, SemanticCategory, Severity } fro
 import { SEMANTIC_SCORING } from '../scoring/config.js';
 import { signal } from '../rules/types.js';
 
+/**
+ * Introduces the model's own reasons at the end of the description.
+ *
+ * Exported so the card can end the explanation where the reasons begin and list them from
+ * `SemanticAnalysis.reasons` instead — the description stays one self-contained string for every
+ * surface that shows it whole.
+ */
+export const REASONING_PREFIX = "Model's reasoning:";
+
 const CATEGORY_LABELS: Readonly<Record<SemanticCategory, string>> = {
   credential_phishing: 'credential phishing',
   brand_impersonation: 'brand impersonation',
@@ -78,8 +87,11 @@ function rawScore(analysis: SemanticAnalysis, corroborated: boolean): number {
  *
  * An `llm` signal cannot corroborate itself, and neither can a dampened one: dampening means a verified
  * sender already explains the finding, which is the opposite of independent support.
+ *
+ * Exported because it is also the gate on whether the model is asked at all: a reading of mail this
+ * returns `false` for scores zero, so the one function has to answer both questions or the two drift.
  */
-function isCorroborated(deterministic: readonly SecuritySignal[]): boolean {
+export function isCorroborated(deterministic: readonly SecuritySignal[]): boolean {
   return deterministic.some((s) => s.category !== 'llm' && s.score > 0 && s.dampened !== true);
 }
 
@@ -171,7 +183,7 @@ export function semanticToSignals(
 
   if (analysis.reasons.length > 0) {
     parts.push(
-      `Model's reasoning: ${analysis.reasons.map((r) => (r.endsWith('.') ? r : `${r}.`)).join(' ')}`,
+      `${REASONING_PREFIX} ${analysis.reasons.map((r) => (r.endsWith('.') ? r : `${r}.`)).join(' ')}`,
     );
   }
 
