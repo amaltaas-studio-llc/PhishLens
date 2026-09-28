@@ -1,6 +1,6 @@
 {
   "name": "phishlens",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "description": "Explainable phishing, malware and social-engineering risk analysis for Gmail, as a Chrome MV3 extension.",
   "license": "MIT",
