@@ -173,8 +173,9 @@ unless something records why. Two rules keep them apart:
 
 - `cancelled` is its own `SemanticStatus`, set whenever the signal is aborted, whether the adapter
   reported it by resolving to nothing or by rejecting.
-- `isSemanticSettled()` gates what may be cached: only `ready` (the model answered) and `off` (it was
-  deliberately not asked). `cancelled`, `error`, `no-output` and `unavailable` are not kept.
+- `isSemanticSettled()` gates what may be cached: only `ready` (the model answered), `off` (it was
+  deliberately not asked) and `skipped` (below). `cancelled`, `error`, `no-output` and `unavailable` are
+  not kept.
 
 The second rule matters because the cache short-circuits before the semantic stage runs, so a cached
 non-answer can never be retried and would stand for the life of the tab. With it, a one-off timeout does
@@ -191,6 +192,36 @@ setting watches the previous model's verdict reappear with nothing short of a re
 work is therefore abandoned and its generation invalidated before the clear, and the token is checked where
 a result is *cached* as well as where it is shown — an entry outlives the moment it was written, which is
 exactly what makes it worth more care than a repaint.
+
+#### 2.2.2 Not asking, and not asking twice
+
+On-device inference is the whole of PhishLens's cost: the checks take milliseconds, a reading takes
+seconds and a noticeable share of the machine. Two rules remove most of it without moving a single point.
+
+**The model is asked only when it could score.** An uncorroborated reading contributes zero
+(`uncorroboratedFactor`), so on mail where no deterministic signal corroborates, the answer the reader
+waits for cannot change the number. With `aiOnlyWhenFlagged` on — the default — the controller runs the
+checks, and when `semanticCanScore()` says no reading could count it records `skipped` instead of asking.
+That is a *settled* status, since asking again on the next visit would find the same nothing, and the card
+says what it means: not asked, the reason, *not a judgement that the message is safe*, and a button that
+asks now. The gate and the scoring rule are one predicate (`isCorroborated`), and a test asserts across
+every fixture that the gate never skips a message on which a reading could have scored — if the scoring
+rule moves, the gate moves with it rather than silently discarding points.
+
+**A reading is keyed by what the model was shown.** Gmail redraws a message when its authentication
+summary or attachment chips arrive late, which changes the view signature the result cache is keyed by and
+used to cost a whole second inference of an identical prompt. `content/readings.ts` keys readings by the
+prompt text itself (plus the signal ids, for the one source that is sent them): a redraw joins the
+inference in flight or replays the settled one, while a message whose visible text changed is asked
+afresh. It lives in the content script for the reason in §2.1, holds at most 50 entries, and is emptied
+whenever the model changes. The caller's abort signal is deliberately not forwarded to a shared
+inference, because the first caller moving on must not cancel the second; `cancelUnless()` abandons
+in-flight work explicitly when the reader has really left.
+
+The deterministic pass runs once per view either way: `refine()` takes the checks already computed for
+the badge rather than recomputing them under `analyze()`, and a test asserts the two paths produce the
+same result on every fixture. What each view cost — checks, reading, reused, or replayed from the result
+cache — is measured in the controller, not the engine, so `analysis/` stays free of clocks.
 
 ---
 
@@ -819,18 +850,43 @@ deterministic-only.
 
 Wording cannot fix it, because a single "no semantic result" value cannot distinguish a browser with no
 model, a model that declined to answer, an attempt that failed, and an inference still running. The engine
-therefore reports `meta.semanticStatus` (`ready` · `pending` · `unavailable` · `no-output` · `error` ·
-`cancelled` · `off`) and the card renders a distinct state for each. `PanelView` groups the render inputs
+therefore reports `meta.semanticStatus` (`ready` · `pending` · `skipped` · `unavailable` · `no-output` ·
+`error` · `cancelled` · `off`) and the card renders a distinct state for each. `PanelView` groups the render inputs
 into a single object for a related reason: the card is painted from several places, and a positional
 `(result, aiMode, email, pending)` signature invites a call site that updates the result and forgets the
 flag, which reintroduces exactly this problem.
 
-The pending state is deliberately understated: a small ring and one line of text, inside a `role="status"`
-region so the transition out of it is announced without interrupting a screen-reader user. It is a
-footnote about a refinement, not a loading screen — the deterministic verdict is already on screen and
-is already complete.
+The pending state is deliberately understated: a small spinner and one line of text, inside a
+`role="status"` region so the transition out of it is announced without interrupting a screen-reader user,
+and a seconds counter beside it that is `aria-hidden` because announcing every tick would be the
+interruption the status region avoids. It is a footnote about a refinement, not a loading screen — the
+deterministic verdict is already on screen and is already complete.
 
-### 5.3 Surfaces outside the open message
+### 5.3 What the card shows, and in what order
+
+The card is read by people who will never open the documentation, so its layout carries the model:
+
+- **The ring is the breakdown, not decoration.** Each segment is one category's contribution, in the same
+  colour as that category's heading and row below, and a floor's share is hatched in the verdict's colour.
+  It is `aria-hidden`, and nothing is conveyed by colour alone: every segment has a named row with its
+  points in "How the score adds up", and the one-line summary beside the ring says in words where the
+  score came from.
+- **Findings are grouped by category, heaviest first,** each group headed with its points, and findings
+  that scored nothing sit under "Also noted" rather than among the reasons for the score.
+- **Evidence says what kind of thing it is.** A measured value or link destination is labelled and set in
+  monospace; an excerpt of the email is a labelled, italic block quote. The three are what a reader most
+  needs to tell apart — *what we measured* from *what the sender wrote* — and prose styling alone did not.
+- **The model's reading stays in its own section,** with its source, rating, confidence and points as
+  chips, and its reasons as a list with each quoted excerpt set apart. It is never interleaved with the
+  findings, for the reason in §4.3.
+- **The footer says what the view cost:** checks and reading timed separately, or that a reading was
+  reused or not asked. A reader who cannot see that the model took nine seconds cannot decide whether it
+  is worth leaving on.
+
+The ring is built with a small `svg()` helper in `ui/dom.ts` that takes attributes and children only —
+it has no way to set text — so the no-HTML rule has no second path around it.
+
+### 5.4 Surfaces outside the open message
 
 Three places show something before or apart from a message being open. Each raises the same question — what
 can this surface honestly say with the evidence it has — and the answers differ enough to be worth writing
@@ -900,7 +956,7 @@ own list, which is worse than no mark.
 The feature is off by default. It is the only part of the extension that annotates mail the user has not
 chosen to look at, and that is a preference, not a default.
 
-### 5.4 Selector drift, made visible without telemetry
+### 5.5 Selector drift, made visible without telemetry
 
 §3.3 covers the loud failure: a message that cannot be read is not scored. The quiet one is worse. A
 selector group falls through to its third candidate, or one part of every message goes unread, and the
@@ -1076,7 +1132,7 @@ convention, not a control.
   deliberate one: a trust decision that did not outlive the tab would be useless. It holds addresses and
   registrable domains the user chose, nothing else — no subject, no score, no record of what was read — and
   it is visible and editable in the options page (§4.2.3).
-- **Extraction health is counted, never persisted and never sent** (§5.4). Counts and selector names only;
+- **Extraction health is counted, never persisted and never sent** (§5.5). Counts and selector names only;
   the copyable report is produced by pure functions over that data, which is what makes "it contains nothing
   from your mail" a test rather than a promise.
 - `src/shared/logger.ts` is the only logging surface. It is a no-op unless
@@ -1153,7 +1209,7 @@ each classification band, each `SemanticStatus`, light and dark — reachable in
 finding a suitable email. `scripts/screenshots.mjs` drives that same page to regenerate `docs/assets/`, so
 the images in the README are renders of the shipping components rather than mockups that drift from them.
 
-Its `view=list` mode is there for a different reason than the rest. Row markers (§5.3) fail by being *too
+Its `view=list` mode is there for a different reason than the rest. Row markers (§5.4) fail by being *too
 numerous* rather than by being wrong, and no assertion answers "would you leave this switched on" — so the
 harness renders the entire fixture corpus as one inbox, in markup mirroring `SELECTORS.listRow` and its
 neighbours, with the real scanner running over it. How many of twenty ordinary-looking rows come back marked

@@ -92,7 +92,7 @@ each state is a link:
 
 ```text
 ?fixture=microsoft-phish   any file in test/fixtures/
-?semantic=ready            ready | pending | unavailable | no-output | error | cancelled | off
+?semantic=ready            ready | pending | skipped | unavailable | no-output | error | cancelled | off
 ?ai=local                  local | server | cloud | off — which analyzer the card names
 ?missing=none              none | sender | subject — a part the adapter could not read. `sender`
                            withholds the score and shows the "Not checked" card; `subject` must not
@@ -101,6 +101,9 @@ each state is a link:
                            | list (the whole corpus as an inbox, with the real row scanner over it)
 ?card=1                    open the explanation card
 ?bare=1                    hide the harness controls, for screenshots
+?ms=4800                   how long the canned reading took, shown in the card's footer and as the
+                           running counter while pending
+?tall=1                    with view=card, lift the height cap to review the whole card in one image
 ```
 
 `view=list` is worth singling out. The row markers' failure mode is not a wrong verdict but too many of
@@ -125,7 +128,7 @@ UI change is one command away from being reflected in the README instead of sile
 
 ## Testing
 
-1255 tests, all in plain Node — no Chrome, no Gmail, no network. Four files ask for a DOM and get it from
+1288 tests, all in plain Node — no Chrome, no Gmail, no network. Five files ask for a DOM and get it from
 `jsdom`, which is why that is the only dev dependency here that is not a build or lint tool; see the note
 below the table.
 
@@ -149,7 +152,8 @@ below the table.
 | `test/observer-dom.test.ts` | The observer and adapter over a real `MutationObserver`: in-place collapse and evidence changes, visibility before the first readable extraction, nested message IDs, heading-only navigation, and debounce-first reconciliation. Needs a DOM. |
 | `test/list-marks.test.ts` | The list marker against inbox-shaped rows: that ordinary mail is left alone, that a recycled row is re-evaluated rather than trusted, that rows already on screen are re-triaged once Gmail exposes the signed-in address — which arrives after they do, and without which the check for a domain imitating the reader's own cannot run — that a mark Gmail discards when it redraws a row as read comes back, and that marking survives Gmail replacing the region being watched. Needs a DOM. |
 | `test/settings.test.ts` | What each setting asks of a view already on screen, with a guard that fails until a newly added setting is classified — "changes nothing" being the one answer that cannot be right for something offered as a choice. |
-| `test/controller.test.ts` | The orchestration's timing, with the model's answer held as a promise this file resolves by hand: that a settings change abandons the inference it supersedes, that the superseded answer reaches neither the screen nor the cache, that a presentation-only change leaves the inference running, and that a header Gmail redraws gets its badge back from the cache rather than from the model. Needs a DOM. |
+| `test/controller.test.ts` | The orchestration's timing, with the model's answer held as a promise this file resolves by hand: that a settings change abandons the inference it supersedes, that the superseded answer reaches neither the screen nor the cache, that a presentation-only change leaves the inference running, and that a header Gmail redraws gets its badge back from the cache rather than from the model. Also that a redraw joins or reuses a reading rather than asking twice, that clean mail is not sent to the model by default while flagged mail is, and that a reading asked for from the card is kept. Needs a DOM. |
+| `test/card.test.ts` | The rendered card: message text set as text even when it looks like markup, findings and the model's reading in separate sections, every ring segment named by a row beside it, the floor shown when a severe finding raised the score, and a skipped reading never worded as an all-clear. Also the card's wording helpers — durations, timing lines, quoted excerpts, score summaries. Needs a DOM. |
 
 **What the DOM tests prove, and what they cannot.** They prove the adapter's logic — that a details table
 becomes an `EmailAuthInfo`, that an unread part is reported rather than dropped. They do not prove the

@@ -23,7 +23,7 @@ The model returns structured data, never prose:
 interface SemanticAnalysis {
   risk: number;                  // 0-100, advisory
   categories: SemanticCategory[]; // from a fixed enum
-  reasons: string[];             // short justifications, rendered as text
+  reasons: string[];             // at most 3 short justifications, rendered as text
   confidence: number;            // 0-1
 }
 ```
@@ -162,7 +162,7 @@ pipeline produces a complete, correctly classified result with the `llm` categor
 zero, and the card *says* the model did not run — silence would let a reader assume the AI approved the
 message.
 
-### Seven statuses, because "no assessment" has several causes
+### Eight statuses, because "no assessment" has several causes
 
 `meta.semanticStatus` distinguishes them, and the card words each differently:
 
@@ -170,6 +170,7 @@ message.
 | --- | --- |
 | `ready` | An assessment was produced. |
 | `pending` | Inference is in flight; the score on screen may still change. |
+| `skipped` | Not asked, because no technical finding could corroborate a reading (below). The card offers to ask. |
 | `off` | The user switched AI analysis off. |
 | `unavailable` | No model in this browser, or no server/backend configured — nothing was sent. |
 | `no-output` | The model ran and returned nothing that passed schema validation. |
@@ -181,10 +182,38 @@ seconds, during which the deterministic score is already complete and on screen.
 this browser" and then replacing it with a verdict seconds later would teach a reader to disbelieve that
 message in the case where it is true, so the card shows a progress indicator for that window instead.
 
-**An interrupted assessment is retried, not remembered.** Only `ready` and `off` may be cached
+**An interrupted assessment is retried, not remembered.** Only `ready`, `skipped` and `off` may be cached
 (`isSemanticSettled`), because a cache hit short-circuits before the model is ever asked — so caching a
 non-answer would make it permanent for the life of the tab. A cancelled attempt, a one-off timeout, and a
 message read while Chrome was still downloading the model are all re-assessed on the next visit.
+
+### Asked only when it could count
+
+By default (**Only ask the AI when a technical check finds something**, in Settings), the model is not
+asked about a message on which no deterministic signal corroborates a reading. Guarantee 2 above already
+scores such a reading zero, so the seconds of inference could only ever produce text; skipping them is
+where most of the feature's cost goes on ordinary mail. The card says the model was not asked and why,
+states that this is not a judgement that the message is safe, and has a button to ask anyway, whose answer
+is kept for the rest of the session. Turning the setting off restores asking on every message. The gate
+uses the same predicate as the scoring rule, so it can never skip a reading that would have scored.
+
+Two further savings apply whichever way it is set:
+
+- **A reading is reused while the model would see the same thing.** Gmail redraws a message when its
+  authentication summary or attachments arrive late; the redraw joins the inference already running, or
+  reuses its answer, instead of asking again. Changing the model setting discards every kept reading.
+- **The prompt shape that worked is remembered.** Chrome builds differ in which prompt options they accept
+  (a response schema, the output-language hint, neither), and each rejected shape used to cost a failed
+  attempt on every message. The first shape that succeeds is tried first from then on, with the others
+  still behind it.
+
+The model is also asked for at most three reasons of 180 characters, rather than four of 240. On the
+synthetic evaluation cases, run against a local 9B model, this cut mean inference time by about 16% and
+output tokens by 13% with the same verdict on every case. The parser still accepts up to 240 characters,
+so a model that overshoots is not cut off mid-sentence.
+
+The footer of the card shows what each view cost — how long the checks and the reading took, or that the
+reading was reused or not asked — so the trade-off is visible rather than asserted.
 
 ## Operational rules
 

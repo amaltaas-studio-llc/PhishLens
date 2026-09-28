@@ -53,7 +53,7 @@ say. Both of these cards are the real component, rendered from the test fixtures
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/card-dark.png">
-  <img alt="The card scoring a message 76 out of 100, High Risk, with two critical findings: the sending domain imitates Microsoft, and a link places Microsoft's name in front of an unrelated domain." src="docs/assets/card-light.png">
+  <img alt="The card scoring a message 76 out of 100, High Risk, in a ring coloured by where the points came from, mostly links and sender. The first finding, marked critical, is that a link places Microsoft's name in front of an unrelated domain, with the real destination shown beneath it." src="docs/assets/card-light.png">
 </picture>
 
 **A brand imitation, 76/100.** The sending domain is a near-identical
@@ -65,7 +65,7 @@ Both findings name the evidence, so you can check them yourself.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/card-low-dark.png">
-  <img alt="The card scoring an ordinary supplier invoice 12 out of 100, Low Risk, with one low finding about the invoice request and a note that the attachment was named but never opened." src="docs/assets/card-low.png">
+  <img alt="The card scoring an ordinary supplier invoice 12 out of 100, Low Risk, all from wording: one low finding about the invoice request with the quoted sentence beneath it, and a note that the attachment was named but never opened." src="docs/assets/card-low.png">
 </picture>
 
 **An ordinary supplier invoice, 12/100.** The same checks run, and the
@@ -182,6 +182,11 @@ silences a finding about identity, links, or attachments. Nothing is hidden, and
 wording. The core checks work without it, and the model is capped: it cannot remove their findings or
 raise a score that the checks do not already support. Advanced users can point PhishLens at their own
 model server. [AI availability and setup →](docs/LOCAL-AI.md)
+
+To save time and battery, the AI is only asked about messages where a check has already found something,
+since on other mail its view could not change the score. The card says when it was not asked and offers
+a button to ask anyway, and a setting turns this off. The bottom of the card shows how long the checks and
+the AI took.
 
 ## Help and limitations
 
