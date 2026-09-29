@@ -54,6 +54,7 @@ The content script holds analysis state and the model session because MV3 worker
 | Brand table / PSL / TLDs | `src/shared/brands.ts`, `public-suffix.ts`, `tlds.ts` |
 | Gmail selectors | `src/gmail/selectors.ts` |
 | Badge / card | `src/ui/` |
+| Toolbar icon score | `src/shared/toolbar-badge.ts` (appearance); painted in `background/` |
 | On-device or server model | `src/analysis/llm/` |
 | Permissions / egress | `src/background/`, `src/manifest.json` |
 | Build / verify | `scripts/build.mjs`, [DEVELOPMENT.md](DEVELOPMENT.md) |

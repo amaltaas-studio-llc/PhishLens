@@ -6,16 +6,17 @@
  * `let cache = …`, no model session, no analysis state; every handler re-reads `chrome.storage` from
  * scratch and every message is self-contained. See docs/adr/0002-mv3-state-in-content-script.md.
  *
- * It does exactly three things, all of which are safe to lose at any instant:
+ * It does exactly four things, all of which are safe to lose at any instant:
  *   1. settings read/write
  *   2. the only place the extension opens a socket — the inert cloud path, and a model server the user
  *      runs themselves
  *   3. seeding defaults on install
+ *   4. painting the toolbar icon badge for the tab that asked (content scripts cannot call `chrome.action`)
  *
  * Egress lives here rather than in the content script so that there is one file to audit for it, and so
  * that a Gmail page's execution context never holds the ability to make requests. Every endpoint is
  * composed from a URL that has already passed validation in `shared/settings.ts`; none is ever taken
- * from a message.
+ * from a message. The badge appearance likewise arrives complete — the worker does not re-derive a score.
  *
  * It deliberately does **not** import the analysis engine or the on-device model adapter. Analysis
  * runs in the content script, where the execution context lives as long as the tab.
@@ -27,6 +28,7 @@ import {
   type ExtensionRequest,
   type ExtensionResponse,
   type ModelServerAnalyzeRequest,
+  type SetToolbarBadgeRequest,
 } from '../shared/messaging.js';
 import {
   DEFAULT_SETTINGS,
@@ -285,7 +287,10 @@ async function listModels(): Promise<ExtensionResponse> {
   }
 }
 
-async function handle(request: ExtensionRequest): Promise<ExtensionResponse> {
+async function handle(
+  request: ExtensionRequest,
+  sender: chrome.runtime.MessageSender,
+): Promise<ExtensionResponse> {
   switch (request.type) {
     case 'GET_SETTINGS':
       return { ok: true, type: 'SETTINGS', settings: await readSettings() };
@@ -297,6 +302,37 @@ async function handle(request: ExtensionRequest): Promise<ExtensionResponse> {
       return modelServerAnalyze(request);
     case 'LIST_MODELS':
       return listModels();
+    case 'SET_TOOLBAR_BADGE':
+      return setToolbarBadge(request, sender);
+  }
+}
+
+/**
+ * Applies a badge the content script already computed. `tabId` comes only from Chrome's `sender.tab`,
+ * never from the message body — a forged id in the payload could not retarget another tab.
+ */
+async function setToolbarBadge(
+  request: SetToolbarBadgeRequest,
+  sender: chrome.runtime.MessageSender,
+): Promise<ExtensionResponse> {
+  const tabId = sender.tab?.id;
+  if (tabId === undefined) {
+    return { ok: false, error: 'toolbar badge requires a tab' };
+  }
+  if (typeof request.text !== 'string' || request.text.length > 4) {
+    return { ok: false, error: 'invalid badge text' };
+  }
+  try {
+    await chrome.action.setBadgeText({ tabId, text: request.text });
+    await chrome.action.setTitle({ tabId, title: request.title });
+    if (request.text !== '') {
+      await chrome.action.setBadgeBackgroundColor({ tabId, color: request.background });
+      await chrome.action.setBadgeTextColor({ tabId, color: request.textColor });
+    }
+    return { ok: true, type: 'ACKNOWLEDGED' };
+  } catch (error) {
+    logger.debug('toolbar badge update failed', error);
+    return { ok: false, error: 'could not update toolbar badge' };
   }
 }
 
@@ -313,7 +349,7 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse): b
     return false;
   }
 
-  handle(message).then(sendResponse, (error: unknown) => {
+  handle(message, sender).then(sendResponse, (error: unknown) => {
     logger.debug('handler threw', error);
     sendResponse({ ok: false, error: 'internal error' } satisfies ExtensionResponse);
   });

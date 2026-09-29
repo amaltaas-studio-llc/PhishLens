@@ -31,6 +31,7 @@ import { GmailObserver, type ObserverEvent } from '../gmail/observer.js';
 import { logger } from '../shared/logger.js';
 import { isTabRequest, requestSettings, sendMessage, type TabResponse, type TabStatus } from '../shared/messaging.js';
 import { DEFAULT_SETTINGS, settingsImpact } from '../shared/settings.js';
+import { toolbarBadgeAppearance } from '../shared/toolbar-badge.js';
 import { trustState, withTrustedSender, withoutTrustedSender } from '../shared/trust.js';
 import type {
   AnalysisResult,
@@ -141,6 +142,7 @@ export class Controller {
     this.#badge.remove();
     this.#highlighter.dispose();
     this.#active = null;
+    this.#syncToolbarBadge();
   }
 
   // -------------------------------------------------------------------------
@@ -151,6 +153,7 @@ export class Controller {
     if (event.kind === 'no-message') {
       logger.debug('no message in view', { reason: event.reason });
       this.#teardownView();
+      this.#syncToolbarBadge();
       return;
     }
 
@@ -192,10 +195,12 @@ export class Controller {
       // thread is not a route change, so nothing has closed it: without this it would go on displaying
       // the previous message's score beside a badge saying this one was never checked.
       if (this.#panel.isOpen) this.#panel.open(this.#unreadableView(active));
+      this.#syncToolbarBadge();
       return;
     }
 
     this.#badge.setPending();
+    this.#syncToolbarBadge();
 
     // The deterministic result is rendered first and is complete on its own. If a semantic analyzer
     // is available, the score is then refined. This ordering means the user is never waiting on a
@@ -327,6 +332,7 @@ export class Controller {
     if (this.#panel.isOpen) {
       this.#panel.open(viewOf(active, result, this.#settings));
     }
+    this.#syncToolbarBadge();
   }
 
   /**
@@ -367,6 +373,19 @@ export class Controller {
     this.#highlighter.clear();
     this.#badge.remove();
     this.#active = null;
+  }
+
+  /**
+   * Mirrors the in-mail badge onto the toolbar icon for this tab.
+   *
+   * Fire-and-forget: a missed paint is corrected on the next status change, and waiting on the worker
+   * must not delay scoring. Appearance is computed here so the worker stays a dumb applicator.
+   */
+  #syncToolbarBadge(): void {
+    const appearance = toolbarBadgeAppearance(this.#status(), {
+      showBadgeWhenLow: this.#settings.showBadgeWhenLow,
+    });
+    void sendMessage({ type: 'SET_TOOLBAR_BADGE', ...appearance });
   }
 
   // -------------------------------------------------------------------------

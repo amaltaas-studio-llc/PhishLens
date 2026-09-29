@@ -87,7 +87,8 @@ email clients.
 2. Unzip it into a folder you will keep on your computer.
 3. Enter `chrome://extensions` in Chrome's address bar and turn on **Developer mode**.
 4. Click **Load unpacked** and select the extracted folder containing `manifest.json`.
-5. Open or refresh Gmail, then open a received message. Look for the badge beside the sender.
+5. Open or refresh Gmail, then open a received message. Look for the badge beside the sender — and
+   the score on the PhishLens toolbar icon, coloured by the same risk band.
 
 No model setup is needed to use the core checks. Pin PhishLens from Chrome's Extensions menu for quick
 access to its status and settings.
@@ -116,6 +117,9 @@ Published downloads can lag behind the source on this page; check the
 </details>
 
 ## What the badge means
+
+The score appears beside the sender and on the toolbar icon for the Gmail tab. Both use the same
+bands and colours; hiding low-risk badges in Settings clears the toolbar number too.
 
 The score summarises the evidence PhishLens found. It is not a percentage chance that the message is
 phishing.

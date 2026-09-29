@@ -6,6 +6,7 @@
  * by the same worker instance.
  */
 import { DEFAULT_SETTINGS } from './settings.js';
+import type { ToolbarBadgeAppearance } from './toolbar-badge.js';
 import type {
   Classification,
   MessagePart,
@@ -65,17 +66,27 @@ export interface ListModelsRequest {
   type: 'LIST_MODELS';
 }
 
+/**
+ * Paints the toolbar icon for the sending tab. Only the content script sends this; the worker applies
+ * it with `sender.tab.id` so a tab never sets another tab's badge.
+ */
+export interface SetToolbarBadgeRequest extends ToolbarBadgeAppearance {
+  type: 'SET_TOOLBAR_BADGE';
+}
+
 export type ExtensionRequest =
   | GetSettingsRequest
   | SetSettingsRequest
   | CloudAnalyzeRequest
   | ModelServerAnalyzeRequest
-  | ListModelsRequest;
+  | ListModelsRequest
+  | SetToolbarBadgeRequest;
 
 export type ExtensionResponse =
   | { ok: true; type: 'SETTINGS'; settings: Settings }
   | { ok: true; type: 'SEMANTIC'; analysis: SemanticAnalysis | null }
   | { ok: true; type: 'MODELS'; models: string[] }
+  | { ok: true; type: 'ACKNOWLEDGED' }
   | { ok: false; error: string };
 
 const REQUEST_TYPES: ReadonlySet<string> = new Set([
@@ -84,6 +95,7 @@ const REQUEST_TYPES: ReadonlySet<string> = new Set([
   'CLOUD_ANALYZE',
   'MODEL_SERVER_ANALYZE',
   'LIST_MODELS',
+  'SET_TOOLBAR_BADGE',
 ]);
 
 export function isExtensionRequest(value: unknown): value is ExtensionRequest {
