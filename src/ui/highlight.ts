@@ -16,6 +16,7 @@
  * the exact character range — a slightly coarser highlight in exchange for not restructuring Gmail's
  * DOM.
  */
+import { SELECTORS, queryAll, queryAllUnion } from '../gmail/selectors.js';
 import { collapseWhitespace } from '../shared/text.js';
 import type { SecuritySignal } from '../shared/types.js';
 import { normalizeDomain, parseUrl, unwrapRedirects } from '../shared/url.js';
@@ -25,6 +26,16 @@ import { HIGHLIGHT_CSS } from './styles.js';
 const HIGHLIGHT_CLASS = 'phishlens-highlight';
 const SUBTLE_CLASS = 'phishlens-highlight-subtle';
 const STYLE_ID = 'phishlens-highlight-style';
+
+/**
+ * Bounds on one text search, which runs on every hover and focus of a finding.
+ *
+ * Text nodes rather than elements, because reading each element's `textContent` re-reads everything
+ * beneath it: the cost of the obvious search is the body's length times its depth, and a message
+ * controls both. Past either bound the excerpt is simply not located, which costs a highlight.
+ */
+const MAX_TEXT_NODES = 5000;
+const MAX_SEARCH_CHARS = 200_000;
 
 export class Highlighter {
   #highlighted: Element[] = [];
@@ -118,8 +129,9 @@ function findAnchorsForUrl(bodyElement: Element, evidenceUrl: string): HTMLAncho
   const target = resolveKey(evidenceUrl);
   if (target === null) return [];
 
+  // Quoted anchors included, as they are in extraction: a link finding can come from either.
   const matches: HTMLAnchorElement[] = [];
-  for (const anchor of bodyElement.querySelectorAll('a[href]')) {
+  for (const anchor of queryAll(bodyElement, SELECTORS.bodyLink)) {
     if (!(anchor instanceof HTMLAnchorElement)) continue;
     const href = anchor.getAttribute('href');
     if (href === null) continue;
@@ -139,28 +151,69 @@ function resolveKey(href: string): string | null {
 /**
  * The deepest element whose text contains the excerpt.
  *
- * Deepest rather than first so the highlight is as tight as possible without splitting text nodes.
- * The excerpt may have been whitespace-collapsed and ellipsised when it was captured as evidence, so
- * both sides are collapsed and the ellipses trimmed before comparing.
+ * Deepest rather than first so the highlight is as tight as possible without splitting text nodes: the
+ * text is read once, the excerpt found in it, and the answer is the nearest element holding every text
+ * node the match touches. The excerpt may have been whitespace-collapsed and ellipsised when it was
+ * captured as evidence, so both sides are collapsed and the ellipses trimmed before comparing.
+ *
+ * Quoted history is searched only when the rest of the body does not hold the excerpt, mirroring
+ * `extractBody`, which reads the quotes only when nothing was written outside them. Searching them first
+ * would highlight the quoted original of a sentence the reply repeats.
  */
-function findSmallestElementContaining(root: Element, excerpt: string): Element | null {
+export function findSmallestElementContaining(root: Element, excerpt: string): Element | null {
   const needle = collapseWhitespace(excerpt.replace(/^…|…$/gu, '')).toLowerCase();
   if (needle.length < 8) return null;
 
-  let best: Element | null = null;
-  let bestLength = Number.POSITIVE_INFINITY;
+  const quoted = new Set(queryAllUnion(root, SELECTORS.quotedContent));
+  return (
+    locate(root, needle, (element) => quoted.has(element)) ??
+    (quoted.size > 0 ? locate(root, needle, () => false) : null)
+  );
+}
 
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
-  let node: Node | null = root;
-  while (node !== null) {
-    if (node instanceof Element) {
-      const content = collapseWhitespace(node.textContent).toLowerCase();
-      if (content.includes(needle) && content.length < bestLength) {
-        best = node;
-        bestLength = content.length;
-      }
-    }
-    node = walker.nextNode();
+interface TextSpan {
+  node: Text;
+  start: number;
+  end: number;
+}
+
+function locate(root: Element, needle: string, skip: (element: Element) => boolean): Element | null {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
+    acceptNode: (node) =>
+      node instanceof Element && skip(node) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+  });
+
+  // The body as one collapsed, lower-cased string, with each text node's range in it.
+  const spans: TextSpan[] = [];
+  let haystack = '';
+  let visited = 0;
+  for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+    if (!(node instanceof Text)) continue;
+    if (visited >= MAX_TEXT_NODES || haystack.length >= MAX_SEARCH_CHARS) break;
+    visited += 1;
+
+    let piece = node.data.replace(/\s+/gu, ' ').toLowerCase();
+    if (piece.startsWith(' ') && (haystack === '' || haystack.endsWith(' '))) piece = piece.slice(1);
+    if (piece === '') continue;
+    spans.push({ node, start: haystack.length, end: haystack.length + piece.length });
+    haystack += piece;
   }
-  return best;
+
+  const at = haystack.indexOf(needle);
+  if (at === -1) return null;
+  const end = at + needle.length;
+
+  const touched = spans.filter((span) => span.end > at && span.start < end);
+  const first = touched[0]?.node.parentElement ?? null;
+  return touched.reduce<Element | null>(
+    (common, span) => (common === null ? null : nearestCommon(common, span.node)),
+    first,
+  );
+}
+
+/** The nearest ancestor of `element` (itself included) that contains `node`. */
+function nearestCommon(element: Element, node: Node): Element | null {
+  let candidate: Element | null = element;
+  while (candidate !== null && !candidate.contains(node)) candidate = candidate.parentElement;
+  return candidate;
 }

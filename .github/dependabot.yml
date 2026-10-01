@@ -27,7 +27,9 @@ updates:
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
 
-  # Without this, action versions silently rot; they were three majors behind within months.
+  # Without this, action versions silently rot; they were three majors behind within months. Actions are
+  # pinned to commit SHAs with the version in a trailing comment, and Dependabot rewrites both together,
+  # so the pin costs nothing in upkeep. Do not drop the comments: they are how it reads the current version.
   - package-ecosystem: github-actions
     directory: /
     schedule:

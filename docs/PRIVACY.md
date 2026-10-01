@@ -11,7 +11,7 @@ for.
 | Manifest entry | Why it is needed |
 | --- | --- |
 | `"host_permissions": ["https://mail.google.com/*"]` | The content script reads the open message from the page in order to analyse it. This is the only origin PhishLens can run on. |
-| `"permissions": ["storage"]` | Persists the options-page settings (AI mode, backend URL, model server address and model name, two display toggles). No message content is ever written to storage. |
+| `"permissions": ["storage"]` | Persists the options-page settings (AI mode, backend URL, model server address and model name, the display toggles, whether AI runs only on flagged mail) and the trust list. No message content is ever written to storage. |
 | `"optional_host_permissions": ["http://localhost/*", "http://127.0.0.1/*", "https://*/*"]` | **Not granted at install.** If you configure your own model server, the options page requests access to that single origin on a click, and revokes it when the address changes. Chrome names the origin in the prompt. |
 
 The HTTPS entry is a broad pattern because Chrome grants only what a pattern in the manifest covers, and a
@@ -34,13 +34,16 @@ If a future feature seems to need something broader, that is a signal to reconsi
 ## Where data lives
 
 **Extracted from Gmail** — sender name and address, Reply-To, subject, visible body text (truncated,
-quoted replies removed), the anchor text and hrefs of links in that same part of the message, attachment filenames and extensions, the delivered-to
+quoted replies removed unless they are all the message has), the anchor text and hrefs of every link in the
+message, quoted parts included, since a sender can mark anything as a quote, attachment filenames and extensions, the delivered-to
 address, Gmail's own authentication summary when it is exposed in the DOM, and the names and addresses of
 whoever sent the earlier messages in the open conversation. That last one is needed to tell a reply from a
 party already in a thread from one imitating them, and like everything else it is read from what is
 already on screen: no message is fetched, and nothing outside the open thread is looked at. This lives in memory in the
 content script for as long as the message is on screen, then is dropped. It is never written to
-`chrome.storage`, never sent to the service worker, and never logged in a release build.
+`chrome.storage` and never logged in a release build. It reaches the service worker in one case only:
+with your own model server configured, the prompt — display name, subject and body excerpt — is handed
+to the worker, which is the one part of the extension allowed to make the request.
 
 **Analysed locally** — all of it. Every deterministic detector and the whole scoring engine run inside
 the tab, and so does Chrome's on-device model if you choose it; AI is off until you do. Nothing touches
@@ -154,7 +157,16 @@ The worker's only network capability is a request to a URL the user configured. 
 can supply an endpoint**: the analyze and list-models handlers read the address from settings, where it has
 already been through `normalizeModelBaseUrl`. Had the URL travelled in the message instead, anything able to
 send the worker a message would have had a general-purpose fetcher, which is a much larger thing to have
-built than a model client.
+built than a model client. Nor can a message supply the model's instructions: the worker adds the system
+prompt itself.
+
+Before every request the worker also checks that the user granted access to that origin, and refuses
+otherwise. Chrome does not enforce this by itself — without a host permission an extension's request still
+leaves as an ordinary cross-origin one, and reaches any server that accepts extension origins — so the grant
+is checked where the request is made. Settings that decide where content goes can be changed only from the
+extension's own pages; a Gmail tab may change the trust list and nothing else. No extension context can grant
+itself a host permission, so even settings edited some other way cannot direct a request at an origin the
+user did not approve.
 
 ### API-key exposure
 
@@ -164,7 +176,8 @@ path adds an `Authorization` header.
 ### Data exfiltration
 
 The default configuration makes no network requests at all. Both network modes require an explicit mode
-choice, an address, and — for a model server — a permission grant Chrome prompts for by origin. Cloud mode
+choice, an address, and a permission grant Chrome prompts for by origin, which the worker checks before
+each request. Cloud mode
 additionally passes everything through one reviewable redaction function, with the recipient address, sender
 local part, filenames, full URLs and message ids removed. Message bodies are never persisted and never
 logged in a release build. There is no telemetry, no analytics, no error reporting, and no update channel

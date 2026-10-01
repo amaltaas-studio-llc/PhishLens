@@ -18,6 +18,9 @@ const MAX_ELEMENTS_SCANNED = 4000;
 /** Ceiling on the descendants examined for an override, per candidate. */
 const MAX_ESCAPES_EXAMINED = 200;
 
+/** Ceiling on the ancestors between an override and its candidate. Mail nests deeply, but not this deep. */
+const MAX_ESCAPE_DEPTH = 64;
+
 /** Ceiling on distinct techniques reported, so one message cannot fill the panel. */
 const MAX_TECHNIQUES = 6;
 
@@ -79,12 +82,30 @@ interface HidingDeclaration {
    *
    * `display:none` and `opacity:0` cannot be escaped from inside: the subtree is not rendered, or is
    * composited at zero as a whole, whatever its children ask for. A zero font size is only the parent's
-   * own, and any descendant naming a size of its own is drawn at that size — which is the entire purpose
-   * of `font-size:0` on a container, since it collapses the whitespace between tags without touching the
-   * text inside them. Treating the container as hidden deletes a paragraph the reader is looking at.
+   * own, and a descendant naming a size that does not depend on the parent's is drawn at that size —
+   * which is the entire purpose of `font-size:0` on a container, since it collapses the whitespace between
+   * tags without touching the text inside them. Treating the container as hidden deletes a paragraph the
+   * reader is looking at.
+   *
+   * An escape frees the descendant and nothing else: the container's own text, and every sibling that
+   * did not escape, are still drawn at zero. See `findHiddenSubtrees`.
    */
   escapedBy?: RegExp;
 }
+
+/**
+ * A font size that does not scale with the parent's, so a zero above it is no longer inherited.
+ *
+ * `em`, `%`, `ex` and `ch` are deliberately absent: each is a multiple of the inherited size, and any
+ * multiple of zero is zero, so `font-size:1em` inside `font-size:0` hides exactly as well as nothing at
+ * all. `rem` is present because it is the exception that looks like the rule — it resolves against the
+ * root element, which here is Gmail's page, not the container. `initial` is `medium`. The values a hiding
+ * declaration would itself match (`1px`, `.05rem`) are excluded where this is consulted, not here.
+ */
+const ABSOLUTE_FONT_SIZE = new RegExp(
+  `${DECL}font-size\\s*:\\s*(?:(?:\\d+(?:\\.\\d+)?|\\.\\d+)\\s*(?:px|pt|pc|cm|mm|in|q|rem|vw|vh|vmin|vmax)|(?:xx-|x-)?small|medium|(?:x-|xx-|xxx-)?large|initial)${END}`,
+  'u',
+);
 
 const HIDING_DECLARATIONS: readonly HidingDeclaration[] = [
   { name: 'display:none', pattern: new RegExp(`${DECL}display\\s*:\\s*none`, 'u') },
@@ -93,7 +114,18 @@ const HIDING_DECLARATIONS: readonly HidingDeclaration[] = [
     pattern: new RegExp(`${DECL}visibility\\s*:\\s*(hidden|collapse)`, 'u'),
     escapedBy: new RegExp(`${DECL}visibility\\s*:\\s*visible`, 'u'),
   },
-  { name: 'opacity:0', pattern: new RegExp(`${DECL}opacity\\s*:\\s*${ZERO}${END}`, 'u') },
+  /*
+   * Zero, or close enough that nothing is legible: `opacity:0.01` is a common way of writing it, chosen
+   * because some clients drop an element whose opacity is exactly zero. Five percent is the ceiling —
+   * faded secondary text sits at a half or more, never anywhere near this.
+   */
+  {
+    name: 'opacity:0',
+    pattern: new RegExp(
+      `${DECL}opacity\\s*:\\s*(?:${ZERO}|0*\\.0[0-4]\\d*|0*\\.050*|(?:[0-4](?:\\.\\d+)?|5(?:\\.0+)?)%)${END}`,
+      'u',
+    ),
+  },
   /*
    * Zero at any unit, one to two *pixels*, or under a tenth of a relative unit. Not `1em`, which is
    * ordinary body text, and not `0.9em`, which is ordinary small print.
@@ -104,7 +136,7 @@ const HIDING_DECLARATIONS: readonly HidingDeclaration[] = [
       `${DECL}font-size\\s*:\\s*(?:${ZERO}\\s*[a-z%]*|[0-2](?:\\.\\d+)?\\s*(?:px|pt)|0?\\.0\\d*\\s*(?:em|rem|ex|ch|%))${END}`,
       'u',
     ),
-    escapedBy: new RegExp(`${DECL}font-size\\s*:`, 'u'),
+    escapedBy: ABSOLUTE_FONT_SIZE,
   },
   {
     name: 'height:0',
@@ -118,7 +150,11 @@ const HIDING_DECLARATIONS: readonly HidingDeclaration[] = [
   },
   {
     name: 'clipped',
-    pattern: new RegExp(`${DECL}(clip\\s*:\\s*rect\\(\\s*0|clip-path\\s*:\\s*inset\\(\\s*(100%|50%))`, 'u'),
+    // A top edge of zero is not an empty rectangle. Only unambiguously empty shapes qualify.
+    pattern: new RegExp(
+      String.raw`${DECL}(?:clip\s*:\s*rect\(\s*${ZERO}(?:px)?(?:(?:\s*,\s*|\s+)${ZERO}(?:px)?){3}\s*\)|clip-path\s*:\s*inset\(\s*(?:100%|50%)\s*\))${END}`,
+      'u',
+    ),
   },
   {
     name: 'moved off screen',
@@ -150,24 +186,55 @@ function declarationFor(technique: string): HidingDeclaration | undefined {
 }
 
 /**
- * Whether something inside the subtree is drawn in spite of the ancestor's declaration.
+ * The descendants drawn in spite of the ancestor's declaration, outermost only.
  *
  * Bounded like the outer scan, and inline styles only, for the same reason: a class rule Gmail rewrote is
  * not readable from here. The consequence is the safe one — a subtree whose override lives in a stylesheet
  * is still treated as hidden, which under-reports the body rather than inventing concealment.
+ *
+ * An override with no text in it frees nothing anyone could read. Counting it was how one empty
+ * `<span style="font-size:14px">` beside a paragraph of filler exempted the filler too.
  */
-function subtreeEscapes(element: Element, declaration: HidingDeclaration): boolean {
+function escapesFrom(element: Element, declaration: HidingDeclaration): Element[] {
   const escapedBy = declaration.escapedBy;
-  if (escapedBy === undefined) return false;
+  if (escapedBy === undefined) return [];
 
+  const escapes: Element[] = [];
   let examined = 0;
   for (const descendant of element.querySelectorAll('[style]')) {
     if (examined >= MAX_ESCAPES_EXAMINED) break;
     examined += 1;
 
+    // Document order, so only the most recent escape can contain this one.
+    if (escapes.at(-1)?.contains(descendant) === true) continue;
+
     const style = descendant.getAttribute('style')?.toLowerCase() ?? '';
     // A descendant restating the property *as another way of hiding* escapes nothing.
-    if (escapedBy.test(style) && hidingTechnique(style) === null) return true;
+    if (!escapedBy.test(style) || hidingTechnique(style) !== null) continue;
+    if (countContentChars(descendant.textContent) === 0) continue;
+    if (hiddenBetween(descendant, element, declaration)) continue;
+
+    escapes.push(descendant);
+  }
+  return escapes;
+}
+
+/**
+ * Whether something between an override and its candidate hides it in a way the override does not undo.
+ *
+ * `font-size:14px` inside `display:none` inside `font-size:0` is not drawn, and reading it as visible put
+ * text that nobody can see back into the body. A repeat of the candidate's own declaration is the one
+ * thing in between that the override does undo.
+ */
+function hiddenBetween(descendant: Element, candidate: Element, declaration: HidingDeclaration): boolean {
+  let node = descendant.parentElement;
+  for (let depth = 0; node !== null && node !== candidate; depth += 1) {
+    // Too deep to tell: treated as hidden, which keeps the text out of the body rather than in it.
+    if (depth >= MAX_ESCAPE_DEPTH) return true;
+    const technique = hidingTechnique(node.getAttribute('style') ?? '');
+    if (technique !== null && technique !== declaration.name) return true;
+    if (node.hasAttribute('hidden')) return true;
+    node = node.parentElement;
   }
   return false;
 }
@@ -189,9 +256,22 @@ export const VISIBILITY_ATTRIBUTES: readonly string[] = ['style', 'hidden'];
 
 const HIDING_CANDIDATES = VISIBILITY_ATTRIBUTES.map((name) => `[${name}]`).join(',');
 
+export interface HiddenSubtree {
+  element: Element;
+  /**
+   * Descendants drawn in spite of the declaration on `element`, which belong to the visible body.
+   *
+   * A caller removing the subtree puts these back in its place. Nothing hidden inside them is looked
+   * for, which errs towards keeping text in the body.
+   */
+  visible: Element[];
+  /** Content characters hidden: the subtree's, less those in `visible`. */
+  chars: number;
+}
+
 export interface HiddenScan {
-  /** Elements whose subtrees are hidden. Outermost only — a hidden child of a hidden parent is not extra. */
-  roots: Element[];
+  /** Hidden subtrees. Outermost only — a hidden child of a hidden parent is not extra. */
+  roots: HiddenSubtree[];
   techniques: string[];
 }
 
@@ -208,7 +288,7 @@ export interface HiddenScan {
  * wording out of the analysis while still showing it.
  */
 export function findHiddenSubtrees(root: Element): HiddenScan {
-  const roots: Element[] = [];
+  const roots: HiddenSubtree[] = [];
   const techniques = new Set<string>();
   let scanned = 0;
 
@@ -218,7 +298,7 @@ export function findHiddenSubtrees(root: Element): HiddenScan {
 
     // Document order, so an ancestor is always seen before its descendants — and since no root is
     // inside another, only the most recent one can contain this element.
-    if (roots.at(-1)?.contains(element) === true) continue;
+    if (roots.at(-1)?.element.contains(element) === true) continue;
 
     const technique =
       hidingTechnique(element.getAttribute('style') ?? '') ??
@@ -226,9 +306,18 @@ export function findHiddenSubtrees(root: Element): HiddenScan {
     if (technique === null) continue;
 
     const declaration = declarationFor(technique);
-    if (declaration !== undefined && subtreeEscapes(element, declaration)) continue;
+    const visible = declaration === undefined ? [] : escapesFrom(element, declaration);
+    let chars = countContentChars(element.textContent);
+    for (const escape of visible) chars -= countContentChars(escape.textContent);
 
-    roots.push(element);
+    /*
+     * Everything readable inside escaped, which is the newsletter wrapper this exists for. Not a root, so
+     * its descendants are still scanned on their own account. Only when an escape was found: a hidden
+     * element with no text and nothing escaping it is still reported, as it always was.
+     */
+    if (visible.length > 0 && chars <= 0) continue;
+
+    roots.push({ element, visible, chars: Math.max(0, chars) });
     if (techniques.size < MAX_TECHNIQUES) techniques.add(technique);
   }
 

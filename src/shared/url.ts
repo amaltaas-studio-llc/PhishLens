@@ -6,7 +6,8 @@
  * an ad-hoc regex will get wrong in exactly the ways an attacker is counting on.
  */
 import {
-  KNOWN_TRACKING_REDIRECTORS,
+  KNOWN_CLICK_TRACKERS,
+  KNOWN_SENDING_PLATFORMS,
   MULTI_LABEL_SUFFIXES,
   OPEN_HOSTING_SUFFIXES,
   URL_SHORTENERS,
@@ -235,12 +236,20 @@ export function isShortener(hostname: string): boolean {
   return URL_SHORTENERS.has(host) || URL_SHORTENERS.has(registrableDomain(host));
 }
 
-export function isKnownTrackingRedirector(hostname: string): boolean {
+/** A third party that sends or relays mail for its customers. Envelope hosts only; see the list. */
+export function isKnownSendingPlatform(hostname: string): boolean {
   const host = normalizeDomain(hostname);
-  return (
-    KNOWN_TRACKING_REDIRECTORS.has(host) ||
-    KNOWN_TRACKING_REDIRECTORS.has(registrableDomain(host)) ||
-    [...KNOWN_TRACKING_REDIRECTORS].some((d) => host.endsWith(`.${d}`))
+  return KNOWN_SENDING_PLATFORMS.has(host) || KNOWN_SENDING_PLATFORMS.has(registrableDomain(host));
+}
+
+/** The URL is a recognised click-tracking or link-protection endpoint. See `KNOWN_CLICK_TRACKERS`. */
+export function isKnownClickTracker(url: URL): boolean {
+  if (!WEB_SCHEMES.has(url.protocol)) return false;
+  const host = normalizeDomain(url.hostname);
+  return KNOWN_CLICK_TRACKERS.some(
+    (tracker) =>
+      (host === tracker.host || (tracker.subdomains === true && host.endsWith(`.${tracker.host}`))) &&
+      (tracker.path === undefined || tracker.path.test(url.pathname)),
   );
 }
 
@@ -290,6 +299,8 @@ export interface UnwrapResult {
   hops: number;
   /** The hostnames we passed through, outermost first. */
   chain: string[];
+  /** The URLs behind `chain`, outermost first: the input, then each target peeled from it. */
+  urls: URL[];
   /**
    * True when a redirect parameter was present but its value was not a parseable absolute URL —
    * i.e. the link looks like an open redirector but we cannot see the destination.
@@ -306,6 +317,7 @@ export interface UnwrapResult {
 export function unwrapRedirects(input: URL, maxHops = 3): UnwrapResult {
   let current = input;
   const chain: string[] = [normalizeDomain(input.hostname)];
+  const urls: URL[] = [input];
   let hops = 0;
   let opaqueRedirect = false;
 
@@ -318,10 +330,11 @@ export function unwrapRedirects(input: URL, maxHops = 3): UnwrapResult {
     }
     current = candidate.parsed;
     chain.push(normalizeDomain(current.hostname));
+    urls.push(current);
     hops += 1;
   }
 
-  return { url: current, hops, chain, opaqueRedirect };
+  return { url: current, hops, chain, urls, opaqueRedirect };
 }
 
 function extractRedirectTarget(url: URL): { parsed: URL | null } | null {

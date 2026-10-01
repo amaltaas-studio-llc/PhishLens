@@ -51,6 +51,42 @@ if (manifest.version !== pkg.version) {
   fail(`manifest version ${manifest.version} does not match package.json ${pkg.version}`);
 }
 
+// Chrome's own rule, which npm's semver does not share: `1.0.0-beta.1` is a valid package.json version
+// that produces a manifest Chrome refuses to load.
+const versionParts = typeof manifest.version === 'string' ? manifest.version.split('.') : [];
+if (
+  versionParts.length < 1 ||
+  versionParts.length > 4 ||
+  !versionParts.every((part) => /^(0|[1-9]\d{0,4})$/.test(part) && Number(part) <= 65535)
+) {
+  fail(`manifest version ${JSON.stringify(manifest.version)} is not 1-4 dot-separated integers of 0-65535`);
+}
+
+/*
+ * The README and docs/PRIVACY.md tell users exactly which permissions they are granting. A change here is
+ * a change to that promise, so it fails until this list — and both documents — are updated in the same
+ * commit. Optional host permissions are not listed: they are requested per origin on a click, and a
+ * default install never holds them.
+ */
+const EXPECTED_PERMISSIONS = ['storage'];
+const EXPECTED_HOST_PERMISSIONS = ['https://mail.google.com/*'];
+const sameList = (actual, expected) =>
+  Array.isArray(actual) &&
+  actual.length === expected.length &&
+  actual.every((value, i) => value === expected[i]);
+if (!sameList(manifest.permissions, EXPECTED_PERMISSIONS)) {
+  fail(
+    `manifest permissions are ${JSON.stringify(manifest.permissions)}, expected ` +
+      `${JSON.stringify(EXPECTED_PERMISSIONS)}; README.md and docs/PRIVACY.md advertise that set`,
+  );
+}
+if (!sameList(manifest.host_permissions, EXPECTED_HOST_PERMISSIONS)) {
+  fail(
+    `manifest host_permissions are ${JSON.stringify(manifest.host_permissions)}, expected ` +
+      `${JSON.stringify(EXPECTED_HOST_PERMISSIONS)}; README.md and docs/PRIVACY.md advertise that set`,
+  );
+}
+
 /** Every path the manifest points at, with the field that named it, for an error a reader can act on. */
 function referencedPaths(m) {
   const found = [];
@@ -115,12 +151,27 @@ for (const page of (await readdir(dist)).filter((f) => f.endsWith('.html'))) {
   }
 }
 
-// A sourcemap reference in a production bundle leaks the original sources and paths.
-for (const { file } of referenced.filter((r) => r.file.endsWith('.js'))) {
-  const p = path.join(dist, file);
-  if (!(await exists(p))) continue;
-  if ((await readFile(p, 'utf8')).includes('sourceMappingURL')) {
+/*
+ * Every bundle in dist/, not only those the manifest names: options, popup and welcome are loaded by HTML
+ * pages, for the same reason the page check above reads the directory.
+ *
+ * The HTML-sink names are a second line behind the ESLint ban. Lint sees only this repository's source;
+ * the bundle also contains whatever a future dependency or build plugin inlines, and a minified build
+ * carries no comments or wording that could mention these names innocently. If a legitimate occurrence
+ * ever appears, find where it came from before narrowing this — it is the property docs/adr/0008 states.
+ */
+const HTML_SINKS =
+  /\b(?:innerHTML|outerHTML|insertAdjacentHTML|createContextualFragment|setHTMLUnsafe|srcdoc|DOMParser)\b|\bdocument\.write(?:ln)?\b/;
+const bundles = (await readdir(dist, { recursive: true })).filter((f) => f.endsWith('.js'));
+for (const file of bundles) {
+  const source = await readFile(path.join(dist, file), 'utf8');
+  // A sourcemap reference in a production bundle leaks the original sources and paths.
+  if (source.includes('sourceMappingURL')) {
     fail(`${file} contains a sourcemap reference`);
+  }
+  const sink = HTML_SINKS.exec(source);
+  if (sink) {
+    fail(`${file} contains ${sink[0]}, an HTML sink; message content must reach the DOM as text only`);
   }
 }
 
@@ -135,5 +186,5 @@ if (problems.length > 0) {
 
 console.log(
   `dist/ looks loadable: manifest v${manifest.manifest_version}, version ${manifest.version}, ` +
-    `${referenced.length} referenced files present.`,
+    `${referenced.length} referenced files present, ${bundles.length} bundles clean.`,
 );

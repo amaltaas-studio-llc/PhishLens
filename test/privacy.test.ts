@@ -400,14 +400,14 @@ describe('buildCloudPayload: what is dropped', () => {
  */
 describe('buildCloudPayload never forwards raw header values', () => {
   const email = {
-    senderName: 'Fidelity Life Offer',
-    senderEmail: 'donot.reply.donot.reply@mt50sys.com',
+    senderName: 'Northwind Life Offer',
+    senderEmail: 'donot.reply.donot.reply@kv38mailer.com',
     subject: 'YOUR QUOTE IS READY',
     bodyText: 'Body text.',
     links: [],
     attachments: [],
     raw: {
-      senderEmail: 'DoNoT.rEpLy.DoNoT.rEpLy@mt50sys.com',
+      senderEmail: 'DoNoT.rEpLy.DoNoT.rEpLy@kv38mailer.com',
       subject: `YOUR QUOTE IS READY${' '.repeat(40)}`,
     },
   };
@@ -424,7 +424,7 @@ describe('buildCloudPayload never forwards raw header values', () => {
   });
 
   it('still forwards the fields it is supposed to', () => {
-    expect(payload.senderDomain).toBe('mt50sys.com');
+    expect(payload.senderDomain).toBe('kv38mailer.com');
     expect(payload.subject).toBe('YOUR QUOTE IS READY');
   });
 });
@@ -445,6 +445,30 @@ describe('redactAddresses', () => {
 
   it('leaves text without addresses untouched', () => {
     expect(redactAddresses('No addresses here at all.')).toBe('No addresses here at all.');
+  });
+
+  it('redacts a local part written outside ASCII', () => {
+    expect(redactAddresses('Contact josé.müller@example.de now')).toBe('Contact <address@example.de> now');
+  });
+});
+
+describe('cloud payload redaction at the edges of what is kept', () => {
+  const base = { senderEmail: 'a@example.com', links: [], attachments: [] };
+
+  it('redacts an address the body cut would otherwise split', () => {
+    // Cut first, this would end in `jane.doe@example` — no dot after the @, so no longer an address.
+    const bodyText = `${'x '.repeat(1994)}jane.doe@example.co.uk and more`;
+    const payload = buildCloudPayload({ ...base, subject: 's', bodyText }, []);
+    expect(payload.bodyExcerpt).not.toContain('jane.doe');
+  });
+
+  it('redacts addresses in the subject as well as the body', () => {
+    const payload = buildCloudPayload(
+      { ...base, subject: 'Re: invoice for sam.okafor@northwind-logistics.com', bodyText: 'b' },
+      [],
+    );
+    expect(payload.subject).not.toContain('sam.okafor');
+    expect(payload.subject).toContain('<address@northwind-logistics.com>');
   });
 });
 
@@ -548,7 +572,7 @@ describe('sanitizeCloudPayload: the contract re-imposed where the request is mad
       ...buildCloudPayload(RICH_EMAIL, []),
       recipientEmail: 'jane.okonkwo@northwind-logistics.com',
       messageId: 'thread-18f2a',
-      raw: { senderEmail: 'DoNoT.rEpLy@mt50sys.com' },
+      raw: { senderEmail: 'DoNoT.rEpLy@kv38mailer.com' },
     });
 
     for (const forbidden of ['recipientEmail', 'messageId', 'raw', 'senderEmail', 'senderName']) {

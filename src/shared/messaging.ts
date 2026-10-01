@@ -45,18 +45,18 @@ export interface CloudAnalyzeRequest {
 }
 
 /**
- * Prompt for a model server the user runs. The two strings are exactly what the on-device model is
+ * The message half of a prompt for a model server the user runs — exactly what the on-device model is
  * given, because that is the mode this one substitutes for.
  *
- * Note what is *not* here: no URL and no model name. The worker reads both from settings, so the only
- * address it can ever be made to call is one that survived `normalizeModelBaseUrl`. Accepting an
- * endpoint over this channel would make the worker a general-purpose fetcher for whatever could send
- * it a message.
+ * Note what is *not* here: no URL, no model name, and no system prompt. The worker reads the first two
+ * from settings, so the only address it can ever be made to call is one that survived
+ * `normalizeModelBaseUrl` and that the user granted access to. It supplies the system prompt itself, so
+ * whatever sends this message cannot rewrite the model's instructions. Accepting an endpoint over this
+ * channel would make the worker a general-purpose fetcher for whatever could send it a message.
  */
 export interface ModelServerAnalyzeRequest {
   type: 'MODEL_SERVER_ANALYZE';
   payload: {
-    system: string;
     user: string;
   };
 }

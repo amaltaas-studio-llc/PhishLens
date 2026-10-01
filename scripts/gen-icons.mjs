@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 /**
- * Generates the extension's PNG icons from code so the repository carries no binary blobs
- * (easier to security-review; nothing opaque in git). Draws a rounded shield with a lens cutout.
+ * Generates the extension's PNG icons from code, so the pixels that ship are reviewable as source rather
+ * than taken on trust. Draws a rounded shield with a lens cutout.
+ *
+ * Every build reruns this into assets/icons/. The PNGs there are also committed, because the README shows
+ * icon128.png and GitHub can only render a file that is in the repository. The output is deterministic, so
+ * a build leaves them byte-identical; a diff in assets/icons/ after building means this file changed and
+ * the regenerated icons belong in the same commit.
  */
 import { deflateSync } from 'node:zlib';
 import { writeFile, mkdir } from 'node:fs/promises';

@@ -18,12 +18,27 @@ import { countContentChars, findHiddenSubtrees, hidingTechnique } from '../src/g
 // Fake DOM
 // ---------------------------------------------------------------------------
 
-/** The smallest element the scan uses: attributes, descendants in document order, and containment. */
+/**
+ * The smallest element the scan uses: attributes, descendants in document order, containment, the parent
+ * chain, and text. An element's own text is drawn before its children's, which is enough to place filler
+ * beside an override rather than inside it.
+ */
 class FakeElement {
   readonly children: FakeElement[] = [];
   parent: FakeElement | null = null;
 
-  constructor(readonly attributes: Record<string, string> = {}) {}
+  constructor(
+    readonly attributes: Record<string, string> = {},
+    readonly text = '',
+  ) {}
+
+  get parentElement(): FakeElement | null {
+    return this.parent;
+  }
+
+  get textContent(): string {
+    return this.text + this.children.map((child) => child.textContent).join('');
+  }
 
   append(...children: FakeElement[]): this {
     for (const child of children) {
@@ -59,14 +74,26 @@ class FakeElement {
   }
 }
 
-function element(attributes: Record<string, string> = {}): FakeElement {
-  return new FakeElement(attributes);
+function element(attributes: Record<string, string> = {}, text = ''): FakeElement {
+  return new FakeElement(attributes, text);
 }
 
 function scan(root: FakeElement): { roots: number; techniques: string[] } {
   const result = findHiddenSubtrees(root as unknown as Element);
   return { roots: result.roots.length, techniques: result.techniques };
 }
+
+/** The content characters the scan would remove from the body, and what it would keep in their place. */
+function hiddenChars(root: FakeElement): { chars: number; kept: number } {
+  const result = findHiddenSubtrees(root as unknown as Element);
+  return {
+    chars: result.roots.reduce((sum, hidden) => sum + hidden.chars, 0),
+    kept: result.roots.reduce((sum, hidden) => sum + hidden.visible.length, 0),
+  };
+}
+
+const READABLE = 'Your consignment leaves the depot on Tuesday morning.';
+const FILLER = 'Pellentesque habitant morbi tristique senectus';
 
 // ---------------------------------------------------------------------------
 
@@ -85,6 +112,16 @@ describe('hidingTechnique', () => {
     expect(hidingTechnique('DISPLAY : NONE')).toBe('display:none');
     expect(hidingTechnique('color:#fff;   display:none')).toBe('display:none');
     expect(hidingTechnique('opacity:0.00;')).toBe('opacity:0');
+  });
+
+  /** Near zero is written as often as zero, by senders working around clients that drop zero. */
+  it('reads an opacity too faint to read as concealment, and faded text as visible', () => {
+    for (const style of ['opacity:0.01', 'opacity:.05', 'opacity:0.049', 'opacity:3%']) {
+      expect(hidingTechnique(style), style).toBe('opacity:0');
+    }
+    for (const style of ['opacity:0.06', 'opacity:0.5', 'opacity:.6', 'opacity:1', 'opacity:50%']) {
+      expect(hidingTechnique(style), style).toBeNull();
+    }
   });
 
   it('reports the most conclusive technique when several are combined', () => {
@@ -281,11 +318,74 @@ describe('findHiddenSubtrees', () => {
   it('leaves a zero font size alone when what is inside sets its own', () => {
     const root = element().append(
       element({ style: 'font-size:0;padding:4px 8px' }).append(
-        element({ style: 'font-size:14px;color:#333' }),
+        element({ style: 'font-size:14px;color:#333' }, READABLE),
       ),
     );
 
     expect(scan(root)).toEqual({ roots: 0, techniques: [] });
+  });
+
+  /**
+   * The same escape had been all-or-nothing: one descendant naming a size exempted the whole container,
+   * including text the container held itself. An empty override beside a paragraph of filler was enough to
+   * keep the filler in the body the content rules read.
+   */
+  it('does not let an empty override exempt the text beside it', () => {
+    const root = element().append(
+      element({ style: 'font-size:0' }, FILLER).append(element({ style: 'font-size:14px' })),
+    );
+
+    expect(scan(root)).toEqual({ roots: 1, techniques: ['font-size:0'] });
+    expect(hiddenChars(root).chars).toBeGreaterThan(30);
+  });
+
+  /** An override exempts itself and what is inside it, and the container's own text stays hidden. */
+  it('keeps only the overriding descendant visible, not the filler around it', () => {
+    const root = element().append(
+      element({ style: 'font-size:0' }, FILLER).append(element({ style: 'font-size:14px' }, READABLE)),
+    );
+
+    const result = hiddenChars(root);
+    expect(scan(root)).toEqual({ roots: 1, techniques: ['font-size:0'] });
+    expect(result.kept).toBe(1);
+    // The filler's letters, and none of the paragraph's.
+    expect(result.chars).toBe(FILLER.replace(/[^\p{L}\p{N}]/gu, '').length);
+  });
+
+  /**
+   * A size that is a multiple of the parent's is a multiple of zero. `1em` inside `font-size:0` is as
+   * invisible as no size at all, and reading it as an override let a container of hidden filler keep all
+   * of it in the body.
+   */
+  it('does not read a size relative to the hidden parent as an override', () => {
+    for (const size of ['1em', '100%', '1.2em', '2ex']) {
+      const root = element().append(
+        element({ style: 'font-size:0' }).append(element({ style: `font-size:${size}` }, FILLER)),
+      );
+      expect(scan(root), size).toEqual({ roots: 1, techniques: ['font-size:0'] });
+    }
+  });
+
+  /** `rem` is measured from the page's root, not the container, so it does escape — as do keywords. */
+  it('reads a size independent of the parent as an override', () => {
+    for (const size of ['1rem', '12pt', 'medium', 'small', '16px !important']) {
+      const root = element().append(
+        element({ style: 'font-size:0' }).append(element({ style: `font-size:${size}` }, READABLE)),
+      );
+      expect(scan(root), size).toEqual({ roots: 0, techniques: [] });
+    }
+  });
+
+  /** An override under something else that hides it is not drawn either. */
+  it('does not read an override as visible when something between hides it another way', () => {
+    const root = element().append(
+      element({ style: 'font-size:0' }).append(
+        element({ style: 'display:none' }).append(element({ style: 'font-size:14px' }, FILLER)),
+      ),
+    );
+
+    expect(scan(root)).toEqual({ roots: 1, techniques: ['font-size:0'] });
+    expect(hiddenChars(root).kept).toBe(0);
   });
 
   /** The concealment case is unchanged: nothing inside asks to be drawn, so nothing is. */
@@ -309,10 +409,19 @@ describe('findHiddenSubtrees', () => {
   /** `visibility` is the other inherited property a child can simply switch back on. */
   it('leaves a hidden subtree alone when a child makes itself visible again', () => {
     const root = element().append(
-      element({ style: 'visibility:hidden' }).append(element({ style: 'visibility:visible' })),
+      element({ style: 'visibility:hidden' }).append(element({ style: 'visibility:visible' }, READABLE)),
     );
 
     expect(scan(root)).toEqual({ roots: 0, techniques: [] });
+  });
+
+  /** And the same limit on it: switching visibility back on for nothing frees nothing. */
+  it('does not let an empty visible child exempt its hidden parent', () => {
+    const root = element().append(
+      element({ style: 'visibility:hidden' }, FILLER).append(element({ style: 'visibility:visible' })),
+    );
+
+    expect(scan(root)).toEqual({ roots: 1, techniques: ['visibility:hidden'] });
   });
 
   /** `display:none` and `opacity:0` cannot be escaped from inside, so no descendant is consulted. */
@@ -343,3 +452,22 @@ describe('findHiddenSubtrees', () => {
     expect(result.roots).toBeLessThanOrEqual(4000);
   });
 });
+
+
+describe('clipping with a visible area', () => {
+  it.each([
+    'position:absolute;clip:rect(0, 400px, 200px, 0)',
+    'clip-path:inset(50% 0 0 0)',
+    'clip-path:inset(50% 10px 0)',
+  ])('does not remove text inside %s', (style) => {
+    expect(hidingTechnique(style)).toBeNull();
+  });
+});
+
+
+it.each(['clip:rect(0,0,0,0)', 'clip:rect(0px 0px 0px 0px)', 'clip-path:inset(50%)', 'clip-path:inset(100%)'])(
+  'recognises an empty clipping shape: %s',
+  (style) => {
+    expect(hidingTechnique(style)).toBe('clipped');
+  },
+);

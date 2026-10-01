@@ -88,7 +88,15 @@ function impersonationWithCredentialAsk(
   signals: readonly SecuritySignal[],
   context: AnalysisContext,
 ): SecuritySignal[] {
-  const impersonation = matchedId(signals, [...IMPERSONATION_SIGNALS]);
+  // The medium half of `unsupported_org_claim` is generous by design — "shares no name with the sending
+  // domain" is also every recruiting, ticketing and survey platform writing on a customer's behalf — and
+  // "confirm your account" is what those platforms send. Pairing the two made a `critical` of a job
+  // application. Only the institutional claim, a bank or payment body writing from a personal mailbox,
+  // is impersonation certain enough to carry this finding.
+  const counted = signals.filter(
+    (s) => !(s.id === 'identity.unsupported_org_claim' && s.severity !== 'high'),
+  );
+  const impersonation = matchedId(counted, [...IMPERSONATION_SIGNALS]);
   const asksForCredentials = present(signals, [
     'content.credential_verification',
     'content.mfa_request',

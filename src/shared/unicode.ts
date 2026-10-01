@@ -147,13 +147,36 @@ export function hasSuspiciousScriptMixing(label: string): boolean {
 }
 
 /**
- * Unicode direction-override and invisible characters. In a filename these produce
- * `invoice_gnp.exe` rendering as `invoice_exe.png`; in display names they hide text.
+ * Characters that change which way text runs. In a filename these make `invoice_gnp.exe` render as
+ * `invoice_exe.png`: LRM/RLM, the embeddings and overrides, and the isolates.
  */
-const BIDI_AND_INVISIBLE = /[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff\u00ad\u180e]/u;
+const DIRECTION_CONTROL = '\\u200e\\u200f\\u202a-\\u202e\\u2066-\\u2069';
+
+/**
+ * Characters that render as nothing at all: zero-width space and joiners, word joiner and the invisible
+ * operators (U+2061–2064, which no mail has reason to contain), BOM, soft hyphen, the combining grapheme
+ * joiner, the Mongolian vowel separator, and the Hangul fillers, which are blank glyphs a name can be
+ * padded or split with. Variation selectors are not here: they pick an emoji's presentation, and
+ * stripping them would change ordinary text rather than reveal anything.
+ */
+const INVISIBLE =
+  '\\u00ad\\u034f\\u115f\\u1160\\u180e\\u200b-\\u200d\\u2060-\\u2064\\u3164\\ufeff\\uffa0';
+
+/**
+ * The one set every caller strips or reports, so a character cannot be hidden from one rule and visible
+ * to another: in display names these hide text, in filenames they split or reverse an extension, and in
+ * the body they break a keyword (`pass\u2062word`) past every content rule.
+ */
+const BIDI_AND_INVISIBLE = new RegExp(`[${DIRECTION_CONTROL}${INVISIBLE}]`, 'u');
+const DIRECTION_CONTROL_ANY = new RegExp(`[${DIRECTION_CONTROL}]`, 'u');
 
 export function hasBidiOrInvisible(text: string): boolean {
   return BIDI_AND_INVISIBLE.test(text);
+}
+
+/** Only the characters that reorder text, as distinct from those that merely hide in it. */
+export function hasDirectionControl(text: string): boolean {
+  return DIRECTION_CONTROL_ANY.test(text);
 }
 
 /**
@@ -203,7 +226,11 @@ const CONFUSABLE_MAP: Readonly<Record<string, string>> = {
   л: 'n', м: 'm', н: 'h', о: 'o', п: 'n', р: 'p', с: 'c', т: 't', у: 'y', ф: 'o', х: 'x',
   ц: 'u', ч: 'h', ш: 'w', щ: 'w', ъ: 'b', ы: 'bi', ь: 'b', э: 'e', ю: 'io', я: 'r',
   ѕ: 's', і: 'i', ј: 'j', ԁ: 'd', ԛ: 'q', ԝ: 'w', ѡ: 'w', ғ: 'f', ҫ: 'c', ұ: 'y',
-  // Greek
+  һ: 'h', ӏ: 'l', Ӏ: 'l',
+  // Latin letters outside ASCII that are drawn as ASCII ones
+  ɑ: 'a', ɡ: 'g', ɩ: 'i', ʀ: 'r', ᴄ: 'c', ᴏ: 'o', ᴠ: 'v', ᴡ: 'w', ᴢ: 'z',
+  // Greek. Capitals are listed separately because they look like Latin capitals, not like their own
+  // lowercase: `Η` is an H, while `η` reads as an n. `skeleton` consults this table before lowercasing.
   α: 'a', β: 'b', γ: 'y', δ: 'd', ε: 'e', ζ: 'z', η: 'n', θ: '0', ι: 'i', κ: 'k', λ: 'l',
   μ: 'u', ν: 'v', ο: 'o', π: 'n', ρ: 'p', σ: 'o', τ: 't', υ: 'u', φ: 'o', χ: 'x', ψ: 'w',
   ω: 'w', ϲ: 'c', ϳ: 'j', Ρ: 'p', Α: 'a', Β: 'b', Ε: 'e', Ζ: 'z', Η: 'h', Ι: 'i', Κ: 'k',
@@ -261,12 +288,15 @@ const IL_FAMILY = /[i!¡]/g;
 export function skeleton(input: string): string {
   const normalized = stripBidiAndInvisible(input)
     .normalize('NFKD')
-    .replace(/\p{Mn}/gu, '') // drop combining marks left behind by NFKD
-    .toLowerCase();
+    .replace(/\p{Mn}/gu, ''); // drop combining marks left behind by NFKD
 
+  // The table is consulted on the character as written, then on its lowercase. Lowercasing first made
+  // every capital entry unreachable and read a Greek `Η` as its lowercase `η`, an n — so `ΗSBC` and
+  // `HSBC` did not compare equal.
   let folded = '';
   for (const ch of normalized) {
-    folded += CONFUSABLE_MAP[ch] ?? ch;
+    const lower = ch.toLowerCase();
+    folded += CONFUSABLE_MAP[ch] ?? CONFUSABLE_MAP[lower] ?? lower;
   }
   for (const [pattern, replacement] of MULTI_CHAR_CONFUSABLES) {
     folded = folded.replace(pattern, replacement);

@@ -35,7 +35,9 @@ Asserted in `test/semantic.test.ts`:
 Display name, subject, and body (body capped). **No** sending domain, Reply-To, link destinations, or
 attachment types — those are checked in `analysis/rules/` from the real values. The prompt asks for the
 requested action before tone; concerning reasons should quote a short excerpt from the mail (any language)
-and explain in English.
+and explain in English. Each reason is asked to be one sentence of at most 15 words, so it reads as one
+line on the card; the parser allows up to 20 and cuts anything longer on a sentence or word boundary,
+never mid-word. The limits are `reasonWords` and `maxReasonWords` in `scoring/config.ts`.
 
 Calibration also applies a dead zone (low risk scores zero) and drops routine categories from the headline
 when they add nothing. Details of thresholds live next to scoring config; see
@@ -72,7 +74,8 @@ while the prompt would be unchanged; cancelled or failed attempts are not cached
 - `temperature: 0`, `topK: 1` where supported; JSON schema constraint with unconstrained retry.
 - Declare English **output**; where accepted, input languages `en`, `de`, `es`, `fr`, `ja`. Availability
   probes stay output-only.
-- Malformed JSON → discard entirely (no partial salvage).
+- Malformed JSON, or a missing `risk`, `confidence` or usable reason → discard entirely. Within the lists,
+  a non-string reason or an unknown category is dropped rather than failing the whole answer.
 - 20 s inference timeout; one prompt at a time (queued); cancel via `AbortSignal`.
 - Session lives in the **content script**; each message uses a clone (or a fresh session) so prior mail
   cannot steer later verdicts.
@@ -84,8 +87,10 @@ Settings → AI mode **Model server**. OpenAI-compatible `POST …/chat/completi
 corroboration rules — a larger model buys better reasons, not more weight.
 
 - Base URL from settings; `http:` only for loopback; otherwise `https:`.
-- Optional host permission requested per origin on a click from the options page.
-- Endpoint never arrives in a runtime message ([adr/0009](adr/0009-model-server-and-inert-cloud.md)).
+- Optional host permission requested per origin on a click from the options page, and checked by the
+  worker before every request — Chrome alone would still send an ungranted one.
+- Endpoint and system prompt never arrive in a runtime message
+  ([adr/0009](adr/0009-model-server-and-inert-cloud.md)); a Gmail tab can change only the trust list.
 
 ## Cloud
 

@@ -13,7 +13,7 @@
  *    condition was unsatisfiable against what `extractAuth` can actually read. The feature was
  *    unreachable in production and green in CI.
  *  - `extractBody` strips quoted replies and `extractLinks` did not, because no test ever ran both over
- *    one tree.
+ *    one tree. (They still disagree, now on purpose and asserted here: see "quoted content".)
  *
  * **What these tests do and do not prove.** They prove the adapter's logic: that a details table becomes
  * an `EmailAuthInfo`, that a quoted reply is excluded, that an unread part is reported as unread rather
@@ -29,7 +29,10 @@
  * Keep the markup *valid*. An HTML parser silently discards a `<td>` that is not inside a row, so invalid
  * fixture markup does not fail — it quietly tests a different tree than the one written here.
  */
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { analyzeDeterministic } from '../src/analysis/engine.js';
+import { loadFixture } from './fixtures/load.js';
 
 import { isScorable } from '../src/gmail/adapter.js';
 import { GmailDomAdapter } from '../src/gmail/dom-adapter.js';
@@ -158,25 +161,26 @@ describe('reading an ordinary message out of the page', () => {
   });
 
   /**
-   * The two halves of one extraction have to agree about what the message is. `extractBody` has always
-   * dropped quoted replies; `extractLinks` read them, so replying to a phish contributed the phish's
-   * links — scored against the person who replied — while the sentences that would explain them were
-   * already gone. Asserted in both directions, because "ignore quoted content" is easy to overshoot into
-   * ignoring the reply itself.
+   * A genuine reply: what was written is read, and what it quotes is not read as its wording. Its links
+   * are read regardless — which block is "quoted" is decided by a class the sender can write, and a link
+   * kept out of the analysis by one is still on screen to be clicked.
    */
-  it('reads links the sender wrote and not links they quoted', () => {
+  it('reads a reply’s own words, and every link including the ones it quotes', () => {
     render({
       body: 'Is this genuine? I have not clicked anything.',
       links: [['our usual portal', 'https://portal.northwind-logistics.com/login']],
       quoted:
-        'From: security@paypa1-alerts.example<br><a href="https://paypa1-alerts.example/verify">Verify your account now</a>',
+        'From: security@northwind-alerts.example<br><a href="https://northwind-alerts.example/verify">Verify your account now</a>',
     });
 
-    const { email } = extract();
+    const { email, missing } = extract();
+    expect(email.bodyText).toContain('Is this genuine?');
+    expect(email.bodyText).not.toContain('Verify your account');
     expect(email.links.map((l) => l.href)).toEqual([
       'https://portal.northwind-logistics.com/login',
+      'https://northwind-alerts.example/verify',
     ]);
-    expect(email.bodyText).not.toContain('Verify your account');
+    expect(missing).toEqual([]);
   });
 
   it('reads attachment filenames from the footer chips', () => {
@@ -250,6 +254,114 @@ describe('reading an ordinary message out of the page', () => {
 
     expect(missing).toEqual([]);
     expect(isScorable(missing)).toBe(true);
+  });
+
+  /** Filler beside a paragraph that sets its own size: the paragraph is read, the filler is not. */
+  it('keeps an overriding paragraph in the body and counts the filler around it as hidden', () => {
+    const filler = 'Pellentesque habitant morbi tristique senectus et netus. '.repeat(4);
+    render({
+      bodyHtml: `<div style="font-size:0">${filler}<p style="font-size:14px">Your consignment leaves the depot on Tuesday morning.</p></div>`,
+    });
+
+    const { email, missing } = extract();
+    expect(email.bodyText).toContain('leaves the depot on Tuesday');
+    expect(email.bodyText).not.toContain('Pellentesque');
+    expect(email.hiddenText?.techniques).toEqual(['font-size:0']);
+    expect(email.hiddenText?.chars).toBeGreaterThan(100);
+    expect(missing).toEqual([]);
+  });
+});
+
+/**
+ * Quoted content, which is removed from the body text and nothing else.
+ *
+ * The selectors that find it are matched against markup inside the message, and the sender writes some of
+ * that markup. So the property asserted is not that a quote is always recognised correctly, but that
+ * recognising one wrongly can cost wording at most — never the whole message, and never its links.
+ */
+describe('quoted content', () => {
+  /**
+   * Gmail prefixes a sender's classes, so `pull-quote` arrives as `m_42pull-quote` — which a substring
+   * match on "quote" still found. Wrapping a whole message in one emptied its body, the observer read the
+   * empty message as one still loading, and it was never assessed at all: no score and no badge.
+   */
+  it('reads a body wrapped in a sender class that merely contains "quote"', () => {
+    render({
+      bodyHtml: `<div class="m_42pull-quote"><p>Your mailbox is full. Sign in within 24 hours to keep receiving mail.</p>
+        <a href="https://northwind-mailbox.example/login">Sign in</a></div>`,
+    });
+
+    const { email, missing } = extract();
+    expect(email.bodyText).toContain('Sign in within 24 hours');
+    expect(email.links.map((l) => l.href)).toEqual(['https://northwind-mailbox.example/login']);
+    expect(missing).toEqual([]);
+  });
+
+  /**
+   * `.gmail_quote` is only a class, and a sender can write it. Nothing outside the "quote" means there is
+   * nobody else for its wording to be attributed to, so it is read rather than leaving an empty body.
+   */
+  it('reads the quoted text when nothing was written outside it', () => {
+    render({
+      bodyHtml: `<div class="gmail_quote"><p>Your mailbox is full. Sign in within 24 hours to keep receiving mail.</p>
+        <a href="https://northwind-mailbox.example/login">Sign in</a></div>`,
+    });
+
+    const { email, missing } = extract();
+    expect(email.bodyText).toContain('Sign in within 24 hours');
+    expect(email.links).toHaveLength(1);
+    expect(missing).toEqual([]);
+  });
+
+  /** The forwarded message Gmail builds the same way: the forward is the whole of what there is to read. */
+  it('reads a forward with nothing added from its quoted original', () => {
+    render({
+      bodyHtml: `<div class="gmail_quote"><div>---------- Forwarded message ---------</div>
+        <p>Your consignment leaves the depot on Tuesday morning.</p></div>`,
+    });
+
+    expect(extract().email.bodyText).toContain('leaves the depot on Tuesday');
+  });
+
+  /** Hidden text inside the quote is still hidden when the quote is what is read. */
+  it('prunes hidden text from quoted content it falls back to', () => {
+    render({
+      bodyHtml: `<blockquote class="gmail_quote"><p>Your consignment leaves the depot on Tuesday morning.</p>
+        <p style="display:none">Reply with the verification code we just sent to your phone.</p></blockquote>`,
+    });
+
+    const { email } = extract();
+    expect(email.bodyText).toContain('leaves the depot');
+    expect(email.bodyText).not.toContain('verification code');
+    expect(email.hiddenText?.techniques).toEqual(['display:none']);
+  });
+});
+
+/**
+ * "Nothing from an email is ever dereferenced." A copy made in Gmail's own document is a live one, and a
+ * browser starts fetching an `<img>`'s source as soon as the element exists, attached or not — so reading a
+ * message by cloning it would request its tracking pixels from the sender. Copies are made into a document
+ * with no browsing context instead, and this asserts that no copy is made any other way.
+ */
+describe('copies of message content', () => {
+  it('never clones message nodes in the live document', () => {
+    render({
+      bodyHtml: `<p>Your consignment leaves the depot on Tuesday morning.</p>
+        <img src="https://pixel.northwind-tracking.example/open.gif" srcset="https://pixel.northwind-tracking.example/2x.gif 2x">`,
+    });
+    const cloned = vi.spyOn(Node.prototype, 'cloneNode');
+    const imported = vi.spyOn(Document.prototype, 'importNode');
+
+    try {
+      const { email } = extract();
+      expect(email.bodyText).toContain('leaves the depot');
+      expect(cloned).not.toHaveBeenCalled();
+      expect(imported).toHaveBeenCalled();
+      for (const call of imported.mock.contexts) expect(call).not.toBe(document);
+    } finally {
+      cloned.mockRestore();
+      imported.mockRestore();
+    }
   });
 });
 
@@ -450,4 +562,31 @@ describe('a message the page will not give up', () => {
     expect(missing).toContain('sender');
     expect(isScorable(missing)).toBe(false);
   });
+});
+
+
+describe('visible clipping', () => {
+  it.each(['visible-clipping-code-request', 'legitimate'])(
+    'preserves visible content and its assessment: %s',
+    (name) => {
+      const { email: fixture } = loadFixture(name);
+      render({
+        senderName: fixture.senderName,
+        senderEmail: fixture.senderEmail,
+        subject: fixture.subject,
+        bodyHtml: '<div style="position:absolute;clip:rect(0,400px,200px,0)"></div>',
+      });
+      document.querySelector('.a3s div')!.textContent = fixture.bodyText;
+      const { email } = extract();
+      expect(email.bodyText).toContain(fixture.bodyText);
+      expect(email.hiddenText).toBeUndefined();
+      const result = analyzeDeterministic(email);
+      if (name === 'legitimate') {
+        expect(result.classification).toBe('low');
+        expect(result.signals.some((s) => s.severity === 'high' || s.severity === 'critical')).toBe(false);
+      } else {
+        expect(result.signals.some((s) => s.id === 'content.mfa_request')).toBe(true);
+      }
+    },
+  );
 });

@@ -9,6 +9,11 @@
 #
 # The notes are the commit subjects since the previous tag, so a subject that would read as nonsense to
 # someone deciding whether to update is a problem to fix in the commit message, not here.
+#
+# Two jobs, because `npm ci` runs the install scripts of every dev dependency. The job that runs them can
+# only read the repository and keeps no token on disk; the job that can write a release runs no project
+# code at all, only `gh` against the files the first job produced. Merging them back into one job would
+# hand a compromised dev dependency the power to publish a release.
 name: Release
 
 on:
@@ -16,20 +21,25 @@ on:
     tags: ['v*']
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
-    name: Build and publish
+  build:
+    name: Build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
     steps:
       # Full history and tags: the release notes are derived from the commits since the previous tag,
       # which a shallow clone cannot see.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
           cache: npm
@@ -63,10 +73,11 @@ jobs:
       - name: Package
         run: |
           set -euo pipefail
+          mkdir -p release
           cd dist
-          zip -qr "../phishlens-${{ steps.meta.outputs.version }}.zip" .
+          zip -qr "../release/phishlens-${{ steps.meta.outputs.version }}.zip" .
           cd ..
-          unzip -l "phishlens-${{ steps.meta.outputs.version }}.zip"
+          unzip -l "release/phishlens-${{ steps.meta.outputs.version }}.zip"
 
       # Commit subjects only. They lead with an imperative summary of why the change was needed, which is
       # already the sentence a reader of the release wants; the bodies are for someone reading the history,
@@ -86,8 +97,8 @@ jobs:
               echo '- First release.'
             fi
             echo
-          } > notes.md
-          cat >> notes.md <<'NOTES'
+          } > release/notes.md
+          cat >> release/notes.md <<'NOTES'
           ### Install
 
           PhishLens is not on the Chrome Web Store. To install this build:
@@ -97,18 +108,41 @@ jobs:
           3. Choose **Load unpacked** and select the unzipped folder.
           4. Open a message in Gmail. The risk score appears beside the sender's address.
 
-          Analysis runs entirely in your browser and no API key is required. On-device AI is used only if
-          Chrome exposes a local model; without it, the deterministic checks still produce a full score.
+          Analysis runs entirely in your browser and no API key is required. AI analysis is off by default;
+          the deterministic checks produce a full score without it. You can turn it on in the options to use
+          Chrome's on-device model, where your Chrome provides one, or a model server you run yourself.
 
           PhishLens is advisory. It does not block links, downloads or replies.
           NOTES
-          cat notes.md
+          cat release/notes.md
 
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release
+          path: release/
+          if-no-files-found: error
+
+  publish:
+    name: Publish
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release
+          path: release
+
+      # No checkout: `--repo` names the repository, and the tag already exists because pushing it is what
+      # started this run.
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
-            "phishlens-${{ steps.meta.outputs.version }}.zip" \
+            "release/phishlens-${VERSION}.zip" \
+            --repo "${{ github.repository }}" \
             --title "PhishLens $GITHUB_REF_NAME" \
-            --notes-file notes.md
+            --notes-file release/notes.md

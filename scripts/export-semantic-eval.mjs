@@ -1,5 +1,15 @@
 #!/usr/bin/env node
-/** Exports synthetic evaluation requests only. No model is contacted and no mailbox is read. */
+/**
+ * Exports synthetic evaluation requests only. No model is contacted and no mailbox is read.
+ *
+ *   npm run eval:prompts -- [outputDir] [baselineRef]   # defaults: harness/.build/semantic-eval, HEAD
+ *
+ * The baseline is only `prompt.ts` as it was at `baselineRef`. Its imports (`shared/text.ts`,
+ * `shared/types.ts`, …) resolve from the working tree, because esbuild is handed that one file's text and
+ * a resolve directory on disk. So a change to a helper the prompt imports — the truncation limit, the
+ * category list — appears in *both* files, and the pair measures only edits made inside `prompt.ts`.
+ * Compare against a full checkout of the old ref when a prompt change spans files.
+ */
 import { build } from 'esbuild';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';

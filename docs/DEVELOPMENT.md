@@ -33,8 +33,12 @@ npm run test:coverage
 npm run verify       # lint, typecheck, test, build, dist check — the gate before committing
 ```
 
-The icons in `dist/icons/` are generated at build time by `scripts/gen-icons.mjs` rather than committed as
-binaries, so no opaque blob ships in a repository whose whole value is being auditable.
+The icons are drawn by code: every build reruns `scripts/gen-icons.mjs` into `assets/icons/` and copies
+them to `dist/icons/`, so what ships is reviewable as source rather than an opaque blob in a repository whose
+whole value is being auditable. The PNGs in `assets/icons/` are committed as well, only because the README
+displays `icon128.png` and GitHub can render nothing that is not in the repository. The generator is
+deterministic, so a build leaves them unchanged; if `assets/icons/` shows a diff after building, the
+generator changed and the regenerated icons belong in the same commit.
 
 One generated *source* file is committed instead: `src/shared/tlds.ts`, the list of top-level domains IANA
 has delegated, refreshed by hand with `node scripts/gen-tlds.mjs`. It is not part of the build, because a
@@ -76,7 +80,7 @@ why the whole detection engine runs under `vitest` in plain Node. Where to chang
 | TypeScript ES2022, `strict` | Plus `noUncheckedIndexedAccess` and `noPropertyAccessFromIndexSignature`, because most of this code indexes into structures derived from hostile input. |
 | **esbuild**, not Vite | IIFE content script + ESM worker/options; no useful app-style HMR for Gmail-injected UI. See [adr/0001](adr/0001-esbuild-not-vite.md). |
 | Vitest | ESM-native, no transform config, and fast enough that the fixture suite is usable as an inner-loop tool. |
-| ESLint + `typescript-eslint` (`strictTypeChecked`) | Flags `any`, unused vars and floating promises, plus `no-innerHTML` / `no-eval` house rules that make the XSS posture mechanical rather than aspirational. |
+| ESLint + `typescript-eslint` (`strictTypeChecked`) | Flags `any`, unused vars and floating promises, plus house rules that make the XSS posture mechanical rather than aspirational: no `eval`, and no HTML sink (`innerHTML`, `outerHTML`, `insertAdjacentHTML`, `createContextualFragment`, `setHTMLUnsafe`, `document.write`, `srcdoc`, `DOMParser`). Also mechanical: `fetch` only in `src/background/`, and no `chrome`, `document`, `window`, `navigator`, `localStorage` or `Date.now` in `src/analysis/`. |
 | Zero runtime dependencies | `"dependencies": {}`. Everything shipped into the browser is in `src/` and can be read end to end. `jsdom` is a dev dependency for the few DOM tests. |
 
 ## The UI harness
@@ -132,8 +136,9 @@ UI change is one command away from being reflected in the README instead of sile
 ## Testing
 
 Tests run in plain Node — no Chrome, no Gmail, no network. A handful of files ask for a DOM and get it from
-`jsdom`, which is why that is the only dev dependency here that is not a build or lint tool; see the note
-below the table.
+`jsdom`, which is why that is the only dev dependency here that is not build, lint or test tooling; see the
+note below the table. `npm run test:coverage` uses `@vitest/coverage-v8`, which must stay on the same
+version as `vitest`.
 
 | File | Covers |
 | --- | --- |
@@ -146,8 +151,10 @@ below the table.
 | `test/unicode.test.ts` | Punycode decoding, script mixing, bidi tricks, confusable folding, bounded edit distance. |
 | `test/privacy.test.ts` | Settings validation, the model-server URL policy from both directions (loopback `http:` yes, anything else no), and what `buildCloudPayload` **drops** as well as what it keeps — then the same contract again against payloads the builder could not have produced, because the worker is what actually sends. |
 | `test/observer.test.ts` | The SPA observer's emit and suppress decisions in both directions, since every negative decision it makes is silent by design. |
-| `test/hidden-text.test.ts` | Which inline styles count as hiding, and — mostly — which do not: this is the one scan whose output is *removed* from the body before scoring, so an over-eager rule deletes the evidence rather than finding it. |
+| `test/hidden-text.test.ts` | Which inline styles count as hiding, and — mostly — which do not: this is the one scan whose output is *removed* from the body before scoring, so an over-eager rule deletes the evidence rather than finding it. Includes the escape rule: only a descendant with an absolute size or its own `visibility: visible` is freed, never the container's own text. |
+| `test/highlight.test.ts` | Locating a finding's excerpt in the rendered body: one bounded pass over text nodes, quoted blocks searched only when nothing outside them matches, links matched through the shared selector. Needs a DOM. |
 | `test/extraction.test.ts` | The extraction-gap rule, starting by demonstrating the danger: a thread hijack scored with its sender removed comes back **Low Risk**, because a reply-chain attack is detectable only from identity. Also that the card's wording never reassures, and that neither diagnostic — the single-message one or the session tally — carries anything from a message, including the section that accounts for the score, where every free-text field of a message is asserted absent at once. |
+| `test/background.test.ts` | The service worker's handlers against a stub of `chrome`: no request to an origin the user has not granted, the worker's own system prompt in place of the caller's, a Gmail tab limited to changing the trust list, and a toolbar badge painted only on the tab that asked and only when every field is well-formed. Overlapping settings patches retain both changes, and overlapping toolbar paints finish in order. |
 | `test/model-protocol.test.ts` | The OpenAI-compatible request and response shapes, and the URL policy the worker enforces before any of it is sent. |
 | `test/trust.test.ts` | Each of the four limits on trusted senders, from both sides: that trust dampens what it should, and that it does nothing at all when authentication did not prove the sender, against an identity finding, or against a `high` finding. |
 | `test/triage.test.ts` | The sender-only verdicts, that none of them can read as an all-clear, that no low-scoring fixture is marked, and the allowlist guard that fails when a new identity rule is classified as neither safe nor unsafe for a list row. |
@@ -159,7 +166,7 @@ below the table.
 | `test/list-marks.test.ts` | The list marker against inbox-shaped rows: that ordinary mail is left alone, that a recycled row is re-evaluated rather than trusted, that rows already on screen are re-triaged once Gmail exposes the signed-in address — which arrives after they do, and without which the check for a domain imitating the reader's own cannot run — that a mark Gmail discards when it redraws a row as read comes back, and that marking survives Gmail replacing the region being watched. Needs a DOM. |
 | `test/settings.test.ts` | What each setting asks of a view already on screen, with a guard that fails until a newly added setting is classified — "changes nothing" being the one answer that cannot be right for something offered as a choice. |
 | `test/readings.test.ts` | Availability waits and late answers cannot survive cancellation or a model change into the reading cache. |
-| `test/controller.test.ts` | The orchestration's timing, with the model's answer held as a promise this file resolves by hand: that a settings change abandons the inference it supersedes, that the superseded answer reaches neither the screen nor the cache, that a presentation-only change leaves the inference running, and that a header Gmail redraws gets its badge back without another inference. Also that a redraw joins or reuses a reading rather than asking twice, that clean mail is not sent to the model by default while flagged mail is, and that a reading asked for from the card is kept. Needs a DOM. |
+| `test/controller.test.ts` | The orchestration's timing, with the model's answer held as a promise this file resolves by hand: that a settings change abandons the inference it supersedes, that the superseded answer reaches neither the screen nor the cache, that a presentation-only change leaves the inference running, and that a header Gmail redraws gets its badge back without another inference. Also that a redraw joins or reuses a reading rather than asking twice, that clean mail is not sent to the model by default while flagged mail is, and that a reading asked for from the card is kept. Out-of-order settings reads cannot repaint an older preference. Needs a DOM. |
 | `test/card.test.ts` | The rendered card: message text set as text even when it looks like markup, findings and the model's reading in separate sections, every ring segment named by a row beside it, the floor shown when a severe finding raised the score, and a skipped reading never worded as an all-clear. Also the card's wording helpers — durations, timing lines, quoted excerpts, score summaries. Needs a DOM. |
 
 **What the DOM tests prove, and what they cannot.** They prove the adapter's logic — that a details table
@@ -181,13 +188,23 @@ because an untested promise is a guess — as well as the current LTS. It then b
 extension as an artifact, so every commit has an installable package attached. Before uploading, it runs
 `npm run check:dist` (`scripts/check-dist.mjs`), which catches what a broken build would otherwise ship
 silently: a file the manifest names but the build did not produce, a `<script>` in `options.html` pointing
-at a renamed bundle, a manifest version out of step with `package.json`, or a sourcemap reference left in a
-production bundle. The file list is read out of the manifest rather than hardcoded, so adding a reference to
-the manifest extends the check automatically. Run it locally after `npm run build` if you are touching the
-build.
+at a renamed bundle, a manifest version out of step with `package.json` or in a form Chrome rejects, a
+sourcemap reference or HTML sink in any bundle, or a permission the README and `docs/PRIVACY.md` do not
+advertise. The file list is read out of the manifest rather than hardcoded, so adding a reference to the
+manifest extends the check automatically; the permission list is hardcoded on purpose, so that changing it
+fails until the documents promising it are updated too. Run it locally after `npm run build` if you are
+touching the build.
+
+The build and the dist check run once, on the current LTS: the bundle is the same bytes whichever Node
+produced it, and the floor is already exercised by lint, typecheck and test.
+
+Every job checks out with `persist-credentials: false`, because `npm ci` runs dev-dependency install
+scripts and nothing after the checkout needs to act as this repository. Third-party actions are pinned to a
+commit SHA with the version in a trailing comment, since a tag can be moved to different code after review.
 
 Dependabot (`.github/dependabot.yml`) proposes weekly updates, grouped into one pull request per ecosystem
-so the noise stays proportionate to a dev-only dependency tree.
+so the noise stays proportionate to a dev-only dependency tree. That includes the action pins: it rewrites
+the SHA and the version comment together.
 
 ## Releasing
 
@@ -200,6 +217,10 @@ git push --follow-tags
 Release with install instructions. It refuses to publish when the tag disagrees with `package.json`, because
 the manifest version is generated from that field and a release whose contents contradict its label is worse
 than no release.
+
+It is two jobs. The build job installs and runs project code with read-only access; the publish job holds
+the only `contents: write` token and runs nothing but `gh release create` on the build job's artifact. Keep
+it that way: in a single job, any dev dependency's install script could publish a release.
 
 A `v*` tag cannot be deleted or moved once pushed (see below), so a mistagged release is corrected by
 releasing the next patch version, never by repointing the tag. Someone may already have downloaded the asset,

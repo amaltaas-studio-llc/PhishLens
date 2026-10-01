@@ -35,10 +35,13 @@ export function collapseWhitespace(text: string): string {
  * `skeleton()`'s job, and it is applied where brand claims are matched.
  */
 export function normalizeForMatching(text: string): string {
-  return collapseWhitespace(truncate(text, MAX_BODY_CHARS))
-    .normalize('NFKC')
+  // The invisible set is `unicode.ts`'s, not a local copy: a character the identity rules report as
+  // hiding text but this keeps would split `pass⁢word` past every content rule.
+  return stripBidiAndInvisible(collapseWhitespace(truncate(text, MAX_BODY_CHARS)).normalize('NFKC'))
     .toLowerCase()
-    .replace(/[\u200b-\u200f\u2060\ufeff\u00ad]/gu, '')
+    // NFKC leaves `ß` alone — it is a letter, not a compatibility form — so German "Schließung" and the
+    // Swiss spelling "Schliessung" only meet if one is folded onto the other here.
+    .replace(/ß/gu, 'ss')
     .replace(/[\u2018\u2019\u201b\u2032]/gu, "'")
     .replace(/[\u201c\u201d\u201f\u2033]/gu, '"')
     .replace(/[\u2010-\u2015\u2212]/gu, '-');
@@ -74,19 +77,32 @@ export function excerpt(text: string, index: number, length: number): string {
  * Gmail usually gives us these separately, but Reply-To is often only available as a raw string.
  */
 export function parseMailbox(raw: string): { name?: string; email?: string } {
-  const value = raw.trim();
+  const value = truncate(raw.trim(), MAX_MAILBOX_CHARS);
   if (value === '') return {};
 
-  const angled = /^(.*?)<\s*([^<>\s]+@[^<>\s]+)\s*>$/u.exec(value);
-  if (angled !== null) {
-    const name = angled[1]?.trim().replace(/^["']|["']$/gu, '') ?? '';
-    const email = angled[2]?.trim().toLowerCase();
-    return { ...(name !== '' ? { name } : {}), ...(email !== undefined ? { email } : {}) };
+  // Located with `lastIndexOf` and checked with linear tests rather than one regex: a lazy prefix ahead
+  // of `[^<>\s]+@[^<>\s]+` retries from every `<` and backtracks over every `@`, which is quadratic in a
+  // header the sender wrote.
+  const open = value.lastIndexOf('<');
+  if (open >= 0 && value.endsWith('>')) {
+    const address = value.slice(open + 1, -1).trim();
+    if (isBareAddress(address)) {
+      const name = value.slice(0, open).trim().replace(/^["']|["']$/gu, '');
+      return { ...(name !== '' ? { name } : {}), email: address.toLowerCase() };
+    }
   }
-  if (/^[^<>\s]+@[^<>\s]+$/u.test(value)) {
+  if (isBareAddress(value)) {
     return { email: value.toLowerCase() };
   }
   return { name: value };
+}
+
+/** RFC 5322's line limit; a mailbox longer than a header line can carry is not one. */
+const MAX_MAILBOX_CHARS = 998;
+
+/** `local@domain` with no whitespace or angle brackets and something on both sides of an `@`. */
+function isBareAddress(value: string): boolean {
+  return /^[^<>\s]{3,}$/u.test(value) && value.slice(1, -1).includes('@');
 }
 
 /** The domain part of an email address, normalised. Returns `''` for anything unparseable. */

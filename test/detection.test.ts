@@ -9,7 +9,7 @@ import { buildContext } from '../src/analysis/context.js';
 import type { ThreadParty } from '../src/analysis/context.js';
 import { analyze, analyzeDeterministic, countedFindings } from '../src/analysis/engine.js';
 import { CATEGORY_WEIGHTS } from '../src/analysis/scoring/config.js';
-import { findParticipantLookalike } from '../src/analysis/rules/thread.js';
+import { findParticipantLookalike, __testables as threadTestables } from '../src/analysis/rules/thread.js';
 import { __testables as contentTestables } from '../src/analysis/rules/content.js';
 import { __testables as adapterTestables } from '../src/gmail/dom-adapter.js';
 import {
@@ -22,7 +22,7 @@ import { distinctForDisplay, scoreFloor, severityFloor } from '../src/analysis/s
 import { triageSender } from '../src/analysis/triage.js';
 import { BRANDS, brandOwningDomain } from '../src/shared/brands.js';
 import { fileExtension, fileExtensionChain } from '../src/shared/text.js';
-import { hasUnknownTld } from '../src/shared/url.js';
+import { hasUnknownTld, registrableDomain } from '../src/shared/url.js';
 import type {
   AnalysisResult,
   EmailMessage,
@@ -30,7 +30,7 @@ import type {
   SemanticAnalysis,
   SemanticAnalyzer,
 } from '../src/shared/types.js';
-import { loadFixture, loadAllFixtures, toEmailLink } from './fixtures/load.js';
+import { loadFixture, loadAllFixtures, toEmailAttachment, toEmailLink } from './fixtures/load.js';
 
 const LANGUAGE_IDS = ['es', 'fr', 'de', 'pt', 'it', 'nl', 'hi', 'hinglish'] as const;
 
@@ -41,6 +41,7 @@ const LEGITIMATE_FIXTURES = [
   'legitimate-substack-newsletter',
   'legitimate-institutional-newsletter',
   'legitimate-invoice',
+  'legitimate-e-invoice',
   'legitimate-thread-reply',
   'legitimate-verification-code',
   'legitimate-brand-product-name',
@@ -69,6 +70,7 @@ const UNVERIFIABLE_FIXTURES = ['legitimate-brand-country-domain'];
 const HONEST_FIXTURES = [...LEGITIMATE_FIXTURES, ...UNVERIFIABLE_FIXTURES];
 
 const MALICIOUS_FIXTURES = [
+  'visible-clipping-code-request',
   'sender-host-brand-domain',
   'paypal-phish',
   'microsoft-phish',
@@ -77,6 +79,7 @@ const MALICIOUS_FIXTURES = [
   'punycode-link',
   'ip-url',
   'executable-attachment',
+  'soft-hyphen-executable',
   'mfa-code-request',
   'anchor-mismatch',
   'zip-attachment',
@@ -480,18 +483,18 @@ describe('click tracking on the sender own domain', () => {
   it('suppresses the rewrite only for the domain that sent the message', () => {
     const base = loadFixture('legitimate-substack-newsletter').email;
     const links = [
-      toEmailLink({ text: 'sprudge.com', href: 'https://dripmail.example/redirect/9c1d4e2a' }),
-      toEmailLink({ text: 'kestrelcoffee.co.uk', href: 'https://dripmail.example/redirect/3f8a1b90' }),
+      toEmailLink({ text: 'northwind-roastery.com', href: 'https://dripmail.example/redirect/9c1d4e2a' }),
+      toEmailLink({ text: 'northwind-coffee.co.uk', href: 'https://dripmail.example/redirect/3f8a1b90' }),
     ];
 
     const fromPlatform = analyzeDeterministic(
-      { ...base, senderEmail: 'the-slow-drip@dripmail.example', links },
+      { ...base, senderEmail: 'the-brew-notes@dripmail.example', links },
       { now: FIXED_NOW },
     );
     expect(hasSignal(fromPlatform, 'link.displayed_url_mismatch')).toBe(false);
 
     const fromElsewhere = analyzeDeterministic(
-      { ...base, senderEmail: 'the-slow-drip@unrelated-sender.example', links },
+      { ...base, senderEmail: 'the-brew-notes@unrelated-sender.example', links },
       { now: FIXED_NOW },
     );
     expect(hasSignal(fromElsewhere, 'link.displayed_url_mismatch')).toBe(true);
@@ -771,6 +774,114 @@ describe('link rules against the harmless links that share their shape', () => {
 });
 
 /**
+ * A redirect parameter must not hide the host the click reaches first. Unwrapping a redirect adds the
+ * destination to what is judged; it never replaces the entry, which is the one host the attacker
+ * could not dress up as somebody else's.
+ */
+describe('every host a click passes through', () => {
+  const linked = (
+    links: { text: string; href: string }[],
+    extra: Partial<EmailMessage> = {},
+  ): AnalysisResult =>
+    analyzeDeterministic(
+      {
+        senderEmail: 'news@northwind-logistics.com',
+        bodyText: 'The details are at the link below.',
+        links: links.map((link) => toEmailLink(link)),
+        attachments: [],
+        ...extra,
+      },
+      { now: FIXED_NOW },
+    );
+  const bare = (href: string) => linked([{ text: 'Open', href }]);
+  const BENIGN = encodeURIComponent('https://www.northwind-traders.com/');
+
+  describe('an entry host that deceives', () => {
+    it('reports a lookalike entry that forwards somewhere harmless', () => {
+      const result = bare(`https://paypa1.com/r?url=${BENIGN}`);
+      expect(signalFor(result, 'link.lookalike_domain.0')?.severity).toBe('critical');
+    });
+
+    it('reports a public IP entry', () => {
+      expect(signalFor(bare(`http://185.234.219.14/go?next=${BENIGN}`), 'link.ip_address_url')?.severity).toBe('critical');
+    });
+
+    it('reports a punycode entry', () => {
+      expect(hasSignal(bare(`https://xn--pypal-4ve.com/r?url=${BENIGN}`), 'link.punycode_domain.0')).toBe(true);
+    });
+
+    it('reports a lookalike hidden behind a known click tracker', () => {
+      const target = encodeURIComponent('https://paypa1.com/login');
+      const result = bare(`https://u1.ct.sendgrid.net/ls/click?url=${target}`);
+      expect(hasSignal(result, 'link.lookalike_domain.0')).toBe(true);
+    });
+
+    it("reports a brand's address shown over an attacker's redirector", () => {
+      const target = encodeURIComponent('https://www.paypal.com/');
+      const result = linked([{ text: 'www.paypal.com', href: `https://northwind-redirect.example/r?return=${target}` }]);
+      expect(signalFor(result, 'link.displayed_url_mismatch.0')?.severity).toBe('high');
+    });
+  });
+
+  describe('the harmless routes that share the shape', () => {
+    it("does not report a brand's address reached through the sender's own redirector", () => {
+      const target = encodeURIComponent('https://www.paypal.com/');
+      const result = linked([{ text: 'www.paypal.com', href: `https://click.northwind-logistics.com/r?url=${target}` }]);
+      expect(hasSignal(result, 'link.displayed_url_mismatch.0')).toBe(false);
+      expect(result.classification).toBe('low');
+    });
+
+    it('leaves an ordinary address behind an unlisted mail platform to the redirect finding', () => {
+      const result = linked([
+        { text: 'www.northwind-traders.com', href: `https://t.northwind-mailer.example/c?url=${BENIGN}` },
+      ]);
+      expect(hasSignal(result, 'link.displayed_url_mismatch.0')).toBe(false);
+      expect(signalFor(result, 'link.redirect_chain.0')?.severity).toBe('medium');
+    });
+
+    it('does not report a known tracker forwarding to the address it shows', () => {
+      const result = linked([{ text: 'www.northwind-traders.com', href: `https://u1.ct.sendgrid.net/ls/click?url=${BENIGN}` }]);
+      expect(result.signals.filter((s) => s.category === 'link' && s.severity !== 'low')).toEqual([]);
+    });
+  });
+
+  describe("a tracker's owner publishing pages", () => {
+    it('judges the destination a Google redirect decodes to', () => {
+      const target = encodeURIComponent('https://northwind-verify.example/login');
+      const result = linked([{ text: 'www.paypal.com', href: `https://www.google.com/url?q=${target}` }]);
+      expect(signalFor(result, 'link.displayed_url_mismatch.0')?.severity).toBe('critical');
+    });
+
+    it('treats a Google Docs form as a page, not as a tracker hop', () => {
+      const result = linked([{ text: 'www.paypal.com', href: 'https://docs.google.com/forms/d/e/1FAIpQL/viewform' }]);
+      expect(signalFor(result, 'link.displayed_url_mismatch.0')?.severity).toBe('critical');
+    });
+
+    it('still lets a Google redirect to the displayed address through', () => {
+      const result = linked([{ text: 'www.northwind-traders.com', href: `https://www.google.com/url?q=${BENIGN}` }]);
+      expect(result.signals.filter((s) => s.category === 'link' && s.severity !== 'low')).toEqual([]);
+    });
+  });
+
+  describe("a brand's own domain that anyone can publish on", () => {
+    const storage = 'https://storage.googleapis.com/northwind-drive-share/signin.html';
+
+    it('reports a sign-in page in public storage on mail claiming to be the storage owner', () => {
+      const result = linked([{ text: 'Open shared file', href: storage }], { senderName: 'Google Drive', senderEmail: 'drive-share@northwind-mail.example' });
+      expect(signalFor(result, 'link.credential_link_open_hosting.0')?.severity).toBe('high');
+    });
+
+    it("does not report Google's own sign-in page on mail claiming to be Google", () => {
+      const result = linked(
+        [{ text: 'Sign in', href: 'https://www.google.com/accounts/signin' }],
+        { senderName: 'Google', senderEmail: 'no-reply@google.com', auth: { signedBy: 'google.com' } },
+      );
+      expect(result.signals.filter((s) => s.id.startsWith('link.credential_link'))).toEqual([]);
+    });
+  });
+});
+
+/**
  * Staff write from their organisation's `.net` and `.com`, and colleagues abroad from its country
  * domain, so the same name under another suffix is the same organisation — unless the suffix is the
  * reader's own with characters dropped, which is a trap and not a market.
@@ -895,10 +1006,29 @@ describe('executable attachments', () => {
 describe('an extension split by an invisible character', () => {
   it('reads it as the extension it displays as', () => {
     const result = analyzeFixture('soft-hyphen-executable');
-    expect(hasSignal(result, 'attachment.executable')).toBe(true);
-    expect(signalFor(result, 'attachment.filename_direction_override')?.description).toContain(
+    expect(signalFor(result, 'attachment.executable')?.severity).toBe('critical');
+    expect(signalFor(result, 'attachment.filename_hidden_characters')?.description).toContain(
       'Its actual type is .exe.',
     );
+  });
+
+  it('does not call a hidden character a direction override, which it is not', () => {
+    const result = analyzeFixture('soft-hyphen-executable');
+    expect(hasSignal(result, 'attachment.filename_direction_override')).toBe(false);
+  });
+
+  it('keeps a reversed name critical whatever type it hides', () => {
+    const result = analyzeDeterministic(
+      {
+        senderEmail: 'billing@northwind-traders.com',
+        bodyText: 'Statement attached.',
+        links: [],
+        attachments: [toEmailAttachment({ filename: 'statement_\u202efdp.txt' })],
+      },
+      { now: FIXED_NOW },
+    );
+    expect(signalFor(result, 'attachment.filename_direction_override')?.severity).toBe('critical');
+    expect(hasSignal(result, 'attachment.filename_hidden_characters')).toBe(false);
   });
 
   it('does not turn a document into a program', () => {
@@ -1035,6 +1165,12 @@ describe('a warning not to share a code, and the request that quotes it', () => 
     expect(signalFor(result, 'content.mfa_request')?.severity).toBe('high');
   });
 
+  it('still reports a request the negated match swallowed into its own span', () => {
+    const result = withBody("Don't share this with anyone, just send me the verification code.");
+
+    expect(signalFor(result, 'content.mfa_request')?.severity).toBe('high');
+  });
+
   it('still reports a request with the advice appended to the same sentence', () => {
     const result = withBody('Please send me your verification code, and never share it with anyone else.');
 
@@ -1112,8 +1248,8 @@ describe('MFA code request', () => {
 /**
  * The regression this suite exists for.
  *
- * A real message impersonating Fidelity scored 24/100 — one point below `caution` — because every
- * identity detector was gated on the enumerated `BRANDS` table and Fidelity is not in it. No table
+ * A real message impersonating a life insurer scored 24/100 — one point below `caution` — because every
+ * identity detector was gated on the enumerated `BRANDS` table and the insurer is not in it. No table
  * ever contains every insurer, bank, utility and agency, so identity detection cannot depend on one
  * being complete.
  */
@@ -1133,8 +1269,8 @@ describe('brand impersonation with no brand-table entry', () => {
 
   it('explains the mismatch in terms of the name and the domain', () => {
     const s = signalFor(result, 'identity.unsupported_org_claim');
-    expect(s?.description).toContain('Fidelity Life Offer');
-    expect(s?.description).toContain('mt50sys.com');
+    expect(s?.description).toContain('Northwind Life Offer');
+    expect(s?.description).toContain('kv38mailer.com');
   });
 
   it('flags the repeated fragment in the sender address', () => {
@@ -1575,7 +1711,7 @@ describe('short brand keywords inside ordinary words', () => {
   it('records a keyword in the display name as an identity claim, not a body mention', () => {
     const context = buildContext({
       senderName: 'PayPal Service',
-      senderEmail: 'billing@mt50sys.com',
+      senderEmail: 'billing@kv38mailer.com',
       subject: 'Invoice',
       bodyText: 'Paypal receipts are attached.',
       links: [],
@@ -1979,7 +2115,7 @@ describe('signatures from a sending platform', () => {
   });
 
   it('still reports a signer that is neither the sender nor a known platform', () => {
-    const result = signedBy('service@paypal.com', 'mt50sys.com');
+    const result = signedBy('service@paypal.com', 'kv38mailer.com');
     expect(hasSignal(result, 'authentication.signing_domain_mismatch')).toBe(true);
   });
 });
@@ -2001,7 +2137,7 @@ describe('organisational-claim detector boundaries', () => {
   });
 
   it('stays quiet for a personal name, which claims no institution', () => {
-    const result = withSender('Priya Raman', 'priya@mt50sys.com');
+    const result = withSender('Priya Raman', 'priya@kv38mailer.com');
     expect(hasSignal(result, 'identity.unsupported_org_claim')).toBe(false);
   });
 
@@ -2016,7 +2152,7 @@ describe('organisational-claim detector boundaries', () => {
   });
 
   it('defers to the brand table when the claimed brand is a known one', () => {
-    const result = withSender('PayPal Billing Team', 'service@mt50sys.com');
+    const result = withSender('PayPal Billing Team', 'service@kv38mailer.com');
     expect(hasSignal(result, 'identity.unsupported_org_claim')).toBe(false);
     expect(hasSignal(result, 'identity.display_name_impersonation')).toBe(true);
   });
@@ -2052,7 +2188,7 @@ describe('signals that survive only in the raw fields', () => {
   const fixture = loadFixture('brand-spoof-leadgen');
 
   it('carries the raw forms alongside the normalised ones', () => {
-    expect(fixture.email.senderEmail).toBe('donot.reply.donot.reply.donot.reply.donot.reply@mt50sys.com');
+    expect(fixture.email.senderEmail).toBe('donot.reply.donot.reply.donot.reply.donot.reply@kv38mailer.com');
     expect(fixture.email.raw?.senderEmail).toContain('DoNoT');
     expect(fixture.email.subject).not.toMatch(/ {2}/u);
     expect(fixture.email.raw?.subject).toMatch(/ {24}/u);
@@ -2740,6 +2876,239 @@ describe('choosing the message to assess', () => {
   });
 });
 
+describe('combinations in bulk mail', () => {
+  const offer =
+    'Treat someone this season: buy 3 gift cards worth $25 each and get a bonus card. Order immediately, the offer expires within 24 hours!';
+  const send = (bodyText: string, links: { text: string; href: string }[]) =>
+    analyzeDeterministic(
+      {
+        senderName: 'Kestrel Coffee Roasters',
+        senderEmail: 'hello@kestrelcoffee.co.uk',
+        subject: 'Our winter gift guide',
+        bodyText,
+        links: links.map((link) => toEmailLink(link)),
+        attachments: [],
+      },
+      { now: FIXED_NOW },
+    );
+
+  it('does not rebuild a combination from a theme bulk mail had withdrawn', () => {
+    const result = send(`${offer} You are receiving this because you subscribed. Unsubscribe.`, [
+      { text: 'Unsubscribe', href: 'https://kestrelcoffee.co.uk/unsubscribe' },
+    ]);
+    expect(hasSignal(result, 'content.urgency')).toBe(false);
+    expect(hasSignal(result, 'content.combo.urgent_gift_card_request')).toBe(false);
+  });
+
+  it('still combines the same themes in a message that is not bulk', () => {
+    const result = send(offer, []);
+    expect(hasSignal(result, 'content.combo.urgent_gift_card_request')).toBe(true);
+  });
+});
+
+describe('a brand name under a suffix that is not a market', () => {
+  it.each(['paypal.it', 'paypal.com.br', 'paypal.co.za'])('reads a country suffix as perhaps the brand: %s', (domain) => {
+    expect(brandNamingDomain(domain)?.id).toBe('paypal');
+  });
+
+  it.each(['paypal.support', 'paypal.secure', 'paypal.online'])('reads a generic suffix as an imitation: %s', (domain) => {
+    expect(brandNamingDomain(domain)).toBeUndefined();
+    const result = analyzeDeterministic(
+      { senderName: 'PayPal', senderEmail: `service@${domain}`, bodyText: 'Your statement is ready.', links: [], attachments: [] },
+      { now: FIXED_NOW },
+    );
+    expect(hasSignal(result, 'identity.unverified_brand_domain')).toBe(false);
+    expect(signalFor(result, 'identity.lookalike_sender_domain')?.severity).toBe('critical');
+  });
+});
+
+describe('an executive title the writer gives themselves', () => {
+  const send = (overrides: Partial<EmailMessage>) =>
+    analyzeDeterministic(
+      {
+        senderName: 'Jo Hartley',
+        senderEmail: 'jo.hartley@outlook.com',
+        recipientEmail: 'sam.okafor@northwind-logistics.com',
+        subject: 'Quick one',
+        bodyText: 'Are you at your desk? I need a favour handled discreetly.',
+        links: [],
+        attachments: [],
+        ...overrides,
+      },
+      { now: FIXED_NOW },
+    );
+
+  it.each([
+    'This is your CEO. Are you at your desk? I need a favour handled discreetly.',
+    "I'm the managing director and I need a favour handled discreetly today.",
+    'Are you at your desk? I need a favour handled discreetly. Regards, Jo Hartley, CEO',
+  ])('reports it in the body: %s', (bodyText) => {
+    expect(signalFor(send({ bodyText }), 'identity.external_executive_claim')?.severity).toBe('high');
+  });
+
+  it('reports it in the display name', () => {
+    expect(hasSignal(send({ senderName: 'Jo Hartley (CEO)' }), 'identity.external_executive_claim')).toBe(true);
+  });
+
+  it('does not read a title the message only mentions', () => {
+    const result = send({ bodyText: 'Our president announced the new office at the all-hands. Are you going to the party?' });
+    expect(hasSignal(result, 'identity.external_executive_claim')).toBe(false);
+  });
+
+  it('does not apply between two personal mailboxes, where there is no organisation to impersonate', () => {
+    const result = send({
+      recipientEmail: 'sam.okafor@gmail.com',
+      bodyText: "Hi! I'm the founder of a small bakery now, come visit sometime.",
+    });
+    expect(hasSignal(result, 'identity.external_executive_claim')).toBe(false);
+  });
+});
+
+describe('an organisation claim that is only generous', () => {
+  const send = (senderName: string, senderEmail: string) =>
+    analyzeDeterministic(
+      {
+        senderName,
+        senderEmail,
+        recipientEmail: 'sam.okafor@northwind-logistics.com',
+        bodyText: 'Please confirm your account to continue your application.',
+        links: [],
+        attachments: [],
+      },
+      { now: FIXED_NOW },
+    );
+
+  it('does not make a platform writing for a customer into credential harvesting', () => {
+    const result = send('Contoso Recruiting Team', 'no-reply@northwind-hireflow.com');
+    expect(signalFor(result, 'identity.unsupported_org_claim')?.severity).toBe('medium');
+    expect(hasSignal(result, 'identity.impersonation_with_credential_request')).toBe(false);
+  });
+
+  it('still pairs an institutional claim from a personal mailbox with the request', () => {
+    const result = send('Northwind Bank Security', 'northwind.bank.alerts@gmail.com');
+    expect(signalFor(result, 'identity.unsupported_org_claim')?.severity).toBe('high');
+    expect(signalFor(result, 'identity.impersonation_with_credential_request')?.severity).toBe('critical');
+  });
+});
+
+describe('structured invoices', () => {
+  it('does not read an XML invoice as a web page', () => {
+    const result = analyzeFixture('legitimate-e-invoice');
+    expect(hasSignal(result, 'attachment.script_container')).toBe(false);
+    expect(hasSignal(result, 'attachment.executable_with_document_pretext')).toBe(false);
+    expect(result.classification).toBe('low');
+  });
+
+  it('still reads an HTML file sent as an invoice as one', () => {
+    const base = loadFixture('legitimate-e-invoice').email;
+    const result = analyzeDeterministic(
+      { ...base, attachments: [toEmailAttachment({ filename: 'Invoice-118-2026.html' })] },
+      { now: FIXED_NOW },
+    );
+    expect(signalFor(result, 'attachment.script_container')?.severity).toBe('high');
+  });
+});
+
+describe('payment wording: where money goes versus how the reader pays', () => {
+  const withBody = (bodyText: string) =>
+    analyzeDeterministic(
+      { senderEmail: 'billing@northwind-streaming.com', bodyText, links: [], attachments: [] },
+      { now: FIXED_NOW },
+    );
+
+  it.each([
+    'Your card was declined. Please update your payment information to keep your subscription.',
+    'Update your account information in settings at any time.',
+    'Your card expires next month; you can update your payment method in your profile.',
+  ])('does not read a card on file as a payee change: %s', (bodyText) => {
+    const result = withBody(bodyText);
+    expect(hasSignal(result, 'content.payment_detail_change')).toBe(false);
+    expect(result.classification).toBe('low');
+  });
+
+  it.each([
+    'Please note our bank details have changed; update the remittance details before the next run.',
+    'Kindly update the payee account number on file to the one below.',
+    'Please use the new bank account for all future invoices.',
+  ])('still reads a payee change: %s', (bodyText) => {
+    expect(signalFor(withBody(bodyText), 'content.payment_detail_change')?.severity).toBe('high');
+  });
+
+  it('reports a billing update demanded under a threat', () => {
+    const result = withBody('Your account has been blocked. Update your payment details to keep your photos.');
+    expect(signalFor(result, 'content.combo.billing_update_under_threat')?.severity).toBe('high');
+  });
+});
+
+describe('a verified brand asking to move money', () => {
+  const PROVEN = { spf: 'pass', dkim: 'pass', dmarc: 'pass', signedBy: 'paypal.com' } as const;
+
+  it('keeps a money-movement combination at full weight', () => {
+    const result = analyzeDeterministic(
+      {
+        senderName: 'PayPal',
+        senderEmail: 'service@paypal.com',
+        bodyText: 'Please wire the funds to the account below today. Keep this confidential and do not discuss it with anyone.',
+        links: [],
+        attachments: [],
+        auth: PROVEN,
+      },
+      { now: FIXED_NOW },
+    );
+    const combo = signalFor(result, 'content.combo.bec_wire_secrecy');
+    expect(combo?.severity).toBe('critical');
+    expect(combo?.dampened).toBeUndefined();
+    expect(result.classification).not.toBe('low');
+  });
+
+  it('still zeroes the fake-sign-in combination on a genuine security notice', () => {
+    const result = analyzeFixture('legitimate-password-reset');
+    expect(result.signals.filter((s) => s.id.startsWith('content.combo.') && s.score > 0)).toEqual([]);
+    expect(result.classification).toBe('low');
+  });
+});
+
+describe('role names in a thread', () => {
+  it.each(['Info', 'Billing', 'Admin', 'IT', 'Northwind Billing'])('treats %s as a desk, not a person', (name) => {
+    expect(threadTestables.isRoleName(name)).toBe(true);
+  });
+
+  it('still treats a person as a person', () => {
+    expect(threadTestables.isRoleName('Dana Whitfield')).toBe(false);
+  });
+});
+
+describe('authentication failures that DMARC overruled', () => {
+  const withAuth = (auth: EmailMessage['auth']) =>
+    analyzeDeterministic(
+      { senderEmail: 'dana@northwind-logistics.com', bodyText: 'Lunch on Friday?', links: [], attachments: [], ...(auth === undefined ? {} : { auth }) },
+      { now: FIXED_NOW },
+    );
+
+  it('reports a softfail beside a DMARC pass as low', () => {
+    const result = withAuth({ spf: 'softfail', dkim: 'pass', dmarc: 'pass' });
+    expect(hasSignal(result, 'authentication.failure')).toBe(false);
+    expect(signalFor(result, 'authentication.partial_failure')?.severity).toBe('low');
+    expect(result.classification).toBe('low');
+  });
+
+  it('keeps a failure with no DMARC pass high', () => {
+    expect(signalFor(withAuth({ spf: 'softfail', dkim: 'pass' }), 'authentication.failure')?.severity).toBe('high');
+    expect(signalFor(withAuth({ spf: 'pass', dkim: 'fail', dmarc: 'fail' }), 'authentication.failure')?.severity).toBe('high');
+  });
+});
+
+describe('brand table domains', () => {
+  it('lists no host beneath a registrable domain, which ownership checks could never match', () => {
+    for (const brand of BRANDS) {
+      for (const domain of brand.domains) {
+        const registrable = registrableDomain(domain);
+        expect(registrable === '' || registrable === domain, `${brand.id}: ${domain}`).toBe(true);
+      }
+    }
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Invariants that must hold for every fixture
 // ---------------------------------------------------------------------------
@@ -2747,8 +3116,12 @@ describe('choosing the message to assess', () => {
 describe('invariants across all fixtures', () => {
   const fixtures = loadAllFixtures();
 
-  it('loads every fixture', () => {
-    expect(fixtures.length).toBeGreaterThanOrEqual(12);
+  // A fixture in neither list is asserted in neither direction, which is how a malicious case can stop
+  // being checked for detection, or a legitimate one for staying out of the severity floors.
+  it('classifies every fixture on disk as honest or malicious, exactly once', () => {
+    const listed = [...HONEST_FIXTURES, ...MALICIOUS_FIXTURES];
+    expect(new Set(listed).size).toBe(listed.length);
+    expect(fixtures.map((f) => f.name).sort()).toEqual([...listed].sort());
   });
 
   for (const fixture of fixtures) {

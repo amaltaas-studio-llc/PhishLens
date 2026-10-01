@@ -69,8 +69,8 @@ export const BRANDS: readonly Brand[] = [
     keywords: ['google', 'gmail', 'googledrive', 'googleworkspace', 'gsuite', 'youtube', 'googlepay'],
     domains: [
       'google.com', 'gmail.com', 'googlemail.com', 'youtube.com', 'googleapis.com',
-      'withgoogle.com', 'google.co.uk', 'googleusercontent.com', 'goo.gl', 'firebase.google.com',
-      'accounts.google.com', 'gstatic.com', 'chromium.org', 'android.com',
+      'withgoogle.com', 'google.co.uk', 'googleusercontent.com', 'goo.gl', 'gstatic.com',
+      'chromium.org', 'android.com',
     ],
     tlds: ['google', 'gmail', 'youtube'],
     lookalikeTargets: ['google.com', 'gmail.com', 'youtube.com', 'googlemail.com'],
@@ -96,7 +96,7 @@ export const BRANDS: readonly Brand[] = [
     keywords: ['amazon', 'amazonprime', 'aws', 'amazonwebservices', 'kindle', 'audible'],
     domains: [
       'amazon.com', 'amazon.co.uk', 'amazon.de', 'amazon.fr', 'amazon.ca', 'amazon.in',
-      'amazon.co.jp', 'amazon.com.au', 'amazonaws.com', 'aws.amazon.com', 'audible.com',
+      'amazon.co.jp', 'amazon.com.au', 'amazonaws.com', 'audible.com',
       'primevideo.com', 'amazonses.com', 'kindle.com', 'amazon.jobs',
     ],
     tlds: ['amazon', 'aws', 'audible', 'kindle', 'prime'],
@@ -237,7 +237,7 @@ export const BRANDS: readonly Brand[] = [
     id: 'hmrc',
     label: 'HMRC',
     keywords: ['hmrc', 'hm revenue'],
-    domains: ['hmrc.gov.uk', 'gov.uk', 'tax.service.gov.uk'],
+    domains: ['hmrc.gov.uk', 'gov.uk'],
     lookalikeTargets: ['hmrc.gov.uk'],
   },
   {

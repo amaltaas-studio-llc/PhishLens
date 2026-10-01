@@ -13,7 +13,11 @@ session so both fail. Gmail fills a view in stages, so analysis is triggered mor
 - The full analysis pipeline and the on-device model session live in the **content script**, which lasts
   as long as the tab.
 - The service worker is **stateless**: settings and opt-in egress only; re-read storage on every message;
-  no module-level cache (asserted by tests).
+  no module-level cache. No test or lint rule can tell a cache from a constant, so this is held by the
+  contract in the header of `src/background/index.ts` and by review.
+- Settings read/merge/write operations and per-tab toolbar paints use browser-managed Web Locks.
+  This serialises overlapping messages without a worker-owned queue. Content scripts accept only the
+  latest requested settings snapshot, so a delayed read cannot undo a newer one.
 - Do not persist analysis results. Keep at most fifty prompt-keyed model readings per tab.
 - Warm the session at startup; serialise prompts through a queue; abort on view change; treat cancel as
   “no answer”, not a verdict.

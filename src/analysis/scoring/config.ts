@@ -70,9 +70,10 @@ export const CATEGORY_WEIGHTS: CategoryWeights = Object.freeze({
  *  - Floors are driven **only by deterministic signals**. `llm` signals are excluded, so the semantic
  *    layer cannot trigger one — the "the model can never produce high risk on its own" guarantee is
  *    unaffected.
- *  - `critical` severity is reserved for findings that are conclusive in isolation (authentication
- *    failure aside — see `authentication.ts`), and no legitimate-mail fixture produces a `high` or
- *    `critical` deterministic signal. That is asserted directly by the test suite, which is what makes
+ *  - `critical` severity is reserved for findings that are conclusive in isolation. An authentication
+ *    failure looks conclusive and is not — forwarding breaks SPF, lists break DKIM — so it is held at
+ *    `high`, and at `low` when DMARC passed anyway (see `authentication.ts`). No legitimate-mail fixture
+ *    produces a `high` or `critical` deterministic signal. That is asserted directly by the test suite, which is what makes
  *    a floor of 50 for `high` safe rather than merely plausible.
  *  - A floor only ever raises the score; it never lowers a higher additive total.
  */
@@ -293,6 +294,7 @@ export interface DampeningConfig {
   readonly dampenableCategories: readonly SignalCategory[];
   readonly alignedSenderSeverityDrop: number;
   readonly combinationIdPrefix: string;
+  readonly refutableCombinations: readonly string[];
   readonly alignedSenderScoreFactor: number;
   readonly blockingCategories: readonly SignalCategory[];
   readonly blockingMinSeverity: Severity;
@@ -313,8 +315,24 @@ export const DAMPENING: DampeningConfig = Object.freeze({
   dampenableCategories: DAMPENABLE_CATEGORIES,
   /** How many severity steps to drop when the sender is aligned with the brand it claims. */
   alignedSenderSeverityDrop: 1,
-  /** Signal-id prefix identifying cross-theme combination findings, which are zeroed when dampened. */
+  /** Signal-id prefix identifying cross-theme combination findings. */
   combinationIdPrefix: 'combo.',
+  /**
+   * The combinations a verified sender with aligned links refutes, and so the only `high` findings
+   * brand dampening may touch, which it zeroes rather than lowers.
+   *
+   * Their whole claim is "you are being rushed onto a fake sign-in or billing page"; once every link stays
+   * inside the organisation the mail provably came from, there is no fake page, and a genuine
+   * password-reset or expired-card notice is what remains. The money-movement combinations are
+   * deliberately absent: a gift-card, wire, payee or payroll request is exactly what a compromised account
+   * sends, and the account being genuine makes acting on it no safer — the reason trust never softens
+   * `high`, applied to brands too.
+   */
+  refutableCombinations: Object.freeze([
+    'urgent_credential_request',
+    'threat_and_credential_request',
+    'billing_update_under_threat',
+  ]),
   /**
    * Multiplier applied to a dampened signal's raw score.
    *
@@ -398,4 +416,16 @@ export const SEMANTIC_SCORING = Object.freeze({
    * for the same number, since on-device decoding time grows with every reason the model writes.
    */
   maxReasons: 3,
+  /**
+   * Words the prompt allows each reason, so a reason reads as one line on the card rather than a
+   * paragraph — the quoted excerpt is what the reader checks, and the explanation only needs to say why
+   * it matters.
+   */
+  reasonWords: 15,
+  /**
+   * Words a reason may actually have before it is cut. Above `reasonWords` on purpose: small models
+   * count words loosely, and cutting at exactly the requested number would truncate most of the reasons
+   * that overshoot by a word or two, which costs more legibility than the extra words do.
+   */
+  maxReasonWords: 20,
 });

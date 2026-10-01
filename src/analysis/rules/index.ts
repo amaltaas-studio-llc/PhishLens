@@ -49,8 +49,9 @@ export function runRuleEngine(context: AnalysisContext): SecuritySignal[] {
  *  - only categories in `DAMPENING.dampenableCategories` are ever touched (currently just `content`);
  *  - severity and score only ever move *down*, and no finding is ever removed;
  *  - a single `medium`-or-worse technical finding cancels dampening entirely;
- *  - trust alone never softens a `high` or `critical` finding, because the sender being genuine is
- *    exactly the situation a compromised account produces.
+ *  - neither proof softens a `high` or `critical` finding, because the sender being genuine is exactly
+ *    the situation a compromised account produces — save the fake-sign-in combinations a verified
+ *    brand with aligned links refutes (`DAMPENING.refutableCombinations`).
  */
 function refine(signals: SecuritySignal[], context: AnalysisContext): SecuritySignal[] {
   const hasBlockingFinding = signals.some(
@@ -85,15 +86,20 @@ function refine(signals: SecuritySignal[], context: AnalysisContext): SecuritySi
     (context.senderAlignedWithClaim ||
       (context.senderOwnedByBrand !== undefined && context.primaryClaim === undefined));
 
-  // Links that all resolve to the sender's own organisation or to the brand it legitimately is.
+  // Links that resolve to the sender's own organisation or to the brand it legitimately is, at every
+  // host the click passes through. A recognised tracker's own hop is excused; what it forwards to is not,
+  // since a tracker on the sender's account will forward to any address the sender typed.
   const owner = context.senderOwnedByBrand;
   const allLinksAligned =
     context.webLinks.length > 0 &&
     context.webLinks.every((link) => {
-      if (link.registrable === '') return false;
-      if (link.registrable === context.senderRegistrable) return true;
-      if (owner !== undefined && brandOwns(owner, link.registrable)) return true;
-      return link.wrappedByKnownTracker;
+      if (link.hosts.length === 0) return false;
+      return link.hosts.every((host) => {
+        if (host.knownTracker) return true;
+        if (host.registrable === '') return false;
+        if (host.registrable === context.senderRegistrable) return true;
+        return owner !== undefined && brandOwns(owner, host.registrable);
+      });
     });
 
   const brandDampens =
@@ -119,17 +125,21 @@ function refine(signals: SecuritySignal[], context: AnalysisContext): SecuritySi
   return signals.map((s) => {
     if (!DAMPENING.dampenableCategories.includes(s.category)) return s;
     if (s.severity === 'info') return s;
-    // A user's say-so is weaker evidence than a domain the brand table proves, so it buys less: the
-    // findings a genuine-but-compromised account would produce keep their full weight.
-    if (!brandDampens && isAtLeast(s.severity, 'high')) return s;
+    // Neither proof softens a `high` or `critical` finding, with one exception below. A genuine sender is
+    // exactly what a compromised account looks like, and the brand's own signature on "change the
+    // payee's bank details" makes that request no less dangerous to act on.
+    const refutable =
+      brandDampens &&
+      DAMPENING.refutableCombinations.some((id) => s.id === `content.${DAMPENING.combinationIdPrefix}${id}`);
+    if (isAtLeast(s.severity, 'high') && !refutable) return s;
 
-    // Combination signals are zeroed rather than merely downgraded. A combination's entire claim is
-    // an inference about *intent* drawn from two themes co-occurring ("urgency plus a credential
-    // request means someone is rushing you onto a fake login page"). Once the sender is verified as
-    // the organisation it claims to be, that inference has no basis — the co-occurrence is just what
-    // a real password-reset notice looks like. The finding stays visible for transparency, scoring
-    // nothing, instead of being deleted.
-    if (s.id.startsWith(`content.${DAMPENING.combinationIdPrefix}`)) {
+    // Refutable combinations are zeroed rather than merely downgraded. Their entire claim is an
+    // inference about *intent* drawn from two themes co-occurring ("urgency plus a credential request
+    // means someone is rushing you onto a fake login page"). Once the sender is verified as the
+    // organisation it claims to be and every link stays inside it, that inference has no basis — the
+    // co-occurrence is just what a real password-reset notice looks like. The finding stays visible
+    // for transparency, scoring nothing, instead of being deleted.
+    if (refutable) {
       return {
         ...s,
         severity: 'info' as const,

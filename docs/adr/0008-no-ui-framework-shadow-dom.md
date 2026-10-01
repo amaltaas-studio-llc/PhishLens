@@ -18,7 +18,8 @@ The UI is a small number of elements. Message content is attacker-controlled. Gm
 
 ## Consequences
 
-- “No HTML from mail” is structural and grepped in bundles.
+- “No HTML from mail” is structural: ESLint bans the HTML sinks in source, and `scripts/check-dist.mjs`
+  greps every built bundle for them, which also covers anything a build plugin or future dependency inlines.
 - The card stays readable while scrolling the message.
 - Health diagnostics can report drift without uploading mail content.
 

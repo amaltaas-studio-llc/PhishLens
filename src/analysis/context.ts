@@ -35,7 +35,7 @@ import {
   hasRedirectParam,
   isDangerousScheme,
   isIpHost,
-  isKnownTrackingRedirector,
+  isKnownClickTracker,
   isMalformedHost,
   isNonNavigationScheme,
   isShortener,
@@ -51,6 +51,24 @@ import {
 } from '../shared/url.js';
 import { decodeIdnHost, hasBidiOrInvisible, skeleton } from '../shared/unicode.js';
 
+/** One host a click passes through, normalised the same way a link's destination is. */
+export interface LinkHost {
+  url: URL;
+  hostname: string;
+  registrable: string;
+  subdomain: string;
+  tld: string;
+  /** Rendered (Unicode) form of the hostname. */
+  displayHost: string;
+  subdomainLabelCount: number;
+  isIp: boolean;
+  isPunycode: boolean;
+  isShortener: boolean;
+  openHosting: string | null;
+  /** This hop is a recognised click-tracking endpoint (`KNOWN_CLICK_TRACKERS`), matched by host and path. */
+  knownTracker: boolean;
+}
+
 export interface LinkAnalysis {
   index: number;
   link: EmailLink;
@@ -58,6 +76,17 @@ export interface LinkAnalysis {
   raw: URL | null;
   /** Destination after peeling redirect wrappers. Equals `raw` when there were none. */
   target: URL | null;
+  /**
+   * Every web host the click passes through, entry first and destination last, without repeats.
+   *
+   * The reason host rules iterate this rather than reading `hostname`. Unwrapping a redirect *adds* a
+   * host to examine; it does not replace the one in the href, which is the server the reader's click
+   * actually reaches. Judging only the unwrapped target let `paypa1.com/invoice?next=https://paypal.com/`
+   * pass every host rule, since the parameter named a destination nobody would question — the parameter
+   * is whatever the attacker typed, and the entry host is the one thing they cannot dress up. Empty for
+   * a non-web href.
+   */
+  hosts: LinkHost[];
   redirectHops: number;
   redirectChain: string[];
   /** A redirect parameter was present but its destination is not visible to us. */
@@ -65,13 +94,16 @@ export interface LinkAnalysis {
   /** The URL carries a redirect-style parameter, whether or not we could resolve its target. */
   redirectShaped: boolean;
   /**
-   * The href's own host is a recognised mail-tracking redirector (SendGrid, Mailchimp, Outlook Safe
+   * The href's own host is a recognised click-tracking endpoint (SendGrid, Mailchimp, Outlook Safe
    * Links, Proofpoint, …).
    *
    * Checked on the *entry* host regardless of whether the wrapped target was resolvable, because
    * these services routinely encode the destination in a form we cannot decode. Without this, every
    * ESP-sent newsletter looks like an anchor/href mismatch: the anchor still reads
    * `example.com` while the href has been rewritten to `ct.sendgrid.net/ls/click?upn=…`.
+   *
+   * It excuses the tracker's *own* host and nothing more. When the destination could be decoded, the
+   * rules judge it like any other host; a tracker wrapping `evil.example` is a link to `evil.example`.
    */
   wrappedByKnownTracker: boolean;
   /**
@@ -197,7 +229,7 @@ export interface AnalysisContext {
   webLinks: LinkAnalysis[];
   attachments: AttachmentAnalysis[];
 
-  /** Distinct registrable domains across all resolved link targets. */
+  /** Distinct registrable domains across every host every web link passes through. */
   linkRegistrables: Set<string>;
 
   /**
@@ -271,7 +303,7 @@ export function buildContext(email: EmailMessage, options: ContextOptions = {}):
 
   const webLinks = links.filter((l) => l.isWeb);
   const linkRegistrables = new Set(
-    webLinks.map((l) => l.registrable).filter((d) => d !== ''),
+    webLinks.flatMap((l) => l.hosts.map((h) => h.registrable)).filter((d) => d !== ''),
   );
 
   const senderLocalPart = emailLocalPart(senderEmail);
@@ -342,17 +374,19 @@ function analyzeLink(link: EmailLink, index: number, senderRegistrable: string):
   const hostname = target === null ? '' : normalizeDomain(target.hostname);
   const entryRegistrable = raw === null ? '' : registrableDomain(normalizeDomain(raw.hostname));
   const displayed = parseDisplayedUrl(link.text);
+  const hosts = raw !== null && isWebUrl(raw) ? linkHosts(unwrapped?.urls ?? [raw]) : [];
 
   return {
     index,
     link,
     raw,
     target,
+    hosts,
     redirectHops: unwrapped?.hops ?? 0,
     redirectChain: unwrapped?.chain ?? [],
     opaqueRedirect: unwrapped?.opaqueRedirect ?? false,
     redirectShaped: raw !== null && hasRedirectParam(raw),
-    wrappedByKnownTracker: raw !== null && isKnownTrackingRedirector(raw.hostname),
+    wrappedByKnownTracker: raw !== null && isKnownClickTracker(raw),
     onSenderDomain: entryRegistrable !== '' && entryRegistrable === senderRegistrable,
     hostname,
     registrable: registrableDomain(hostname),
@@ -373,6 +407,32 @@ function analyzeLink(link: EmailLink, index: number, senderRegistrable: string):
     displayedRegistrable: displayed === null ? '' : registrableDomain(displayed.hostname),
     anchorText: normalizeForMatching(link.text).slice(0, 300),
   };
+}
+
+/** `urls` is bounded by `unwrapRedirects`, so this is at most a handful of entries per link. */
+function linkHosts(urls: readonly URL[]): LinkHost[] {
+  const hosts: LinkHost[] = [];
+  const seen = new Set<string>();
+  for (const url of urls) {
+    const hostname = normalizeDomain(url.hostname);
+    if (seen.has(hostname)) continue;
+    seen.add(hostname);
+    hosts.push({
+      url,
+      hostname,
+      registrable: registrableDomain(hostname),
+      subdomain: subdomainOf(hostname),
+      tld: tldOf(hostname),
+      displayHost: decodeIdnHost(hostname),
+      subdomainLabelCount: countSubdomainLabels(hostname),
+      isIp: hostname !== '' && isIpHost(hostname),
+      isPunycode: hasPunycode(hostname),
+      isShortener: hostname !== '' && isShortener(hostname),
+      openHosting: hostname === '' ? null : openHostingSuffix(hostname),
+      knownTracker: isKnownClickTracker(url),
+    });
+  }
+  return hosts;
 }
 
 /**

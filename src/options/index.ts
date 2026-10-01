@@ -23,6 +23,7 @@ import {
   isRemoteAddress,
   normalizeBackendUrl,
   normalizeModelBaseUrl,
+  originPattern,
 } from '../shared/settings.js';
 import { withoutTrustedSender } from '../shared/trust.js';
 import type { Settings } from '../shared/types.js';
@@ -31,20 +32,6 @@ import { el, requireElement } from '../ui/dom.js';
 declare const __PHISHLENS_VERSION__: string;
 
 const STATUS_MS = 1600;
-
-/**
- * The match pattern for a validated base URL, as narrow as Chrome allows: one scheme, one host, one
- * port. Chrome grants by origin, so the path prefix cannot be part of it — `/engines/v1` is not a
- * separate permission from `/`.
- */
-function originPattern(baseUrl: string): string | null {
-  if (baseUrl === '') return null;
-  try {
-    return `${new URL(baseUrl).origin}/*`;
-  } catch {
-    return null;
-  }
-}
 
 class OptionsPage {
   readonly #modeInputs = [...document.querySelectorAll<HTMLInputElement>('input[name="aiMode"]')];
@@ -202,9 +189,10 @@ class OptionsPage {
       settings.modelBaseUrl === ''
         ? 'Set the server address, then choose a model. Until both are set, analysis runs without a model.'
         : !granted
-          ? // Both fields can be filled in by hand, which looks complete and fails on every request,
-            // since Chrome blocks the call before the server ever sees it.
-            'Press Connect to allow PhishLens to reach this address. Without that, every request is blocked by Chrome.'
+          ? // Both fields can be filled in by hand, which looks complete and fails on every request:
+            // the worker refuses to contact an address the user has not granted. Chrome alone would
+            // not stop it — an ungranted request still leaves, as an ordinary cross-origin one.
+            'Press Connect to allow PhishLens to reach this address. Until then, nothing is sent to it.'
           : settings.modelName === ''
             ? 'Choose a model. Press Connect to list what this server has loaded.'
             : '';

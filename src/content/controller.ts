@@ -86,6 +86,17 @@ export class Controller {
   #active: ActiveView | null = null;
   /** Guards against a slow analysis of a previous message overwriting a newer one. */
   #analysisToken = 0;
+  /**
+   * Set by `stop()`, and never cleared: a stopped controller is finished, and a page restored from the
+   * back/forward cache gets a new one (see `content/index.ts`).
+   *
+   * Checked after every `await`, because each is a point at which `pagehide` may have run. Without it a
+   * `start()` still waiting on settings went on to register its listeners after `stop()` had removed
+   * them, and a settings reload in flight rebuilt the list observer and warmed the model on a page that
+   * had already been torn down.
+   */
+  #stopped = false;
+  #settingsRequest = 0;
 
   constructor(adapter: MailAdapter) {
     this.#adapter = adapter;
@@ -104,7 +115,8 @@ export class Controller {
         this.#highlighter.clear();
       },
       onClose: () => {
-        this.#panel.close();
+        // Back to the control that opened the card, but only from inside it; see `Panel.close`.
+        if (this.#panel.close()) this.#badge.focus();
       },
       onTrustChange: (entry, trusted) => {
         void this.#changeTrust(entry, trusted);
@@ -120,7 +132,9 @@ export class Controller {
   }
 
   async start(): Promise<void> {
-    this.#settings = await requestSettings();
+    const settings = await requestSettings();
+    if (this.#stopped) return;
+    this.#settings = settings;
     logger.info('starting', { aiMode: this.#settings.aiMode, adapter: this.#adapter.id });
 
     chrome.storage.onChanged.addListener(this.#handleStorageChanged);
@@ -131,6 +145,7 @@ export class Controller {
   }
 
   stop(): void {
+    this.#stopped = true;
     this.#requestedReading = null;
     this.#analysisToken++;
     this.#readings.clear();
@@ -519,7 +534,7 @@ export class Controller {
    * and that cost would otherwise land on the first message opened. Fire-and-forget.
    */
   #warmModel(): void {
-    if (this.#settings.aiMode !== 'local') return;
+    if (this.#stopped || this.#settings.aiMode !== 'local') return;
     void localAnalyzer().warmUp();
   }
 
@@ -538,8 +553,12 @@ export class Controller {
   };
 
   async #reloadSettings(): Promise<void> {
+    const request = ++this.#settingsRequest;
+    const settings = await requestSettings();
+    // A slower read must not roll the tab back to an earlier settings snapshot.
+    if (this.#stopped || request !== this.#settingsRequest) return;
     const previous = this.#settings;
-    this.#settings = await requestSettings();
+    this.#settings = settings;
     logger.debug('settings reloaded', { aiMode: this.#settings.aiMode });
 
     const impact = settingsImpact(previous, this.#settings);
@@ -587,7 +606,7 @@ export class Controller {
    * Stopping removes every mark, so turning the setting off leaves nothing behind to explain.
    */
   #applyListMarks(): void {
-    if (!this.#settings.listMarksEnabled) {
+    if (this.#stopped || !this.#settings.listMarksEnabled) {
       this.#listMarks.stop();
       return;
     }

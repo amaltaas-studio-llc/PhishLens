@@ -183,7 +183,7 @@ export function semanticToSignals(
 
   if (analysis.reasons.length > 0) {
     parts.push(
-      `${REASONING_PREFIX} ${analysis.reasons.map((r) => (r.endsWith('.') ? r : `${r}.`)).join(' ')}`,
+      `${REASONING_PREFIX} ${analysis.reasons.map((r) => (/[.!?…。！？]["”']?$/u.test(r) ? r : `${r}.`)).join(' ')}`,
     );
   }
 

@@ -92,9 +92,23 @@ describe('trustEntryFor', () => {
     expect(trustEntryFor('not-an-address')).toBeNull();
     expect(trustEntryFor(`${'a'.repeat(300)}@example.com`)).toBeNull();
   });
+
+  it("offers a shared platform tenant's own host, never the platform", () => {
+    expect(trustEntryFor('support@northwind.zendesk.com')).toBe('northwind.zendesk.com');
+    expect(trustEntryFor('it@northwind.onmicrosoft.com')).toBe('northwind.onmicrosoft.com');
+  });
 });
 
 describe('matchingTrustEntry', () => {
+  it("does not let one tenant of a shared platform inherit another's trust", () => {
+    expect(matchingTrustEntry(['northwind.zendesk.com'], 'help@northwind.zendesk.com')).toBe(
+      'northwind.zendesk.com',
+    );
+    expect(matchingTrustEntry(['northwind.zendesk.com'], 'help@northwlnd.zendesk.com')).toBeUndefined();
+    // An entry naming the platform itself trusts nobody, rather than every tenant.
+    expect(matchingTrustEntry(['zendesk.com'], 'help@northwind.zendesk.com')).toBeUndefined();
+  });
+
   it('matches a domain entry across subdomains and an address entry exactly', () => {
     expect(matchingTrustEntry(['ledgerworks-billing.com'], 'x@mail.ledgerworks-billing.com')).toBe(
       'ledgerworks-billing.com',
@@ -462,22 +476,39 @@ describe('brand dampening and proof of origin', () => {
     expect(signalFor(result, 'content.mfa_request')?.severity).toBe('high');
   });
 
-  it('still dampens the same message when Gmail proved the sender', () => {
-    const result = analyzeDeterministic({ ...impersonation, auth: PROVEN_BRAND }, { now: FIXED_NOW });
+  // The genuine shape: a security notice asking the reader to verify, with no link anywhere else.
+  const notice: EmailMessage = {
+    ...impersonation,
+    bodyText:
+      'We detected unusual activity on your account. Please verify your account to confirm your identity and restore access immediately.',
+  };
 
-    expect(signalFor(result, 'content.mfa_request')?.dampened).toBe(true);
+  it('dampens a security notice when Gmail proved the sender', () => {
+    const unproven = analyzeDeterministic(notice, { now: FIXED_NOW });
+    const result = analyzeDeterministic({ ...notice, auth: PROVEN_BRAND }, { now: FIXED_NOW });
+
+    expect(unproven.signals.filter((s) => s.dampened === true)).toEqual([]);
+    expect(signalFor(result, 'content.credential_verification')?.dampened).toBe(true);
     expect(result.classification).toBe('low');
   });
 
   it('accepts an aligned signed-by row on its own, as the trust gate does', () => {
     // The only authentication evidence most Gmail builds actually render. A gate needing more than this is
     // a gate that never fires in production while passing every test here.
-    const result = analyzeDeterministic(
-      { ...impersonation, auth: { signedBy: 'paypal.com' } },
-      { now: FIXED_NOW },
-    );
+    const result = analyzeDeterministic({ ...notice, auth: { signedBy: 'paypal.com' } }, { now: FIXED_NOW });
 
-    expect(signalFor(result, 'content.mfa_request')?.dampened).toBe(true);
+    expect(signalFor(result, 'content.credential_verification')?.dampened).toBe(true);
+  });
+
+  it('never softens a high finding, however well the brand is proven', () => {
+    // Asking for the code is the request no real organisation makes, and a genuine signature is what a
+    // compromised brand mailbox produces — the reason trust keeps `high` at full weight applies here too.
+    const result = analyzeDeterministic({ ...impersonation, auth: PROVEN_BRAND }, { now: FIXED_NOW });
+    const mfa = signalFor(result, 'content.mfa_request');
+
+    expect(mfa?.severity).toBe('high');
+    expect(mfa?.dampened).toBeUndefined();
+    expect(result.classification).not.toBe('low');
   });
 
   it.each<[string, EmailAuthInfo]>([

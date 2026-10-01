@@ -84,8 +84,17 @@ export const SELECTORS = {
    */
   body: ['div.a3s.aiL', 'div.a3s', '.ii.gt div[dir]', '.ii.gt'],
 
-  /** Quoted / trimmed content, excluded from analysis so replies are not re-analysed. */
-  quotedContent: ['.gmail_quote', '.im', 'blockquote.gmail_quote', '.ajR', 'div[class*="quote"]'],
+  /**
+   * Quoted / trimmed content, excluded from the body text so replies are not re-analysed.
+   *
+   * Whole class names only, never a substring match. Gmail prefixes the classes a sender writes
+   * (`pull-quote` arrives as `m_42pull-quote`), and a prefix still contains every substring it did before:
+   * `[class*="quote"]` matched any sender who chose a class with "quote" in it, which made wrapping the
+   * whole message in one a way to have none of it read. What remains here can still be written by a sender
+   * — `.gmail_quote` is only a class — so the consumers are built so that matching it costs wording at
+   * worst: links are read regardless, and a body with nothing outside its quotes is read from the quotes.
+   */
+  quotedContent: ['.gmail_quote', '.im', 'blockquote.gmail_quote', '.ajR'],
 
   /** The "show details" table Gmail renders with mailed-by / signed-by / to. */
   detailsTable: ['table.cf.gJ', '.hb table', '.ajA table', 'table.gJ'],

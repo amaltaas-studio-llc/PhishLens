@@ -15,7 +15,8 @@ import {
   hasUnknownTld,
   isDangerousScheme,
   isIpHost,
-  isKnownTrackingRedirector,
+  isKnownClickTracker,
+  isKnownSendingPlatform,
   isMalformedHost,
   isNonNavigationScheme,
   isShortener,
@@ -208,9 +209,29 @@ describe('domain reputation lists', () => {
     expect(isShortener('example.com')).toBe(false);
   });
 
-  it('recognises tracking redirectors including their subdomains', () => {
-    expect(isKnownTrackingRedirector('click.sendgrid.net')).toBe(true);
-    expect(isKnownTrackingRedirector('evil.example')).toBe(false);
+  it('recognises click trackers by their own host and click path, not by registrable domain', () => {
+    expect(isKnownClickTracker(new URL('https://u123.ct.sendgrid.net/ls/click?upn=x'))).toBe(true);
+    expect(isKnownClickTracker(new URL('https://www.google.com/url?q=https://example.org/'))).toBe(true);
+    expect(isKnownClickTracker(new URL('https://substack.com/redirect/abc'))).toBe(true);
+    expect(isKnownClickTracker(new URL('https://evil.example/ls/click'))).toBe(false);
+    // Publishable surfaces of a tracker's owner are pages, not hops.
+    expect(isKnownClickTracker(new URL('https://docs.google.com/forms/d/x/viewform'))).toBe(false);
+    expect(isKnownClickTracker(new URL('https://www.google.com/search?q=x'))).toBe(false);
+    expect(isKnownClickTracker(new URL('https://attacker.substack.com/p/sign-in'))).toBe(false);
+    expect(isKnownClickTracker(new URL('https://phish.hs-sites.com/login.html'))).toBe(false);
+  });
+
+  it('recognises sending platforms by registrable domain, for the envelope only', () => {
+    expect(isKnownSendingPlatform('bounces.sendgrid.net')).toBe(true);
+    expect(isKnownSendingPlatform('mail.substack.com')).toBe(true);
+    expect(isKnownSendingPlatform('evil.example')).toBe(false);
+  });
+
+  it('peels each redirect hop into the url list, entry first', () => {
+    const peeled = unwrapRedirects(
+      new URL('https://paypa1.com/r?url=https%3A%2F%2Fnorthwind-traders.example%2F'),
+    );
+    expect(peeled.urls.map((url) => url.hostname)).toEqual(['paypa1.com', 'northwind-traders.example']);
   });
 
   it('identifies open hosting suffixes, which anyone can get a subdomain on', () => {

@@ -13,7 +13,7 @@
 import { brandOwningDomain, brandOwns } from '../../shared/brands.js';
 import type { AuthVerdict, SecuritySignal } from '../../shared/types.js';
 import {
-  isKnownTrackingRedirector,
+  isKnownSendingPlatform,
   normalizeDomain,
   registrableDomain,
   sameRegistrableDomain,
@@ -36,6 +36,24 @@ function authenticationFailure(context: AnalysisContext): SecuritySignal[] {
   if (isFailure(auth.dkim)) failed.push(`DKIM (${auth.dkim ?? ''})`);
   if (isFailure(auth.dmarc)) failed.push(`DMARC (${auth.dmarc ?? ''})`);
   if (failed.length === 0) return [];
+
+  // DMARC passing means the From domain was proven by whichever mechanism *did* align, so a failed SPF or
+  // DKIM beside it is the trace of a forwarder or a list rewriting the message, not of a forged sender.
+  // At `high` it put an ordinary forwarded message at Suspicious on the strength of a check the verdict
+  // that matters had already overruled.
+  if (auth.dmarc === 'pass') {
+    return [
+      signal({
+        id: 'authentication.partial_failure',
+        category: 'authentication',
+        severity: 'low',
+        score: 8,
+        title: 'One authentication check failed, but DMARC passed',
+        description: `Gmail reports that ${failed.join(' and ')} did not pass, while DMARC did. DMARC passing means the message was still tied to ${context.senderDomain === '' ? 'the sender\u2019s domain' : context.senderDomain}; a single failed check alongside it is usually a forwarding service or mailing list in the delivery path.`,
+        evidence: { value: failed.join(', ') },
+      }),
+    ];
+  }
 
   // Deliberately `high` rather than `critical`, even though a hard SPF/DKIM failure looks conclusive.
   // Legitimate mail fails these routinely: forwarding breaks SPF, and mailing lists that rewrite a
@@ -75,7 +93,7 @@ function signingDomainMismatch(context: AnalysisContext): SecuritySignal[] {
   // A brand's own domain sending through a recognised bulk-mail platform, which signs with its own
   // domain by design. The mismatch carries no information here, and reporting it at `medium` used to be
   // enough to block the false-positive dampening on exactly the mail that dampening exists for.
-  if (fromOwner !== undefined && isKnownTrackingRedirector(signedBy)) return [];
+  if (fromOwner !== undefined && isKnownSendingPlatform(signedBy)) return [];
 
   const claimsBrand = context.primaryClaim !== undefined;
 
@@ -125,7 +143,7 @@ function sentViaUnrelatedHost(context: AnalysisContext): SecuritySignal[] {
   const brandClaimedButSentElsewhere =
     claim !== undefined && !brandOwns(claim.brand, viaRegistrable);
 
-  if (!brandClaimedButSentElsewhere && isKnownTrackingRedirector(via)) return [];
+  if (!brandClaimedButSentElsewhere && isKnownSendingPlatform(via)) return [];
 
   return [
     signal({

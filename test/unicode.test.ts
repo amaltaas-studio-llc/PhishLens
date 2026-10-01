@@ -10,6 +10,7 @@ import {
   decodeIdnHost,
   editDistance,
   hasBidiOrInvisible,
+  hasDirectionControl,
   hasStyledLetterforms,
   hasSuspiciousScriptMixing,
   isConfusableWith,
@@ -18,6 +19,7 @@ import {
   skeleton,
   stripBidiAndInvisible,
 } from '../src/shared/unicode.js';
+import { normalizeForMatching, parseMailbox } from '../src/shared/text.js';
 
 describe('punycodeDecodeLabel', () => {
   it.each([
@@ -118,6 +120,60 @@ describe('bidi and invisible characters', () => {
     expect(stripBidiAndInvisible('pay\u200bpal.com')).toBe('paypal.com');
     expect(stripBidiAndInvisible('clean.txt')).toBe('clean.txt');
   });
+
+  it.each([
+    ['invisible times', 'pass\u2062word'],
+    ['function application', 'pass\u2061word'],
+    ['combining grapheme joiner', 'pass\u034fword'],
+    ['pop directional formatting', 'pass\u202cword'],
+    ['left-to-right isolate', 'pass\u2066word'],
+    ['Hangul filler', 'pass\u3164word'],
+  ])('detects and strips a %s', (_label, input) => {
+    expect(hasBidiOrInvisible(input)).toBe(true);
+    expect(stripBidiAndInvisible(input)).toBe('password');
+  });
+
+  it('leaves emoji presentation selectors alone, which change nothing a reader is shown', () => {
+    expect(hasBidiOrInvisible('ok \u2764\ufe0f')).toBe(false);
+  });
+
+  it('tells characters that reorder text from characters that only hide in it', () => {
+    expect(hasDirectionControl('invoice\u202Egnp.exe')).toBe(true);
+    expect(hasDirectionControl('report\u2067.pdf')).toBe(true);
+    expect(hasDirectionControl('invoice.ex\u00ade')).toBe(false);
+    expect(hasDirectionControl('invoice.ex\u200be')).toBe(false);
+  });
+});
+
+describe('the same invisible set in matching text', () => {
+  it('lets a content rule read a keyword split by any character the identity rules strip', () => {
+    expect(normalizeForMatching('Pass\u2062word')).toBe('password');
+    expect(normalizeForMatching('Pass\u3164word')).toBe('password');
+  });
+
+  it("folds German ß onto the ss every pattern is written with", () => {
+    expect(normalizeForMatching('Schließung')).toBe('schliessung');
+  });
+});
+
+describe('parseMailbox on hostile input', () => {
+  it('splits a display name from its address', () => {
+    expect(parseMailbox('"Dana Whitfield" <Dana@Northwind-Logistics.com>')).toEqual({
+      name: 'Dana Whitfield',
+      email: 'dana@northwind-logistics.com',
+    });
+    expect(parseMailbox('dana@northwind-logistics.com')).toEqual({ email: 'dana@northwind-logistics.com' });
+    expect(parseMailbox('Dana <not an address>')).toEqual({ name: 'Dana <not an address>' });
+    expect(parseMailbox('<@x>')).toEqual({ name: '<@x>' });
+  });
+
+  it('stays linear on a header built to make a regex backtrack', () => {
+    const hostile = `${'<'.repeat(20_000)}${'a@'.repeat(20_000)}`;
+    const started = performance.now();
+    parseMailbox(hostile);
+    parseMailbox(`x <${'a@'.repeat(20_000)}`);
+    expect(performance.now() - started).toBeLessThan(250);
+  });
 });
 
 describe('skeleton (confusable folding)', () => {
@@ -140,6 +196,21 @@ describe('skeleton (confusable folding)', () => {
 
   it('is idempotent, so folding a folded string changes nothing', () => {
     expect(skeleton(skeleton('раураl'))).toBe(skeleton('раураl'));
+  });
+
+  it.each([
+    ['Cyrillic shha', 'һsbc', 'hsbc'],
+    ['Cyrillic palochka', 'аррӏе', 'apple'],
+    ['Latin alpha', 'pɑypal', 'paypal'],
+    ['Latin script g', 'ɡoogle', 'google'],
+  ])('folds a %s onto the letter it is drawn as', (_label, spoof, real) => {
+    expect(skeleton(spoof)).toBe(skeleton(real));
+  });
+
+  it('reads a Greek capital as the Latin capital it looks like, not as its own lowercase', () => {
+    // `Η` lowercases to `η`, which reads as an n; uppercase it is an H.
+    expect(skeleton('ΗSBC')).toBe(skeleton('HSBC'));
+    expect(skeleton('ΡΑΥΡΑL')).toBe(skeleton('PAYPAL'));
   });
 });
 

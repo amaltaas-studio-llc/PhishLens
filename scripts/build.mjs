@@ -2,9 +2,10 @@
 /**
  * PhishLens build.
  *
- * esbuild is used instead of Vite because the three entry points have three different output
- * contracts (content script must be IIFE, worker and options must be ESM), and because the primary
- * UI is injected into Gmail's DOM, so a dev server cannot preview it. See docs/adr/0001-esbuild-not-vite.md.
+ * esbuild is used instead of Vite because the five entry points do not share one output contract (the
+ * content script must be IIFE; the worker and the options, popup and welcome pages are ESM), and because
+ * the primary UI is injected into Gmail's DOM, so a dev server cannot preview it. See
+ * docs/adr/0001-esbuild-not-vite.md.
  */
 import * as esbuild from 'esbuild';
 import { readFile, writeFile, mkdir, rm, cp, access } from 'node:fs/promises';

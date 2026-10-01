@@ -127,6 +127,11 @@ export class Badge {
     );
   }
 
+  /** Moves focus to the badge, if it is on screen. Used to hand focus back when the card closes. */
+  focus(): void {
+    if (this.isAttached()) this.#button?.focus({ preventScroll: true });
+  }
+
   isAttached(): boolean {
     return this.#host?.isConnected === true;
   }

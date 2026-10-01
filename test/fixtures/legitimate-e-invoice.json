@@ -1,0 +1,23 @@
+{
+  "name": "legitimate-e-invoice",
+  "description": "False-positive resistance: a supplier invoice delivered in a national e-invoicing format, as an XML file with a PDF copy beside it. Structured invoices travel as .xml by law in several countries, so the file type is the most ordinary attachment such a supplier sends, and the word 'invoice' is always next to it. Reading .xml as a web page paired that with the invoice wording into a critical malware-pretext finding.",
+  "email": {
+    "senderName": "Northwind Forniture Amministrazione",
+    "senderEmail": "amministrazione@northwind-forniture.it",
+    "recipientEmail": "sam.okafor@northwind-logistics.com",
+    "subject": "Invoice 118/2026 - electronic invoice and PDF copy",
+    "bodyText": "Dear Sam,\n\nplease find attached invoice 118/2026 for the September shipment of packaging materials. The XML file is the electronic invoice as lodged with the tax exchange system; the PDF is a readable copy of the same document for your records.\n\nPayment terms are unchanged: 60 days end of month, to the account printed on the invoice.\n\nKind regards,\nGiulia Marchetti\nAccounts, Northwind Forniture S.r.l.",
+    "links": [],
+    "attachments": [
+      { "filename": "IT01234567890_00118.xml" },
+      { "filename": "Invoice-118-2026.pdf" }
+    ],
+    "auth": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass",
+      "signedBy": "northwind-forniture.it",
+      "mailedBy": "northwind-forniture.it"
+    }
+  }
+}

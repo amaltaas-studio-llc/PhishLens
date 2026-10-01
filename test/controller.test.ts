@@ -121,6 +121,7 @@ interface PendingInference {
 }
 
 let stored: Settings;
+let delayedSettings: (() => Promise<unknown>) | null = null;
 let inferences: PendingInference[];
 let storageListeners: ((changes: Record<string, unknown>, area: string) => void)[];
 let tabListeners: ((
@@ -166,6 +167,7 @@ function installChrome(): void {
     },
     sendMessage: (request: ExtensionRequest): Promise<unknown> => {
       if (request.type === 'GET_SETTINGS') {
+        if (delayedSettings !== null) return delayedSettings();
         return Promise.resolve({ ok: true, type: 'SETTINGS', settings: stored });
       }
       if (request.type === 'MODEL_SERVER_ANALYZE') {
@@ -458,6 +460,67 @@ describe('with the default gate on asking the model', () => {
 });
 
 /**
+ * `pagehide` can arrive while the controller is waiting on the service worker, and everything after that
+ * `await` used to run as though it had not: listeners registered after `stop()` removed them, and a settings
+ * reload rebuilt the list observer on a page that had been torn down.
+ */
+describe('when the page is hidden while work is in flight', () => {
+  /** A list row worth marking, so a list observer that should not exist leaves something to see. */
+  function drawListRow(): void {
+    const parsed = new DOMParser().parseFromString(
+      `<!doctype html><html><body><table><tr class="zA" id="row-0">
+        <td class="yW"><span email="security@paypa1-alerts.example" name="PayPal Security">PayPal Security</span></td>
+        <td class="xY"><div class="y6"><span>A subject</span></div></td>
+      </tr></table></body></html>`,
+      'text/html',
+    );
+    document.body.append(...parsed.body.childNodes);
+  }
+
+  it('does not finish starting after it has been stopped', async () => {
+    controller.stop();
+    storageListeners = [];
+    tabListeners = [];
+    inferences = [];
+    document.body.replaceChildren();
+
+    const late = new Controller(new FakeAdapter());
+    const starting = late.start();
+    late.stop();
+    await starting;
+    await vi.advanceTimersByTimeAsync(500);
+    await flush();
+
+    expect(storageListeners).toHaveLength(0);
+    expect(tabListeners).toHaveLength(0);
+    expect(badgeIsOnScreen()).toBe(false);
+    expect(inferences).toHaveLength(0);
+  });
+
+  it('does not apply a settings reload that lands after it has been stopped', async () => {
+    drawListRow();
+    writeSettings(settings({ listMarksEnabled: true }));
+    controller.stop();
+    await flush();
+    await vi.advanceTimersByTimeAsync(1000);
+    await flush();
+
+    expect(document.querySelector('.phishlens-row-mark')).toBeNull();
+  });
+
+  /** The control for the test above: the same write, without the stop, does mark the row. */
+  it('applies the same reload when it has not been stopped', async () => {
+    drawListRow();
+    writeSettings(settings({ listMarksEnabled: true }));
+    await flush();
+    await vi.advanceTimersByTimeAsync(1000);
+    await flush();
+
+    expect(document.querySelector('.phishlens-row-mark')).not.toBeNull();
+  });
+});
+
+/**
  * An inference already in flight belongs to the settings that have just been replaced. Its late answer
  * must neither repaint the view nor be kept as the new model's reading.
  */
@@ -514,4 +577,24 @@ describe('when a settings change supersedes work in flight', () => {
     expect(inferences).toHaveLength(1);
     expect(tabStatus()).toMatchObject({ semantic: 'ready' });
   });
+});
+
+
+it('ignores a settings snapshot that arrives after a newer reload', async () => {
+  inferences[0]?.resolve(semantic());
+  await flush();
+  const pending: ((value: unknown) => void)[] = [];
+  delayedSettings = () => new Promise((resolve) => { pending.push(resolve); });
+  try {
+    writeSettings(settings({ showBadgeWhenLow: true }));
+    writeSettings(settings({ showBadgeWhenLow: false }));
+    pending[1]?.({ ok: true, type: 'SETTINGS', settings: settings({ showBadgeWhenLow: false }) });
+    await flush();
+    expect(badgeIsOnScreen()).toBe(false);
+    pending[0]?.({ ok: true, type: 'SETTINGS', settings: settings({ showBadgeWhenLow: true }) });
+    await flush();
+    expect(badgeIsOnScreen()).toBe(false);
+  } finally {
+    delayedSettings = null;
+  }
 });

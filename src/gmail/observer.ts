@@ -12,7 +12,7 @@
  *
  * So both are used, reconciled through a single **view signature**:
  *
- *     routeThreadId | domMessageId | domThreadId | fingerprint(sender, subject, bodyLength)
+ *     routeThreadId | domMessageId | domThreadId | sender | fingerprint(the whole extracted message)
  *
  *  - The debounced observer recomputes the signature. **Unchanged signature → no emit.** That is what
  *    stops redundant re-analysis on a same-thread re-render.
@@ -38,8 +38,8 @@
  *
  * The fingerprint component matters beyond thread identity: Gmail reuses message-id attributes when
  * expanding a collapsed message in place, and it renders the header before the body has loaded.
- * Including the body length means "same thread, but the body has now actually arrived" is a change,
- * so the first emit is against a complete message rather than an empty one.
+ * Fingerprinting everything extracted means "same thread, but the body has now actually arrived" is a
+ * change, so the first emit is against a complete message rather than an empty one. See `domSignature`.
  */
 import { logger } from '../shared/logger.js';
 import type { EmailMessage, MessagePart } from '../shared/types.js';
@@ -74,6 +74,8 @@ export interface ObserverOptions {
   reconcileIntervalMs?: number;
   /** Give up reconciling after this long. */
   reconcileTimeoutMs?: number;
+  /** How long a body that is present but unreadable is given to become readable before it is reported. */
+  unreadableGraceMs?: number;
   /** How long a reported message may be absent before its absence is reported in turn. */
   disappearanceGraceMs?: number;
 }
@@ -88,6 +90,12 @@ const DEFAULTS = {
    * already on screen making a claim about a message nobody can see.
    */
   disappearanceGraceMs: 600,
+  /*
+   * Gmail draws a body hidden while it is still building the view, and reporting that as unreadable would
+   * flash "not checked" on ordinary mail. Long enough to outlast that; short enough that a body which
+   * really does hide everything is reported while the reader is still looking at it.
+   */
+  unreadableGraceMs: 1500,
 } as const;
 
 export class GmailObserver {
@@ -103,6 +111,9 @@ export class GmailObserver {
   #reconcileDeadline = 0;
   /** Grace period before a reported message's absence is treated as real. */
   #vanishTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The body first seen present-but-unreadable, and when, so the grace runs once per body. */
+  #unreadableSince: { body: Element | null; at: number } | null = null;
+  #unreadableTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Signature of the last emitted message. The redundancy guard, and *only* that. */
   #lastSignature = '';
@@ -181,6 +192,7 @@ export class GmailObserver {
     this.#clearDebounce();
     this.#stopReconciling();
     this.#stopConfirmingDisappearance();
+    this.#clearUnreadableGrace();
     this.#lastSignature = '';
     this.#reported = false;
     this.#lastEmit = null;
@@ -335,11 +347,41 @@ export class GmailObserver {
 
     const extraction = this.#adapter.extract(handle);
     const { email } = extraction;
+    const empty =
+      email.bodyText.trim() === '' && email.links.length === 0 && email.attachments.length === 0;
+    if (!empty || !extraction.missing.includes('body')) this.#clearUnreadableGrace();
     // A header rendered before its body: wait rather than analysing an empty message.
-    if (email.bodyText.trim() === '' && email.links.length === 0 && email.attachments.length === 0) {
-      return null;
-    }
+    if (empty && !extraction.missing.includes('body')) return null;
+    /*
+     * Unless the adapter has said the body is there and could not be read. That is waited on too, but
+     * only for a grace: waiting on it indefinitely meant a message that never emitted, and a message that
+     * never emits gets no badge — which on a quiet install is exactly what a clean message looks like.
+     */
+    if (empty && !this.#unreadableGraceOver(handle.bodyElement)) return null;
     return { handle, email: extraction.email, missing: extraction.missing };
+  }
+
+  /** Whether this unreadable body has been given its grace, arranging a re-evaluation if not. */
+  #unreadableGraceOver(body: Element | null): boolean {
+    const now = Date.now();
+    if (this.#unreadableSince?.body !== body) this.#unreadableSince = { body, at: now };
+    const remaining = this.#unreadableSince.at + this.#options.unreadableGraceMs - now;
+    if (remaining <= 0) return true;
+
+    // Nothing may mutate in the meantime, and a body that stays hidden must still be reported.
+    this.#unreadableTimer ??= setTimeout(() => {
+      this.#unreadableTimer = null;
+      this.#scheduleEvaluation();
+    }, remaining);
+    return false;
+  }
+
+  #clearUnreadableGrace(): void {
+    this.#unreadableSince = null;
+    if (this.#unreadableTimer !== null) {
+      clearTimeout(this.#unreadableTimer);
+      this.#unreadableTimer = null;
+    }
   }
 
   /** Visibility can make the first readable extraction possible, so watch before requiring one. */

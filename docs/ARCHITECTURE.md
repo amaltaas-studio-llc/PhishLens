@@ -22,11 +22,11 @@ list-row triage (sender only)
 
 | Area | Path | May use |
 | --- | --- | --- |
-| Pure engine | `src/analysis/` | No `chrome.*`, no `document`, no `fetch` |
-| Shared helpers | `src/shared/` | Same purity as analysis when imported from it |
+| Pure engine | `src/analysis/` | No `chrome.*`, no `document`, no `fetch`, no `Date.now` (lint-enforced) |
+| Shared helpers | `src/shared/` | Pure, except the `chrome.*` wrappers in `messaging.ts`, which touch `chrome` only when called |
 | Gmail DOM | `src/gmail/` | Selectors only in `selectors.ts` |
-| UI | `src/ui/`, welcome, options, popup | `el({ text })` only — never `innerHTML` |
-| Background | `src/background/` | Sole `fetch` site; URL from settings only |
+| UI | `src/ui/`, welcome, options, popup | `el({ text })` only — never `innerHTML` or any other HTML sink (lint-enforced, and grepped in bundles) |
+| Background | `src/background/` | Sole `fetch` site (lint-enforced); URL from settings only |
 
 The content script holds analysis state and the model session because MV3 workers die after idle
 ([adr/0002](adr/0002-mv3-state-in-content-script.md)).

@@ -216,6 +216,21 @@ export function isModelServerConfigured(settings: Settings): boolean {
 }
 
 /**
+ * The match pattern for a validated base URL, as narrow as Chrome allows: one scheme, one host, one
+ * port. Chrome grants by origin, so the path prefix cannot be part of it — `/engines/v1` is not a
+ * separate permission from `/`. Shared because the options page requests exactly this pattern and the
+ * worker checks exactly this pattern before every request; two derivations could disagree.
+ */
+export function originPattern(baseUrl: string): string | null {
+  if (baseUrl === '') return null;
+  try {
+    return `${new URL(baseUrl).origin}/*`;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * What a settings change asks of the message already on screen.
  *
  * Here rather than inside the content script so it can be asserted without a DOM, and in one place so the

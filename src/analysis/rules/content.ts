@@ -114,9 +114,11 @@ function firstUnnegatedMatch(
     if (!isNegated(text, found.index, found[0].length, packs)) {
       return { match: found[0], index: found.index };
     }
-    // A zero-length match would otherwise loop on one position forever. No pattern here can produce one
-    // today; the guard costs nothing and what it prevents is a hung tab.
-    if (scan.lastIndex === found.index) scan.lastIndex += 1;
+    // Resume one character in, not after the match. A pattern with a bounded gap (`share[^.]{0,40}code`)
+    // can swallow a second, unnegated request into the negated one's span — "never share it with anyone,
+    // just send the code" — and skipping the whole span would hide it. `MAX_OCCURRENCES` still bounds
+    // the work, and the step also keeps a zero-length match from looping on one position.
+    scan.lastIndex = found.index + 1;
   }
   return null;
 }
@@ -304,11 +306,26 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
       'The message requests that stored bank or payment details be updated. Redirecting a legitimate payment stream is the highest-value form of invoice fraud.',
     severity: 'high',
     score: 30,
+    // Where money is *sent*, not how the reader pays. "Update your payment information" and "update your
+    // account information" are what every subscription says about a card on file, and a `high` finding
+    // there made ordinary billing mail Suspicious; the fraud is a payee announcing a new account to pay
+    // into, which is spelled with bank, remittance, payee or account-number wording.
     patterns: [
-      /\b(update|change|amend|revise|new|different|updated)\b[^.!?]{0,40}\b(bank|banking|account|payment|remittance|payee|deposit) (details|information|account|instructions|number)\b/u,
+      /\b(update|change|amend|revise|new|different|updated)\b[^.!?]{0,40}\b(?:(?:bank|banking|remittance|payee|deposit) (?:details|information|account|instructions|number)|account (?:number|instructions)|payment (?:instructions|account))\b/u,
       /\b(our|the|my) (bank|banking|account) (details|information) (have|has) (changed|been (changed|updated))\b/u,
-      /\b(please )?(use|note) (the )?(new|updated|following) (bank|account|payment|remittance)\b/u,
+      /\b(please )?(use|note) (the )?(new|updated|following) (bank|account|remittance|payment (details|instructions|account))\b/u,
       /\bchange (of|to) (bank|banking|payment|remittance) (details|instructions)\b/u,
+    ],
+  },
+  {
+    id: 'billing_update',
+    title: 'Message asks you to update a card or billing details',
+    description:
+      'The message asks the recipient to update the card or billing details held for an account. Every subscription sends this when a card expires, so it is noted rather than weighed; it matters when the message also threatens the account.',
+    severity: 'low',
+    score: 8,
+    patterns: [
+      /\b(update|confirm|verify|re-?enter|change|fix)\b[^.!?]{0,30}\b(payment|billing|card) (information|info|details|method)\b/u,
     ],
   },
   {
@@ -504,6 +521,15 @@ const COMBINATIONS: readonly Combination[] = [
       'The message states the account is at risk and directs the recipient to sign in to resolve it. This pairing is the standard structure of a credential-harvesting page lure.',
   },
   {
+    id: 'billing_update_under_threat',
+    requires: ['account_threat', 'billing_update'],
+    severity: 'high',
+    score: 30,
+    title: 'Message threatens account loss and asks for card details',
+    description:
+      'The message states the account is blocked or about to be deleted and directs the recipient to re-enter card or billing details to keep it. This pairing is the standard structure of a fake billing page lure.',
+  },
+  {
     id: 'gift_card_with_secrecy',
     requires: ['gift_card', 'secrecy'],
     severity: 'critical',
@@ -592,12 +618,22 @@ interface ThemeMatch {
   evidenceText: string;
 }
 
-function matchThemes(context: AnalysisContext): ThemeMatch[] {
+interface Wording {
+  folded: string;
+  packs: readonly LanguagePack[];
+}
+
+/** Shared by theme, bulk-mail and salutation checks so each message is folded and gated once. */
+function prepareWording(text: string): Wording {
+  const folded = foldLatinDiacritics(text);
+  return { folded, packs: detectLanguages(folded) };
+}
+
+function matchThemes(context: AnalysisContext, wording = prepareWording(context.matchText)): ThemeMatch[] {
   // Pack patterns run against diacritic-folded text so accentless spellings still match; evidence is
   // always excerpted from the unfolded `matchText`, whose indices the fold preserves.
   const text = context.matchText;
-  const folded = foldLatinDiacritics(text);
-  const packs = detectLanguages(folded);
+  const { folded, packs } = wording;
   const matches: ThemeMatch[] = [];
 
   for (const pattern of CONTENT_PATTERNS) {
@@ -632,15 +668,14 @@ function matchThemes(context: AnalysisContext): ThemeMatch[] {
  * it does not clear the message — it suppresses the *content* heuristics that bulk mail trivially
  * trips, while leaving every link and identity finding intact.
  */
-function looksLikeBulkMail(context: AnalysisContext): boolean {
+function looksLikeBulkMail(context: AnalysisContext, wording: Wording): boolean {
   // A message that pads itself with text the reader cannot see is not the legitimate marketing this
   // suppression protects, and the suppression is cheap for an attacker to earn: an unsubscribe line and a
   // link named "unsubscribe" is the entire cost. Concealed filler withdraws the benefit of the doubt.
   const hidden = context.email.hiddenText?.chars ?? 0;
   if (hidden >= DETECTION_TUNING.minHiddenBodyChars) return false;
 
-  const folded = foldLatinDiacritics(context.matchText);
-  const packs = detectLanguages(folded);
+  const { folded, packs } = wording;
   const englishUnsubscribe =
     /\b(unsubscribe|opt[- ]out|manage (your )?(email )?preferences|update (your )?preferences|email preferences|no longer wish to receive|stop receiving|view (this|it) (email )?in (your )?browser|sent to you because|you are receiving this)\b/u.test(
       context.matchText,
@@ -664,11 +699,20 @@ function looksLikeBulkMail(context: AnalysisContext): boolean {
   return (manyLinks || hasUnsubscribeLink) && !credentialAsk;
 }
 
-function themeSignals(context: AnalysisContext, themes: ThemeMatch[]): SecuritySignal[] {
-  const bulk = looksLikeBulkMail(context);
+/**
+ * The themes that count, once bulk mail has had its marketing-prone ones withdrawn.
+ *
+ * Combinations are built from this and not from every match: a theme suppressed because it is how
+ * newsletters talk cannot come back as half of a `high` combination, which would restore the false
+ * positive at a higher severity than the one the suppression removed.
+ */
+function survivingThemes(context: AnalysisContext, themes: ThemeMatch[], wording: Wording): ThemeMatch[] {
+  const bulk = looksLikeBulkMail(context, wording);
+  return themes.filter((theme) => !(bulk && theme.pattern.suppressedInBulk === true));
+}
 
+function themeSignals(themes: ThemeMatch[]): SecuritySignal[] {
   return themes
-    .filter((theme) => !(bulk && theme.pattern.suppressedInBulk === true))
     .map((theme) =>
       signal({
         id: `content.${theme.pattern.id}`,
@@ -700,12 +744,11 @@ function combinationSignals(themes: ThemeMatch[]): SecuritySignal[] {
  * A message that names a brand but whose text never references anything the recipient could
  * independently verify (an order number, an account's last four digits, a real name).
  */
-function genericSalutationWithBrandClaim(context: AnalysisContext): SecuritySignal[] {
+function genericSalutationWithBrandClaim(context: AnalysisContext, wording: Wording): SecuritySignal[] {
   if (context.primaryClaim === undefined) return [];
   const generic =
     /\b(dear (customer|client|user|member|sir|madam|sir\/madam|account holder|valued (customer|client|member))|dear (email )?user|hello (customer|user|member)|attention:? (customer|user)|dear [\w.+-]+@)/u;
-  const folded = foldLatinDiacritics(context.matchText);
-  const packs = detectLanguages(folded);
+  const { folded, packs } = wording;
   const hit =
     firstMatch(context.matchText, generic) ??
     packs.reduce<{ match: string; index: number } | null>((found, pack) => {
@@ -919,11 +962,12 @@ function hiddenBodyText(context: AnalysisContext): SecuritySignal[] {
 }
 
 export function detectContentSignals(context: AnalysisContext): SecuritySignal[] {
-  const themes = matchThemes(context);
+  const wording = prepareWording(context.matchText);
+  const themes = survivingThemes(context, matchThemes(context, wording), wording);
   return [
-    ...themeSignals(context, themes),
+    ...themeSignals(themes),
     ...combinationSignals(themes),
-    ...genericSalutationWithBrandClaim(context),
+    ...genericSalutationWithBrandClaim(context, wording),
     ...subjectObfuscation(context),
     ...subjectPadding(context),
     ...forgedTrustAssurance(context),

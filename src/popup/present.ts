@@ -331,7 +331,9 @@ export function aiRow(settings: Settings, state: PopupState): AiRow {
 function fixFor(status: SemanticStatus, aiMode: AiMode): string | null {
   if (status === 'unavailable') {
     return aiMode === 'local'
-      ? 'This browser has no built-in model. Technical checks are unaffected; a model you run yourself works as an alternative.'
+      ? // `unavailable` covers a model not yet downloaded, a switched-off setting and an ineligible
+        // device, which Chrome does not distinguish, so the advice names the page that sorts them out.
+        'Chrome’s built-in model is not ready: it may need downloading or switching on. Settings links to the setup steps. Technical checks are unaffected.'
       : 'PhishLens could not reach it. Test the connection to see why.';
   }
   if (aiMode === 'server' && (status === 'no-output' || status === 'error')) {

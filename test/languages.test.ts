@@ -126,6 +126,14 @@ describe('language packs', () => {
     }
   });
 
+  it('matches the German and Swiss spellings of ß alike', () => {
+    const threat = LANGUAGE_PACKS.find((pack) => pack.id === 'de')?.themes.account_threat ?? [];
+    for (const body of ['um die Schließung zu vermeiden', 'um die Schliessung zu vermeiden']) {
+      const text = foldLatinDiacritics(normalizeForMatching(body));
+      expect(threat.some((pattern) => pattern.test(text)), body).toBe(true);
+    }
+  });
+
   it('keeps a conditional demand reportable despite a negation word', () => {
     const spanish = foldLatinDiacritics(
       normalizeForMatching(

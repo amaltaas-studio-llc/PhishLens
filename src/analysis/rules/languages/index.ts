@@ -37,6 +37,12 @@ export const LANGUAGE_PACKS: readonly LanguagePack[] = Object.freeze([
   hinglish,
 ]);
 
+// Pack data is immutable; compile its boundary-aware markers once rather than per message.
+const PACK_MARKERS = LANGUAGE_PACKS.map((pack) => ({
+  pack,
+  patterns: [...new Set(pack.markers)].map((marker) => compile(String.raw`\b${escapeRegExp(marker)}\b`)),
+}));
+
 const DEVANAGARI_LETTER = /\p{Script=Devanagari}/u;
 const ANY_LETTER = /\p{L}/u;
 
@@ -51,26 +57,25 @@ export function detectLanguages(text: string): readonly LanguagePack[] {
   const window = text.slice(0, DETECTION_TUNING.languageMarkerWindowChars);
   const active: LanguagePack[] = [];
 
-  for (const pack of LANGUAGE_PACKS) {
+  for (const { pack, patterns } of PACK_MARKERS) {
     if (pack.script === 'devanagari') {
       if (devanagariShare(window) >= DETECTION_TUNING.devanagariLetterShare) active.push(pack);
       continue;
     }
-    if (distinctMarkers(window, pack.markers) >= DETECTION_TUNING.languageMarkerMinDistinct) {
+    if (hasEnoughMarkers(window, patterns)) {
       active.push(pack);
     }
   }
   return active;
 }
 
-function distinctMarkers(text: string, markers: readonly string[]): number {
-  const seen = new Set<string>();
-  for (const marker of markers) {
-    if (seen.has(marker)) continue;
-    // Anchored per marker so a short particle cannot match inside a longer English word.
-    if (compile(String.raw`\b${escapeRegExp(marker)}\b`).test(text)) seen.add(marker);
+function hasEnoughMarkers(text: string, patterns: readonly RegExp[]): boolean {
+  let count = 0;
+  for (const pattern of patterns) {
+    if (pattern.test(text)) count++;
+    if (count >= DETECTION_TUNING.languageMarkerMinDistinct) return true;
   }
-  return seen.size;
+  return false;
 }
 
 function devanagariShare(text: string): number {

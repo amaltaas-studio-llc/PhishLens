@@ -70,6 +70,22 @@ const ELAPSED_TICK_MS = 200;
 const RING = { size: 72, radius: 30, stroke: 8, gap: 1.6 } as const;
 
 /**
+ * The card's focusable controls, each named by a selector, in the order they are tried.
+ *
+ * A repaint replaces every node in the card, so focus cannot be kept by holding the element: it is
+ * recorded as "the nth match of this selector" and put back on the nth match afterwards. `.trust button`
+ * comes before `button.copy` because the trust button carries that class too.
+ */
+const FOCUS_TARGETS = [
+  '.close',
+  '.trust button',
+  'button.action',
+  'li.finding[tabindex]',
+  '.diagnostic summary',
+  'button.copy',
+] as const;
+
+/**
  * What trust means, at the moment the user is deciding.
  *
  * Each says what is weighted down *and* what is not, because the honest summary of this feature is that
@@ -148,6 +164,14 @@ export class Panel {
   #panel: HTMLElement | null = null;
   #head: HTMLElement | null = null;
   #scroll: HTMLElement | null = null;
+  /**
+   * The polite live region, built once with the shell and only ever given new text.
+   *
+   * Outside everything `#paint` replaces, which is the point: a live region announces changes to itself,
+   * and one rebuilt on every paint is a new region each time — removed before its change can be read, and
+   * replaced by one whose first content screen readers treat as already there.
+   */
+  #live: HTMLElement | null = null;
   #open = false;
   /** Redraws the running counter while a reading is in flight. Owned here so closing stops it. */
   #ticker: ReturnType<typeof setInterval> | null = null;
@@ -186,7 +210,15 @@ export class Panel {
     }
   }
 
-  close(): void {
+  /**
+   * Removes the card. Returns whether focus was inside it, so the caller can put focus somewhere useful.
+   *
+   * The caller decides where rather than this, because the card does not know what opened it — and
+   * because Escape is heard while focus is anywhere in Gmail, and moving focus out of a reply someone is
+   * typing because they dismissed something else would be worse than leaving it.
+   */
+  close(): boolean {
+    const hadFocus = (this.#root?.activeElement ?? null) !== null;
     this.#stopTicker();
     document.removeEventListener('keydown', this.#handleKeydown, true);
     this.#callbacks.onBlurSignal();
@@ -196,18 +228,21 @@ export class Panel {
     this.#panel = null;
     this.#head = null;
     this.#scroll = null;
+    this.#live = null;
     this.#open = false;
+    return hadFocus;
   }
 
   /** Builds the empty shell once. Contents are supplied by `#paint`. */
   #build(): void {
     const { host, root } = createShadowHost(HOST_ID, PANEL_CSS);
+    const live = el('p', { class: 'live', attrs: { role: 'status', 'aria-live': 'polite' } });
     const head = el('div', { class: 'head' });
     const scroll = el('div', { class: 'scroll' });
     const panel = el('div', {
       class: 'panel',
       attrs: { role: 'dialog', 'aria-modal': 'false', 'aria-label': 'PhishLens security assessment' },
-      children: [head, scroll],
+      children: [live, head, scroll],
     });
 
     root.append(panel);
@@ -218,6 +253,38 @@ export class Panel {
     this.#panel = panel;
     this.#head = head;
     this.#scroll = scroll;
+    this.#live = live;
+  }
+
+  /** Which control has focus, as a selector and its position among that selector's matches. */
+  #focusedTarget(): { selector: string; index: number } | null {
+    const root = this.#root;
+    const active = root?.activeElement ?? null;
+    if (root === null || active === null) return null;
+
+    for (const selector of FOCUS_TARGETS) {
+      const index = [...root.querySelectorAll(selector)].indexOf(active);
+      if (index !== -1) return { selector, index };
+    }
+    return null;
+  }
+
+  /**
+   * Puts focus back on the control equivalent to the one that had it, after a paint replaced it.
+   *
+   * A control that no longer exists — the ask button, once the reading it asked for is under way — sends
+   * focus to the close button rather than letting it fall to the page, where a keyboard user would have
+   * to find their way back into the card from the top of Gmail.
+   */
+  #restoreFocus(target: { selector: string; index: number } | null, hadFocus: boolean): void {
+    const root = this.#root;
+    if (root === null || !hadFocus) return;
+
+    const matches = target === null ? [] : [...root.querySelectorAll<HTMLElement>(target.selector)];
+    const element =
+      matches[Math.min(target?.index ?? 0, matches.length - 1)] ??
+      root.querySelector<HTMLElement>('.close');
+    if (element !== null && root.activeElement !== element) element.focus({ preventScroll: true });
   }
 
   #paint(view: PanelView): void {
@@ -229,6 +296,8 @@ export class Panel {
     this.#stopTicker();
     panel.setAttribute('data-state', view.kind === 'result' ? view.result.classification : 'unreadable');
 
+    const hadFocus = (this.#root?.activeElement ?? null) !== null;
+    const focused = this.#focusedTarget();
     const offset = scroll.scrollTop;
     if (view.kind === 'result') {
       head.replaceChildren(...this.#renderHead(view.result, view.email));
@@ -246,6 +315,11 @@ export class Panel {
       scroll.replaceChildren(this.#renderUnreadable(view));
     }
     scroll.scrollTop = offset;
+    this.#restoreFocus(focused, hadFocus);
+
+    // Assigned only when it differs, since some screen readers announce a region rewritten unchanged.
+    const message = announcement(view);
+    if (this.#live !== null && this.#live.textContent !== message) this.#live.textContent = message;
   }
 
   /**
@@ -526,16 +600,16 @@ export class Panel {
   }
 
   /**
-   * `role="status"` on the label: the interesting moment for a screen-reader user is the transition
-   * *out* of this state, and a polite live region announces the replacement without interrupting
-   * whatever they are reading. The counter sits outside it, or every tick would be announced.
+   * No live region here: this whole section is replaced when the reading lands, and the interesting
+   * moment for a screen-reader user is that transition, which the shell's region announces (see
+   * `#live`). The counter is hidden from them, or every tick would be read out.
    */
   #renderPending(aiMode: AiMode): HTMLElement {
     return el('div', {
       class: 'pending',
       children: [
         el('span', { class: 'spinner', attrs: { 'aria-hidden': 'true' } }),
-        el('span', { text: pendingLabel(aiMode), attrs: { role: 'status' } }),
+        el('span', { text: pendingLabel(aiMode) }),
         el('span', { class: 'elapsed', attrs: { 'aria-hidden': 'true' } }),
       ],
     });
@@ -788,6 +862,21 @@ export class Panel {
       ],
     });
   }
+}
+
+/**
+ * What the live region says for a view: the verdict, and where the AI reading has got to.
+ *
+ * Short on purpose. It is read out on every change, so it carries only what changes — the verdict and
+ * the reading's arrival — and leaves the reasons to the card, which the reader can move through.
+ */
+function announcement(view: PanelView): string {
+  if (view.kind === 'unreadable') return `${UNREADABLE_LABEL}.`;
+
+  const verdict = `${CLASSIFICATION_LABELS[view.result.classification]}, ${String(view.result.score)} of 100.`;
+  if (view.semantic === 'pending') return `${verdict} ${pendingLabel(view.aiMode)}`;
+  if (view.semantic === 'ready') return `${verdict} AI assessment added.`;
+  return verdict;
 }
 
 /**

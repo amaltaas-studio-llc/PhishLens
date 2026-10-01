@@ -36,11 +36,12 @@ import {
   isCloudConfigured,
   isModelServerConfigured,
   normalizeSettings,
+  originPattern,
 } from '../shared/settings.js';
 import { truncate } from '../shared/text.js';
 import type { Settings } from '../shared/types.js';
 import { parseSemanticAnalysis } from '../analysis/llm/parse.js';
-import { MAX_PROMPT_CHARS } from '../analysis/llm/prompt.js';
+import { MAX_PROMPT_CHARS, SYSTEM_PROMPT } from '../analysis/llm/prompt.js';
 import { sanitizeCloudPayload } from '../analysis/llm/redact.js';
 import {
   MAX_TOKENS,
@@ -73,11 +74,46 @@ async function readSettings(): Promise<Settings> {
 }
 
 async function writeSettings(patch: Partial<Settings>): Promise<Settings> {
-  const current = await readSettings();
-  const next = normalizeSettings({ ...current, ...patch });
-  await chrome.storage.sync.set({ [STORAGE_KEY]: next });
-  return next;
+  // Storage has no atomic merge: the read and write must share a browser-managed lock.
+  // A module-level queue would disappear when MV3 terminates this worker.
+  return navigator.locks.request('phishlens-settings', async () => {
+    const current = await readSettings();
+    const next = normalizeSettings({ ...current, ...patch });
+    await chrome.storage.sync.set({ [STORAGE_KEY]: next });
+    return next;
+  });
 }
+
+/**
+ * The settings a Gmail tab may change: the trust list, which the card's "trust this sender" button
+ * edits. Everything else — above all where content is sent and which mode sends it — is changed only
+ * from the extension's own pages, so a defect that let a message run code in the content script could
+ * not use this channel to point egress somewhere new.
+ */
+const TAB_WRITABLE_SETTINGS: ReadonlySet<string> = new Set(['trustedSenders']);
+
+/**
+ * Whether the user granted access to the origin a request is about to go to.
+ *
+ * Checked here, before every request, because the grant is the user's consent and Chrome does not
+ * enforce it on its own: without a host permission an extension's fetch still leaves, as an ordinary
+ * cross-origin request, and reaches any server that answers CORS for extension origins — which is the
+ * configuration these servers are told to use. Settings can be edited without the options page (a
+ * content script can write `chrome.storage` directly), so this is the check that holds either way: no
+ * extension context can grant itself a host permission.
+ */
+async function hasHostAccess(baseUrl: string): Promise<boolean> {
+  const pattern = originPattern(baseUrl);
+  if (pattern === null) return false;
+  try {
+    return await chrome.permissions.contains({ origins: [pattern] });
+  } catch (error) {
+    logger.debug('host permission check failed', error);
+    return false;
+  }
+}
+
+const NOT_GRANTED = 'access to this address has not been granted; press Connect in PhishLens settings';
 
 /**
  * The single egress point.
@@ -91,6 +127,9 @@ async function cloudAnalyze(request: CloudAnalyzeRequest): Promise<ExtensionResp
   const settings = await readSettings();
   if (!isCloudConfigured(settings)) {
     return { ok: false, error: 'cloud analysis is not enabled' };
+  }
+  if (!(await hasHostAccess(settings.backendBaseUrl))) {
+    return { ok: false, error: 'access to the analysis service has not been granted' };
   }
 
   // Rebuilt to the contract rather than forwarded. See `sanitizeCloudPayload`: the redaction is only a
@@ -161,12 +200,15 @@ async function modelServerAnalyze(request: ModelServerAnalyzeRequest): Promise<E
   if (!isModelServerConfigured(settings)) {
     return { ok: false, error: 'no model server is configured' };
   }
+  if (!(await hasHostAccess(settings.modelBaseUrl))) {
+    return { ok: false, error: NOT_GRANTED };
+  }
 
-  // Bounded here as well as in `buildUserPrompt`, for the same reason the cloud payload is rebuilt: these
-  // strings arrive over a message, and an unbounded one would be serialised and sent by the only part of
+  // Bounded here as well as in `buildUserPrompt`, for the same reason the cloud payload is rebuilt: the
+  // string arrives over a message, and an unbounded one would be serialised and sent by the only part of
   // the extension that can reach the network.
   const messages = [
-    { role: 'system', content: truncate(asPromptText(request.payload.system), MAX_PROMPT_CHARS) },
+    { role: 'system', content: SYSTEM_PROMPT },
     { role: 'user', content: truncate(asPromptText(request.payload.user), MAX_PROMPT_CHARS) },
   ];
 
@@ -259,6 +301,7 @@ async function postCompletion(
 async function listModels(): Promise<ExtensionResponse> {
   const settings = await readSettings();
   if (settings.modelBaseUrl === '') return { ok: false, error: 'no model server URL is set' };
+  if (!(await hasHostAccess(settings.modelBaseUrl))) return { ok: false, error: NOT_GRANTED };
 
   try {
     const response = await privateFetch(
@@ -294,8 +337,17 @@ async function handle(
   switch (request.type) {
     case 'GET_SETTINGS':
       return { ok: true, type: 'SETTINGS', settings: await readSettings() };
-    case 'SET_SETTINGS':
+    case 'SET_SETTINGS': {
+      const patch: unknown = request.patch;
+      if (patch === null || typeof patch !== 'object') return { ok: false, error: 'invalid settings' };
+      // `sender.url` is set by Chrome: the extension's own origin for its pages, even when one is open in
+      // a tab, and the page's URL for a content script. `sender.tab` cannot tell the two apart.
+      const fromExtensionPage = sender.url?.startsWith(chrome.runtime.getURL('')) === true;
+      if (!fromExtensionPage && Object.keys(patch).some((key) => !TAB_WRITABLE_SETTINGS.has(key))) {
+        return { ok: false, error: 'that setting can only be changed from PhishLens settings' };
+      }
       return { ok: true, type: 'SETTINGS', settings: await writeSettings(request.patch) };
+    }
     case 'CLOUD_ANALYZE':
       return cloudAnalyze(request);
     case 'MODEL_SERVER_ANALYZE':
@@ -319,21 +371,31 @@ async function setToolbarBadge(
   if (tabId === undefined) {
     return { ok: false, error: 'toolbar badge requires a tab' };
   }
-  if (typeof request.text !== 'string' || request.text.length > 4) {
-    return { ok: false, error: 'invalid badge text' };
+  // All four checked before any call, so a malformed request cannot leave the badge half-painted.
+  if (
+    typeof request.text !== 'string' ||
+    request.text.length > 4 ||
+    typeof request.title !== 'string' ||
+    typeof request.background !== 'string' ||
+    typeof request.textColor !== 'string'
+  ) {
+    return { ok: false, error: 'invalid badge' };
   }
-  try {
-    await chrome.action.setBadgeText({ tabId, text: request.text });
-    await chrome.action.setTitle({ tabId, title: request.title });
-    if (request.text !== '') {
-      await chrome.action.setBadgeBackgroundColor({ tabId, color: request.background });
-      await chrome.action.setBadgeTextColor({ tabId, color: request.textColor });
+  // A paint spans several async API calls; keep each tab's text, title and colours together.
+  return navigator.locks.request(`phishlens-toolbar-${String(tabId)}`, async () => {
+    try {
+      await chrome.action.setBadgeText({ tabId, text: request.text });
+      await chrome.action.setTitle({ tabId, title: request.title });
+      if (request.text !== '') {
+        await chrome.action.setBadgeBackgroundColor({ tabId, color: request.background });
+        await chrome.action.setBadgeTextColor({ tabId, color: request.textColor });
+      }
+      return { ok: true, type: 'ACKNOWLEDGED' };
+    } catch (error) {
+      logger.debug('toolbar badge update failed', error);
+      return { ok: false, error: 'could not update toolbar badge' };
     }
-    return { ok: true, type: 'ACKNOWLEDGED' };
-  } catch (error) {
-    logger.debug('toolbar badge update failed', error);
-    return { ok: false, error: 'could not update toolbar badge' };
-  }
+  });
 }
 
 chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse): boolean => {
@@ -361,8 +423,7 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse): b
 chrome.runtime.onInstalled.addListener((details) => {
   void (async () => {
     // Seed defaults without overwriting anything the user has already chosen.
-    const settings = await readSettings();
-    await chrome.storage.sync.set({ [STORAGE_KEY]: settings });
+    const settings = await writeSettings({});
     logger.info('installed', { reason: details.reason, aiMode: settings.aiMode });
 
     /*

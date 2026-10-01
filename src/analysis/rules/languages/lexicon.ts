@@ -20,6 +20,7 @@ export const THEME_IDS = [
   'mfa_request',
   'wire_transfer',
   'payment_detail_change',
+  'billing_update',
   'payroll_change',
   'gift_card',
   'invoice_fraud',
@@ -82,8 +83,9 @@ const BOUNDARY = String.raw`(?:(?<!${WORD})(?=${WORD})|(?<=${WORD})(?!${WORD}))`
  * are folded here so the pattern matches the folded haystack `matchThemes` searches, and `\b` is
  * rewritten into a Unicode-aware boundary so accented Latin and Devanagari word edges still count.
  *
- * German `ß` is written as `ss` in patterns: `normalizeForMatching` runs NFKC first, which expands
- * `ß` to two characters, and a length-preserving fold cannot undo that.
+ * German `ß` is written as `ss` in patterns. NFKC does not touch `ß`, so `normalizeForMatching` folds it
+ * to `ss` explicitly — the Swiss spelling, and the one every keyboard can type — and a pattern written
+ * with `ß` would match neither form.
  */
 export function compile(source: string): RegExp {
   return new RegExp(foldLatinDiacritics(source).replace(/\\b/gu, BOUNDARY), 'u');

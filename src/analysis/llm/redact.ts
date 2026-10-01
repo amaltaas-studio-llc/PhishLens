@@ -35,8 +35,8 @@ export function buildCloudPayload(
   const replyToDomain = addressDomain(email.replyTo);
 
   return {
-    subject: truncate(collapseWhitespace(email.subject ?? ''), MAX_SUBJECT_CHARS),
-    bodyExcerpt: redactAddresses(truncate(email.bodyText, MAX_PROMPT_BODY_CHARS)),
+    subject: redactedExcerpt(collapseWhitespace(email.subject ?? ''), MAX_SUBJECT_CHARS),
+    bodyExcerpt: redactedExcerpt(email.bodyText, MAX_PROMPT_BODY_CHARS),
     senderDomain,
     // The display name's *shape* is what matters for impersonation, not the name itself.
     senderNameShape: describeNameShape(email.senderName ?? ''),
@@ -78,8 +78,8 @@ export function sanitizeCloudPayload(raw: unknown): CloudPayload | null {
   const shape = typeof source['senderNameShape'] === 'string' ? source['senderNameShape'] : '';
 
   return {
-    subject: truncate(collapseWhitespace(asString(source['subject'])), MAX_SUBJECT_CHARS),
-    bodyExcerpt: redactAddresses(truncate(asString(source['bodyExcerpt']), MAX_PROMPT_BODY_CHARS)),
+    subject: redactedExcerpt(collapseWhitespace(asString(source['subject'])), MAX_SUBJECT_CHARS),
+    bodyExcerpt: redactedExcerpt(asString(source['bodyExcerpt']), MAX_PROMPT_BODY_CHARS),
     senderDomain,
     // A shape is a hyphenated vocabulary this file controls. Anything else is reported as `unknown`
     // rather than passed through, because a display name is exactly what this field exists not to carry,
@@ -144,9 +144,19 @@ function patternList(value: unknown, max: number, pattern: RegExp): string[] {
  * mismatched address is a real signal); the local part is not.
  */
 export function redactAddresses(text: string): string {
-  return text.replace(/[\w.+-]+@([\w-]+(?:\.[\w-]+)+)/gu, (_match, domain: string) => {
-    return `<address@${normalizeDomain(domain)}>`;
-  });
+  return text.replace(
+    /[\p{L}\p{N}._%+-]+@([\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+)/gu,
+    (_match, domain: string) => `<address@${normalizeDomain(domain)}>`,
+  );
+}
+
+/**
+ * Redacted, then cut. The other order lets the cut land inside an address, and `jane.doe@example` with
+ * no dot after the `@` no longer looks like one, so its local part would leave unredacted. Redacting
+ * first is bounded by a generous pre-cut, since nothing past twice the limit can survive the real one.
+ */
+function redactedExcerpt(text: string, max: number): string {
+  return truncate(redactAddresses(text.slice(0, max * 2)), max);
 }
 
 /**

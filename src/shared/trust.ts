@@ -40,8 +40,26 @@ export function trustEntryFor(senderEmail: string): string | null {
   if (registrable === '') return null;
   // A disposable-mailbox address is not a stable identity, so neither form of entry means anything.
   if (DISPOSABLE_DOMAINS.has(registrable)) return null;
-  return FREEMAIL_DOMAINS.has(registrable) ? address : registrable;
+  if (FREEMAIL_DOMAINS.has(registrable)) return address;
+  return SHARED_SENDER_PLATFORMS.has(registrable) ? normalizeDomain(addressDomain(address)) : registrable;
 }
+
+/**
+ * Platforms that send every customer's mail from a subdomain of one domain: `acme.zendesk.com` is
+ * Acme's help desk, and `northwind.zendesk.com` is anybody who signed up yesterday. The registrable
+ * domain names the platform, so trusting it would trust every tenant — the `gmail.com` problem again —
+ * and the entry is the tenant's full host instead.
+ *
+ * A short list on purpose, of platforms whose tenant subdomain *is* the sending address. Bulk senders
+ * that send from the customer's own domain (SendGrid, Mailchimp) do not belong here; their mail is
+ * already keyed to that domain.
+ */
+const SHARED_SENDER_PLATFORMS: ReadonlySet<string> = new Set([
+  'zendesk.com',
+  'freshdesk.com',
+  'onmicrosoft.com',
+  'atlassian.net',
+]);
 
 /** The entry that covers this sender, or `undefined`. Matching is exact; there are no wildcards. */
 export function matchingTrustEntry(
@@ -50,10 +68,12 @@ export function matchingTrustEntry(
 ): string | undefined {
   const address = senderEmail.trim().toLowerCase();
   if (address === '') return undefined;
-  const registrable = registrableDomain(addressDomain(address));
+  const host = normalizeDomain(addressDomain(address));
+  const registrable = registrableDomain(host);
+  const unit = SHARED_SENDER_PLATFORMS.has(registrable) ? host : registrable;
 
   return trusted.find((entry) =>
-    entry.includes('@') ? entry === address : entry !== '' && entry === registrable,
+    entry.includes('@') ? entry === address : entry !== '' && entry === unit,
   );
 }
 

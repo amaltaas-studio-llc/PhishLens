@@ -134,6 +134,19 @@ export const PANEL_CSS = `
   background: var(--state);
 }
 
+/* The live region: read by assistive technology, drawn nowhere, and absolute so the column ignores it. */
+.live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* Head is fixed; only the findings scroll. */
 .head { flex: none; padding: 12px 16px 12px; border-bottom: 1px solid #f1f3f4; }
 .scroll { flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; }

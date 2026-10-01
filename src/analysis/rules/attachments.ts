@@ -9,7 +9,7 @@
  */
 import { formatList } from '../../shared/text.js';
 import type { SecuritySignal } from '../../shared/types.js';
-import { stripBidiAndInvisible } from '../../shared/unicode.js';
+import { hasDirectionControl, stripBidiAndInvisible } from '../../shared/unicode.js';
 import type { AnalysisContext } from '../context.js';
 import { signal } from './types.js';
 import type { Detect } from './types.js';
@@ -43,9 +43,16 @@ const MACRO_CAPABLE_EXTENSIONS: ReadonlySet<string> = new Set([
   'dot', 'ppt', 'pot', 'xlsb',
 ]);
 
-/** Formats commonly used as the first stage of a malware chain. */
+/**
+ * Formats commonly used as the first stage of a malware chain.
+ *
+ * No `.xml` or `.xsl`. A double-clicked `.xml` opens as a data tree, not a page, and it is the format
+ * structured invoices travel in — national e-invoicing schemes deliver every supplier invoice as one —
+ * so listing it reported each of those as a web page and paired it with the word "invoice" into a
+ * `critical`. What actually renders a page from a local file is the rest of this list.
+ */
 const SCRIPT_CONTAINER_EXTENSIONS: ReadonlySet<string> = new Set([
-  'html', 'htm', 'xhtml', 'svg', 'mhtml', 'mht', 'shtml', 'xml', 'xsl', 'one', 'wsz',
+  'html', 'htm', 'xhtml', 'svg', 'mhtml', 'mht', 'shtml', 'one', 'wsz',
 ]);
 
 /** Extensions a reader is likely to assume are safe, used as the *first* half of a double extension. */
@@ -212,21 +219,43 @@ function doubleExtensionAttachments(context: AnalysisContext): SecuritySignal[] 
   ];
 }
 
-/** Right-to-left override characters that make `gnp.exe` render as `exe.png`. */
+/**
+ * Characters in a filename that change how it reads: ones that reverse it, so `gnp.exe` renders as
+ * `exe.png`, and ones that render as nothing, so `invoice.ex\u00ade` is an `.exe` no blocklist matches.
+ *
+ * Two findings rather than one, because only the first makes the screen lie about the type. A reversed
+ * name shows the reader an extension that is not the file's — `critical`, whatever the type. A hidden
+ * character shows the right letters with a gap nobody can see; it is evidence of an attempt to slip past
+ * a filter, and when the type it hides is dangerous the executable rule says so at full weight already.
+ */
 function filenameSpoofingAttachments(context: AnalysisContext): SecuritySignal[] {
   const hits = context.attachments.filter((a) => a.hasBidiTrick);
-  const [first] = hits;
-  if (first === undefined) return [];
+  const reversed = hits.find((a) => hasDirectionControl(a.filename));
+  if (reversed !== undefined) {
+    return [
+      signal({
+        id: 'attachment.filename_direction_override',
+        category: 'attachment',
+        severity: 'critical',
+        score: 40,
+        title: 'Attachment filename contains text-direction override characters',
+        description: `The filename contains invisible characters that reverse how part of it is displayed, so the extension shown on screen is not the real one. Its actual type is .${reversed.extension}. Stripped of the hidden characters the name is "${stripBidiAndInvisible(reversed.filename)}".`,
+        evidence: { value: stripBidiAndInvisible(reversed.filename) },
+      }),
+    ];
+  }
 
+  const [hidden] = hits;
+  if (hidden === undefined) return [];
   return [
     signal({
-      id: 'attachment.filename_direction_override',
+      id: 'attachment.filename_hidden_characters',
       category: 'attachment',
-      severity: 'critical',
-      score: 40,
-      title: 'Attachment filename contains text-direction override characters',
-      description: `The filename contains invisible characters that reverse how part of it is displayed, so the extension shown on screen is not the real one. Its actual type is .${first.extension}. Stripped of the hidden characters the name is "${stripBidiAndInvisible(first.filename)}".`,
-      evidence: { value: stripBidiAndInvisible(first.filename) },
+      severity: 'medium',
+      score: 16,
+      title: 'Attachment filename contains invisible characters',
+      description: `The filename contains characters that take up no space on screen, so it reads normally while not matching the name a filter would look for. Its actual type is .${hidden.extension}. Stripped of the hidden characters the name is "${stripBidiAndInvisible(hidden.filename)}".`,
+      evidence: { value: stripBidiAndInvisible(hidden.filename) },
     }),
   ];
 }

@@ -23,7 +23,7 @@ explanation, evidence); none computes the final score.
 | Category | File | Looks for |
 | --- | --- | --- |
 | Identity | `identity.ts`, `thread.ts` | Lookalikes, homoglyphs, brand-in-wrong-place, display names that do not match the domain, reply-chain impersonation |
-| Links | `links.ts` | Anchor ≠ destination, brand-prefix hosts, IPs, punycode, shorteners, credential wording to unrelated hosts, public object-storage pages |
+| Links | `links.ts` | Anchor ≠ destination, brand-prefix hosts, IPs, punycode, shorteners, credential wording to unrelated hosts, public object-storage pages — on every host a click passes through |
 | Content | `content.ts`, `languages/` | Credential asks, OTP solicitation, payment changes, gift cards, urgency, secrecy, process bypass, … |
 | Attachments | `attachments.ts` | Executables, macros, archives, double extensions, RTLO tricks (filename only) |
 | Authentication | `authentication.ts` | SPF/DKIM/DMARC and Gmail’s warning as shown in the page — no raw headers |
@@ -31,6 +31,26 @@ explanation, evidence); none computes the final score.
 **Wording languages.** English patterns always run. Packs add patterns to the **same themes** for Spanish,
 French, German, Portuguese, Italian, Dutch, Hindi and Hinglish (gated detection; per-language negation and
 bulk vocabulary). Details: `src/analysis/rules/languages/`.
+
+**Redirects add hosts; they never replace one.** A redirect parameter is decoded textually (up to three
+hops) and each host on the path is judged — the entry host first, since it is the one an attacker cannot
+dress up. Host-identity rules (lookalike, IP, punycode, brand prefix, shortener, deep subdomains) run on
+every hop; rules about the page itself (sign-in wording, open storage, a prose anchor naming a brand) run
+on the decoded destination. A displayed brand address reached through somebody else's redirector is
+`high`. Known click trackers are matched on their own host and click path (`google.com` only for
+`/url`), and excuse only their own hop: what they forward to is judged like anything else, and only a
+tracker whose target cannot be decoded leaves nothing to judge. A tracker's owner publishing pages
+(`docs.google.com`, `sites.google.com`, `*.substack.com`, `hs-sites.com`, `ghost.io`) is not a tracker; the
+publishable ones are open hosting, where brand ownership of the domain says nothing about the page.
+
+**What counts as the message.** Quoted replies are left out of the wording checks so a thread is not
+re-judged on what earlier messages said — but a quote is only a class name, which a sender can write, so
+two things do not depend on it. Every link is read, quoted or not, and a body with nothing outside its
+quotes (a bare forward, or a lure wrapped in a fake quote) is read from the quotes. Text hidden with
+`font-size: 0`, `visibility: hidden`, `display: none`, off-screen positioning or near-zero opacity is
+removed before scoring and reported once it is long enough to matter; clipping only counts when the
+shape is unambiguously empty, so a rectangle starting at zero does not erase visible content; a child escapes a hidden container
+only with an absolute size or its own `visibility: visible`, and the container's own text stays hidden.
 
 **OTP vs code delivery.** Asking the reader to share a one-time code is the attack; delivering a code is
 ordinary mail. Rules key on solicitation verbs, and a surrounding negation (“never share…”, including
@@ -68,12 +88,19 @@ tested.
 
 Full reasoning: [adr/0005](adr/0005-false-positive-resistance.md). In short:
 
-- **Dampening** — soften `content` when a claimed brand’s domain is proven by Gmail; never dampen
-  identity/link; never high/critical.
+- **Dampening** — soften `content` when a claimed brand’s domain is proven by Gmail and every link host
+  stays inside it; never dampen identity/link; never high/critical. The one exception is the fake-page
+  combinations (`DAMPENING.refutableCombinations`: urgent or threatened sign-in, billing update under
+  threat), which a verified brand with aligned links refutes and which are zeroed; money-movement
+  combinations keep full weight, since a compromised genuine mailbox sends exactly those.
 - **Bulk mail** — suppress marketing-prone content themes when unsubscribe language is present and there
-  is no credential ask (per language).
+  is no credential ask (per language). Combinations are built from the surviving themes only.
 - **Sender click-trackers** — mismatch rules skip the sender’s own domain unless the anchor impersonates a brand.
-- **Trust list** — same proof gate; dampens only content/authentication; findings stay visible.
+- **Trust list** — same proof gate; dampens `content` only, never a high/critical finding; findings stay
+  visible. Shared ticketing/tenant platforms (`zendesk.com`, `freshdesk.com`, `onmicrosoft.com`,
+  `atlassian.net`) are trusted per tenant host, never as the platform.
+- **Authentication** — an SPF/DKIM failure beside a DMARC pass is `low` (forwarding, mailing lists); a
+  failure without one stays `high`.
 - **Brand-independent identity** — shared-name / institutional checks that need no brand table.
 
 ## List rows

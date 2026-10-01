@@ -13,7 +13,7 @@ import {
   hasPunycode,
   hasUnknownTld,
   isIpHost,
-  isKnownTrackingRedirector,
+  isKnownSendingPlatform,
   isMalformedHost,
   normalizeDomain,
   sameRegistrableDomain,
@@ -184,6 +184,14 @@ export interface LookalikeMatch {
  * suffix that is not a misspelling of anything: either the brand's own country domain or somebody who
  * registered the brand's name elsewhere, and nothing readable from the message can tell those apart.
  */
+/**
+ * A suffix a brand would run a market under: a country code, or a country's own second level beneath one
+ * (`com.br`, `co.jp`, `org.uk`). Generic suffixes are not markets. Nobody localises to `.support`,
+ * `.secure` or `.online`, and those are what a phishing kit registers the brand's exact name under — so
+ * reading them as "perhaps the brand's" handed the kit an `unverified` instead of a lookalike.
+ */
+const MARKET_SUFFIX = /^(?:(?:com?|net|org|gov|gob|edu|ac|or|ne|go|ltd|plc)\.)?[a-z]{2}$/u;
+
 export function brandNamingDomain(registrable: string): Brand | undefined {
   const domain = normalizeDomain(registrable);
   if (domain === '') return undefined;
@@ -191,7 +199,7 @@ export function brandNamingDomain(registrable: string): Brand | undefined {
   const core = domainCore(domain);
   if (core.length < 4) return undefined;
   const suffix = domain.slice(core.length + 1);
-  if (suffix === '') return undefined;
+  if (!MARKET_SUFFIX.test(suffix)) return undefined;
 
   for (const brand of BRANDS) {
     if (brandOwns(brand, domain)) continue;
@@ -570,6 +578,32 @@ function suspiciousSenderSubdomainStructure(context: AnalysisContext): SecurityS
   ];
 }
 
+const EXECUTIVE_TITLES =
+  'ceo|cfo|coo|cto|chief executive|chief financial|managing director|president|vice president|vp of|head of finance|chairman|founder';
+const EXECUTIVE_TITLE = new RegExp(`\\b(${EXECUTIVE_TITLES})\\b`, 'u');
+
+/**
+ * The writer giving themselves the title, which is what the body has to do to count.
+ *
+ * A title anywhere in the opening was enough before, and the opening is where ordinary mail *mentions*
+ * one — "our president announced", "the founder of a bakery I like". The fraud states it of the sender:
+ * "this is your CEO", or a sign-off with the name and the title after it.
+ */
+const EXECUTIVE_SELF_DESCRIPTION = new RegExp(
+  `\\b(?:i am|i'm|this is) (?:(?:the|your|our) )?(?:company'?s? )?(?:${EXECUTIVE_TITLES})\\b`,
+  'u',
+);
+const EXECUTIVE_SIGN_OFF = new RegExp(
+  `\\b(?:regards|thanks|thank you|best|sincerely|cheers)[,.!]? (?:[\\p{L}'.-]{1,30},? ){1,3}(?:[|-] )?(?:the )?(?:${EXECUTIVE_TITLES})\\b`,
+  'u',
+);
+
+function claimsExecutiveTitle(matchText: string): boolean {
+  const opening = matchText.slice(0, 500);
+  const closing = matchText.slice(-500);
+  return EXECUTIVE_SELF_DESCRIPTION.test(opening) || EXECUTIVE_SIGN_OFF.test(closing);
+}
+
 /**
  * The message claims to be from an executive at the recipient's own organisation, but arrives from
  * outside it. The classic wire-transfer / gift-card precursor.
@@ -579,11 +613,12 @@ function externalExecutiveClaim(context: AnalysisContext): SecuritySignal[] {
   if (recipientDomain === '' || context.senderRegistrable === '') return [];
   if (recipientDomain === context.senderRegistrable) return [];
   if (!context.senderIsFreemail) return [];
+  // "Your organisation" is the premise, and a personal mailbox has none: mail between two Gmail
+  // accounts mentioning a founder or a president is a friend's news, not an executive writing in.
+  if (FREEMAIL_DOMAINS.has(recipientDomain)) return [];
 
-  const execPattern =
-    /\b(ceo|cfo|coo|cto|chief executive|chief financial|managing director|president|vice president|vp of|head of finance|chairman|founder)\b/u;
   const nameOrSubject = `${context.senderNameMatch} ${context.subject}`.toLowerCase();
-  if (!execPattern.test(nameOrSubject) && !execPattern.test(context.matchText.slice(0, 500))) return [];
+  if (!EXECUTIVE_TITLE.test(nameOrSubject) && !claimsExecutiveTitle(context.matchText)) return [];
 
   return [
     signal({
@@ -602,9 +637,9 @@ function externalExecutiveClaim(context: AnalysisContext): SecuritySignal[] {
  * The display name asserts an *institutional* identity that the sending domain does not support.
  *
  * Every other impersonation rule is gated on `BRANDS`, and no table will ever hold every insurer, bank,
- * utility and agency — so `"Fidelity Life Offer" <…@mt50sys.com>` scored zero on identity. This asks a
- * brand-list-free question: does the display name share any name with the domain that sent it?
- * `"Kestrel Coffee Roasters" <hello@kestrelcoffee.co.uk>` does; the Fidelity example does not.
+ * utility and agency — so `"Northwind Life Offer" <…@kv38mailer.com>` scored zero on identity. This asks
+ * a brand-list-free question: does the display name share any name with the domain that sent it?
+ * `"Kestrel Coffee Roasters" <hello@kestrelcoffee.co.uk>` does; the life-offer example does not.
  *
  * Scoped narrowly to stay out of ordinary mail: the name must assert an organisation rather than a
  * person, known-brand claims are left to `displayNameImpersonation`, brand-owned domains may call
@@ -618,7 +653,7 @@ function unsupportedOrganizationalClaim(context: AnalysisContext): SecuritySigna
   // Google-owned, but a Gmail *mailbox* is not Google, and exempting it here would exempt every
   // consumer mailbox — the single most important case this rule exists to catch.
   if (context.senderOwnedByBrand !== undefined && !context.senderIsFreemail) return [];
-  if (isKnownTrackingRedirector(context.senderDomain)) return [];
+  if (isKnownSendingPlatform(context.senderDomain)) return [];
   if (!ORGANISATION_MARKER.test(context.senderNameMatch)) return [];
 
   const nameTokens = organisationNameTokens(context.senderNameMatch);

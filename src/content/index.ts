@@ -17,22 +17,33 @@ function main(): void {
   // Gmail renders chat and compose in iframes; we only analyse the top-level conversation view.
   if (window.top !== window.self) return;
 
-  const controller = new Controller(new GmailDomAdapter());
-
-  void controller.start().catch((error: unknown) => {
-    logger.error('failed to start', error);
-  });
+  let controller = launch();
 
   // `pagehide` rather than `unload`: it fires for back/forward-cache navigations too, and releasing
   // the on-device model session matters because it can hold significant memory.
-  window.addEventListener(
-    'pagehide',
-    () => {
-      controller.stop();
-      disposeLocalAnalyzer();
-    },
-    { once: true },
-  );
+  window.addEventListener('pagehide', () => {
+    controller.stop();
+    disposeLocalAnalyzer();
+  });
+
+  /*
+   * A page restored from the back/forward cache does not run this script again, so without this the tab
+   * came back with every listener removed by `pagehide` and no badge on anything, for as long as it stayed
+   * open. A fresh controller rather than restarting the stopped one: `stop()` is final by design, which is
+   * what lets it be safe against work still in flight from before the page was hidden.
+   */
+  window.addEventListener('pageshow', (event) => {
+    if (!event.persisted) return;
+    controller = launch();
+  });
+}
+
+function launch(): Controller {
+  const controller = new Controller(new GmailDomAdapter());
+  void controller.start().catch((error: unknown) => {
+    logger.error('failed to start', error);
+  });
+  return controller;
 }
 
 main();

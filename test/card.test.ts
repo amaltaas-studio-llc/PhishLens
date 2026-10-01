@@ -161,6 +161,116 @@ describe('the rendered card', () => {
   });
 });
 
+/**
+ * The card is repainted in place — the model's reading arriving, a trust click, the ask button — and a
+ * repaint replaces every node in it. Each of those used to drop keyboard focus to the page and take the
+ * live region with it, so a screen-reader user heard nothing when the reading landed and then had to find
+ * their way back into the card from the top of Gmail.
+ */
+describe('the card across repaints', () => {
+  function view(semantic: SemanticStatus, over: Partial<ResultView> = {}): ResultView {
+    return {
+      kind: 'result',
+      result: deterministic(PHISH, semantic),
+      aiMode: 'local',
+      email: PHISH,
+      semantic,
+      timing: TIMING,
+      trust: { kind: 'none' },
+      ...over,
+    };
+  }
+
+  function rootOf(): ShadowRoot {
+    const root = document.querySelector('#phishlens-panel-host')?.shadowRoot;
+    if (root === null || root === undefined) throw new Error('the card did not render');
+    return root;
+  }
+
+  it('keeps one live region, and gives it the new state when the reading lands', async () => {
+    panel.open(view('pending'));
+    const live = rootOf().querySelector('[role="status"]');
+    expect(live?.textContent).toMatch(/Reading the message on-device/u);
+
+    panel.open({ ...view('ready'), result: await readyResult(PHISH) });
+    expect(rootOf().querySelectorAll('[role="status"]')).toHaveLength(1);
+    expect(rootOf().querySelector('[role="status"]')).toBe(live);
+    expect(live?.textContent).toMatch(/AI assessment added/u);
+  });
+
+  it('puts focus back on the equivalent control after a repaint', () => {
+    panel.open(view('pending'));
+    const root = rootOf();
+    const close = root.querySelector<HTMLElement>('.close');
+    expect(root.activeElement).toBe(close);
+
+    panel.open(view('ready'));
+    expect(root.activeElement?.matches('.close')).toBe(true);
+    expect(root.activeElement).not.toBe(close);
+  });
+
+  it('keeps focus on the same finding, by position, across a repaint', () => {
+    panel.open(view('pending'));
+    const root = rootOf();
+    const findings = [...root.querySelectorAll<HTMLElement>('li.finding[tabindex]')];
+    const target = findings.at(-1);
+    if (target === undefined) throw new Error('the fixture has no locatable finding');
+    target.focus();
+
+    panel.open(view('ready'));
+    const after = [...root.querySelectorAll('li.finding[tabindex]')];
+    expect(root.activeElement).not.toBe(target);
+    expect(after.findIndex((finding) => finding === root.activeElement)).toBe(findings.length - 1);
+  });
+
+  it('keeps focus on the trust button after the click that repaints it', () => {
+    const offer = { kind: 'offer', entry: 'northwind-logistics.com' } as const;
+    panel.open(view('ready', { trust: offer }));
+    const root = rootOf();
+    root.querySelector<HTMLElement>('.trust button')?.focus();
+
+    panel.open(view('ready', { trust: { kind: 'trusted', entry: 'northwind-logistics.com' } }));
+    expect(root.activeElement?.matches('.trust button')).toBe(true);
+    expect(root.activeElement?.textContent).toMatch(/Stop trusting/u);
+  });
+
+  /** The ask button is gone once the reading it asked for is under way; focus stays in the card. */
+  it('moves focus to the close button when the focused control no longer exists', () => {
+    panel.open(view('skipped', { result: deterministic(LEGITIMATE, 'skipped'), email: LEGITIMATE }));
+    const root = rootOf();
+    root.querySelector<HTMLElement>('button.action')?.focus();
+
+    panel.open(view('pending', { result: deterministic(LEGITIMATE, 'pending'), email: LEGITIMATE }));
+    expect(root.querySelector('button.action')).toBeNull();
+    expect(root.activeElement?.matches('.close')).toBe(true);
+  });
+
+  /** Focus is only moved by a repaint that took it away: a reader working in Gmail is left alone. */
+  it('does not take focus on a repaint when it was elsewhere', () => {
+    const outside = document.createElement('button');
+    document.body.append(outside);
+    panel.open(view('pending'));
+    outside.focus();
+
+    panel.open(view('ready'));
+    expect(document.activeElement).toBe(outside);
+    expect(rootOf().activeElement).toBeNull();
+    outside.remove();
+  });
+
+  it('reports whether focus was inside it when it closes', () => {
+    panel.open(view('ready'));
+    expect(panel.close()).toBe(true);
+
+    const outside = document.createElement('button');
+    document.body.append(outside);
+    panel.open(view('ready'));
+    outside.focus();
+    expect(panel.close()).toBe(false);
+    outside.remove();
+  });
+});
+
 describe('card wording', () => {
   it('formats durations at the precision a reader can feel', () => {
     expect(formatDuration(0.2)).toBe('<1 ms');

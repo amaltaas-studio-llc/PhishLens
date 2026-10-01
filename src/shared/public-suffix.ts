@@ -74,10 +74,18 @@ export const OPEN_HOSTING_SUFFIXES: readonly string[] = [
   'duckdns.org', 'no-ip.org', 'hopto.org', 'serveo.net', 'localtunnel.me',
   '000webhostapp.com', 'infinityfreeapp.com', 'freehostia.com', 'byethost.com',
   'sharepoint-online.com', 'my-sharepoint.com',
+  // Publishing platforms whose tenants get a subdomain or a path on the platform's own name.
+  'sites.google.com', 'script.google.com', 'hs-sites.com', 'ghost.io',
   // Object stores: the bucket is a path segment, so the hostname itself is the open host.
   'storage.googleapis.com', 'firebasestorage.googleapis.com', 's3.amazonaws.com',
   'r2.cloudflarestorage.com', 'digitaloceanspaces.com', 'backblazeb2.com', 'wasabisys.com',
   'storage.yandexcloud.net', 'githubusercontent.com', 'dropboxusercontent.com',
+  'googleusercontent.com', 'mcusercontent.com',
+  // Deliberately absent: `sharepoint.com`, `force.com` and `myshopify.com`. Anyone can open a tenant on
+  // each, but they are also where organisations run their own document shares, customer portals and
+  // shops, whose genuine mail links to a sign-in page there as a matter of course. Listing them would put
+  // `credential_link_open_hosting` at `high` on that mail; the lookalike and brand-in-subdomain rules
+  // still examine their tenant names.
 ];
 
 /** Consumer mailbox providers. A sender here cannot legitimately *be* a corporation. */
@@ -114,36 +122,92 @@ export const URL_SHORTENERS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Hosts that legitimately perform link tracking/redirection on behalf of senders. Their presence is
- * expected in real marketing mail, so they must not be treated as "suspicious redirect".
+ * Services that send mail, or sign and relay it, on behalf of other organisations.
  *
- * A convenience, not the mechanism. Any list of platforms is out of date the day it is written, so
- * the load-bearing check is `LinkAnalysis.onSenderDomain`, which recognises the same rewrite from its
- * shape. This list adds the case that check cannot see: a sender on its own domain whose links are
- * rewritten to the platform's domain.
+ * For the *envelope* only — a DKIM signer, a `via` host, a sending address — where the question is "is
+ * this a third party that sends for its customers?". Never for links: several of these also host pages
+ * their customers write, and a domain that sends on anyone's behalf says nothing about where a click
+ * goes. `KNOWN_CLICK_TRACKERS` answers that question.
  */
-export const KNOWN_TRACKING_REDIRECTORS: ReadonlySet<string> = new Set([
-  'google.com', 'www.google.com', 'links.google.com',
-  'click.mail.google.com', 'notifications.google.com',
-  'sendgrid.net', 'ct.sendgrid.net', 'url1234.sendgrid.net',
-  'mailchimp.com', 'list-manage.com', 'mandrillapp.com', 'mcusercontent.com',
+export const KNOWN_SENDING_PLATFORMS: ReadonlySet<string> = new Set([
+  'google.com', 'sendgrid.net', 'mailchimp.com', 'list-manage.com', 'mandrillapp.com',
+  'mcsv.net', 'rsgsv.net',
   'salesforce.com', 'pardot.com', 'exacttarget.com', 'exct.net', 'et.email',
-  'hubspotlinks.com', 'hs-sites.com', 'hubspotemail.net',
+  'hubspotlinks.com', 'hubspotemail.net',
   'sparkpostmail.com', 'mailgun.org', 'postmarkapp.com', 'pstmrk.it',
-  'braze.com', 'sailthru.com', 'iterable.com', 'links.iterable.com',
+  'braze.com', 'sailthru.com', 'iterable.com',
   'klaviyomail.com', 'customeriomail.com', 'intercom-mail.com',
-  'awstrack.me', 'amazonses.com', 'ses.amazonaws.com',
-  'safelinks.protection.outlook.com', 'protection.outlook.com',
-  'urldefense.com', 'urldefense.proofpoint.com', 'proofpoint.com',
-  'clicktime.symantec.com', 'mimecast.com', 'protect-us.mimecast.com',
-  'barracudanetworks.com', 'linkprotect.cudasvc.com',
-  // Newsletter platforms. Included because a writer on a custom domain still has every link rewritten
-  // to the platform's, which `onSenderDomain` cannot recognise.
-  'substack.com', 'email.mg1.substack.com', 'email.mg2.substack.com',
-  'beehiiv.com', 'mail.beehiiv.com', 'link.mail.beehiiv.com',
-  'convertkit-mail.com', 'convertkit-mail2.com', 'kit.com',
-  'ghost.io', 'buttondown.email', 'mailerlite.com',
+  'awstrack.me', 'amazonses.com',
+  'substack.com', 'beehiiv.com', 'convertkit-mail.com', 'convertkit-mail2.com', 'kit.com',
+  'ghost.io', 'buttondown.email', 'mailerlite.com', 'mlsend.com',
   'rs6.net', 'cmail19.com', 'cmail20.com', 'activehosted.com',
   'aweber.com', 'getresponse.com', 'mailjet.com', 'omnisend.com',
   'sendinblue.com', 'brevo.com', 'klclick.com',
 ]);
+
+/**
+ * A host that rewrites links for click tracking or link scanning, and the shape of its rewrite.
+ *
+ * `subdomains` admits any host beneath `host`, and is only set where the registrable domain serves
+ * nothing *but* rewritten links. `path`, when present, must match: `google.com` is a redirector at
+ * `/url` and a search engine everywhere else, and `substack.com` is a redirector at `/redirect/` and
+ * every writer's publication everywhere else.
+ */
+export interface ClickTracker {
+  readonly host: string;
+  readonly subdomains?: boolean;
+  readonly path?: RegExp;
+}
+
+/**
+ * Click-tracking and link-protection endpoints, matched exactly rather than by registrable domain.
+ *
+ * A convenience, not the mechanism. Any list of platforms is out of date the day it is written, so the
+ * load-bearing check is `LinkAnalysis.onSenderDomain`, which recognises the same rewrite from its shape.
+ * This list adds the case that check cannot see: a sender on its own domain whose links are rewritten to
+ * the platform's.
+ *
+ * Matching a registrable domain with every subdomain is what this replaced, and it was a hole: the list
+ * carried `google.com`, `substack.com` and `ghost.io`, so a link to a form on `docs.google.com` or a page
+ * on anyone's `*.ghost.io` publication was exempt from the anchor-mismatch rules as a "tracker". Only an
+ * endpoint that does nothing but forward a click may be listed, and a platform that also lets its users
+ * publish belongs in `OPEN_HOSTING_SUFFIXES` instead.
+ */
+export const KNOWN_CLICK_TRACKERS: readonly ClickTracker[] = [
+  { host: 'google.com', path: /^\/url$/u },
+  { host: 'sendgrid.net', subdomains: true },
+  { host: 'list-manage.com', subdomains: true },
+  { host: 'mandrillapp.com', subdomains: true },
+  { host: 'exacttarget.com', subdomains: true },
+  { host: 'exct.net', subdomains: true },
+  { host: 'hubspotlinks.com', subdomains: true },
+  { host: 'hubspotemail.net', subdomains: true },
+  { host: 'sparkpostmail.com', subdomains: true },
+  { host: 'mailgun.org', subdomains: true },
+  { host: 'pstmrk.it', subdomains: true },
+  { host: 'links.iterable.com' },
+  { host: 'klaviyomail.com', subdomains: true },
+  { host: 'klclick.com', subdomains: true },
+  { host: 'customeriomail.com', subdomains: true },
+  { host: 'intercom-mail.com', subdomains: true },
+  { host: 'awstrack.me', subdomains: true },
+  { host: 'safelinks.protection.outlook.com', subdomains: true },
+  { host: 'urldefense.com' },
+  { host: 'urldefense.proofpoint.com' },
+  { host: 'clicktime.symantec.com' },
+  { host: 'protect-us.mimecast.com' },
+  { host: 'protect-eu.mimecast.com' },
+  { host: 'protect-au.mimecast.com' },
+  { host: 'linkprotect.cudasvc.com' },
+  { host: 'substack.com', path: /^\/redirect\//u },
+  { host: 'email.mg1.substack.com' },
+  { host: 'email.mg2.substack.com' },
+  { host: 'link.mail.beehiiv.com' },
+  { host: 'convertkit-mail.com', subdomains: true },
+  { host: 'convertkit-mail2.com', subdomains: true },
+  { host: 'mlsend.com', subdomains: true },
+  { host: 'rs6.net', subdomains: true },
+  { host: 'cmail19.com', subdomains: true },
+  { host: 'cmail20.com', subdomains: true },
+  { host: 'mjt.lu', subdomains: true },
+];

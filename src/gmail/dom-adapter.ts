@@ -15,6 +15,9 @@
  *    an unbounded string.
  *  - **Quoted text is removed** before the body is read, so a reply is analysed on what was newly
  *    written rather than re-analysing the message it quotes.
+ *  - **Copies go into an inert document.** A subtree cloned into Gmail's own document is a live one: an
+ *    `<img>` in it starts loading its `src` the moment it is created, attached or not, which would make
+ *    reading a message fetch from the sender's server. A document with no browsing context loads nothing.
  */
 import { logger } from '../shared/logger.js';
 import { MAX_BODY_CHARS, collapseWhitespace, emailDomain, fileExtension, parseMailbox, truncate } from '../shared/text.js';
@@ -39,14 +42,6 @@ const MAX_LINKS = 300;
 const MAX_ATTACHMENTS = 60;
 /** Message wrappers are shallow; never walk an unbounded ancestor chain looking for an id. */
 const MAX_MESSAGE_WRAPPERS = 32;
-/**
- * Upper bound on quoted subtrees consulted when excluding quoted links.
- *
- * A deeply nested reply chain produces one per round, and `.im` in the candidate list matches broadly, so
- * this is attacker-influenced like everything else derived from a message. Exceeding it costs precision in
- * the safe direction: a link in the twentieth quoted block is read as though the sender wrote it.
- */
-const MAX_QUOTED_SUBTREES = 20;
 
 /** Runs an extraction step, returning a fallback if it throws for any reason. */
 function attempt<T>(label: string, fn: () => T, fallback: T): T {
@@ -161,10 +156,15 @@ export class GmailDomAdapter implements MailAdapter {
     // Read once: the sender, the authentication summary and the `via` line all come from this table.
     const details = attempt('details', () => extractDetailRows(handle.root), new Map<string, string>());
     const sender = attempt('sender', () => extractSender(handle.root, details), {});
-    const body = attempt('body', () => extractBody(handle.bodyElement), { text: '' });
+    const inert = attempt<Document | null>('inert', () => createInertDocument(), null);
+    // A body that threw is one nobody read, and reported as such rather than scored as empty.
+    const body = attempt('body', () => extractBody(handle.bodyElement, inert), {
+      text: '',
+      unreadable: true,
+    });
     const auth = attempt<EmailAuthInfo | undefined>(
       'auth',
-      () => extractAuth(handle.root, details),
+      () => extractAuth(handle.root, details, inert),
       undefined,
     );
     const raw = attempt<RawFields>('raw', () => {
@@ -197,8 +197,23 @@ export class GmailDomAdapter implements MailAdapter {
       ...(Object.keys(raw).length > 0 ? { raw } : {}),
     };
 
-    return { email, missing: missingParts(handle, email, body.prunedToNothing === true) };
+    return { email, missing: missingParts(handle, email, body.unreadable === true) };
   }
+}
+
+/** A document with no browsing context, so nothing copied into it fetches anything. */
+function createInertDocument(): Document {
+  return document.implementation.createHTMLDocument('');
+}
+
+/**
+ * A deep copy of `element` owned by `inert`, or `null` when there is no inert document to own it.
+ *
+ * Never a fallback to `cloneNode` in the live document: losing one field is a degraded extraction, while
+ * a copy that loads the message's images is a request to the sender's server on the reader's behalf.
+ */
+function inertCopy(element: Element, inert: Document | null): Element | null {
+  return inert === null ? null : inert.importNode(element, true);
 }
 
 /**
@@ -216,7 +231,7 @@ export class GmailDomAdapter implements MailAdapter {
 function missingParts(
   handle: MessageHandle,
   email: EmailMessage,
-  bodyPrunedToNothing: boolean,
+  bodyUnreadable: boolean,
 ): readonly MessagePart[] {
   const missing: MessagePart[] = [];
 
@@ -228,8 +243,9 @@ function missingParts(
   // The second case is the body that was found and read to nothing: judged by consequence like the sender,
   // since a body every visibility rule removed leaves the content checks with the same empty string a
   // missing element would, and a message with links but no words was otherwise scored as though its wording
-  // had been examined and found unremarkable.
-  if (handle.bodyElement === null || bodyPrunedToNothing) missing.push('body');
+  // had been examined and found unremarkable. A body whose extraction threw is the same case reached by a
+  // different road.
+  if (handle.bodyElement === null || bodyUnreadable) missing.push('body');
 
   if (missing.length > 0) logger.info('parts of the message could not be read', { missing });
   return missing;
@@ -591,43 +607,68 @@ function rawSubject(): string {
 /**
  * Visible body text with quoted history removed, and separately whatever CSS keeps off screen.
  *
- * The body element is cloned before anything is removed, so Gmail's live DOM is never modified. This
- * costs a shallow clone per analysis and is worth it: mutating Gmail's own nodes risks breaking its event
- * handlers, which the brief explicitly rules out.
+ * The body element is copied before anything is removed, so Gmail's live DOM is never modified. This
+ * costs a copy per analysis and is worth it: mutating Gmail's own nodes risks breaking its event
+ * handlers, which the brief explicitly rules out. The copy lives in `inert`; see the file header.
  *
  * Hidden subtrees are removed from the text rather than left in it. `textContent` does not care whether
  * CSS put something out of view, so hidden filler would otherwise sit inside the string the content rules
  * match against, diluting them in exactly the way it is meant to dilute a spam filter. See `HiddenText`.
  */
-function extractBody(bodyElement: Element | null): {
+function extractBody(
+  bodyElement: Element | null,
+  inert: Document | null,
+): {
   text: string;
   hidden?: HiddenText;
-  /** Every word the body had was inside something the visibility scan judged hidden. */
-  prunedToNothing?: boolean;
+  /**
+   * The body was there and yielded nothing that could honestly be scored: every word it had was inside
+   * something the visibility scan judged hidden, or it could not be copied out to read at all.
+   */
+  unreadable?: boolean;
 } {
   if (bodyElement === null) return { text: '' };
 
-  const clone = bodyElement.cloneNode(true) as Element;
-  for (const quoted of queryAllUnion(clone, SELECTORS.quotedContent)) {
-    quoted.remove();
-  }
+  const clone = inertCopy(bodyElement, inert);
+  if (clone === null) return { text: '', unreadable: true };
+
   for (const nonContent of queryAll(clone, ['style', 'script'])) {
     nonContent.remove();
   }
+  const quoted = outermost(queryAllUnion(clone, SELECTORS.quotedContent));
+  for (const block of quoted) block.remove();
 
-  const scan = findHiddenSubtrees(clone);
-  let chars = 0;
-  for (const element of scan.roots) {
-    chars += countContentChars(element.textContent);
-    element.remove();
+  const own = pruneHidden(clone);
+  let text = truncate(normalizeBodyWhitespace(clone.textContent), MAX_BODY_CHARS);
+  let chars = own.chars;
+  const techniques = new Set(own.techniques);
+
+  /*
+   * Quoted blocks are the whole body: a forwarded message with nothing added, or a sender who wrapped
+   * everything in a class the quote selectors match. Read them rather than return nothing. An empty body
+   * here was the worst outcome available — not "not checked" but no assessment at all, because the
+   * observer reads a message with no words, links or attachments as one still loading and waits for it
+   * forever, so the message was left with no badge, exactly like a clean one on a quiet install. The
+   * quote rule exists to keep a reply's history from being scored against the person replying, and
+   * when nothing was written outside the history there is no one else for it to be scored against.
+   */
+  if (countContentChars(text) === 0 && quoted.length > 0) {
+    const history = clone.ownerDocument.createElement('div');
+    history.append(...quoted);
+    const pruned = pruneHidden(history);
+    const quotedText = truncate(normalizeBodyWhitespace(history.textContent), MAX_BODY_CHARS);
+    if (countContentChars(quotedText) > 0) {
+      text = quotedText;
+      chars += pruned.chars;
+      for (const technique of pruned.techniques) techniques.add(technique);
+    }
   }
 
-  const text = truncate(normalizeBodyWhitespace(clone.textContent), MAX_BODY_CHARS);
-  if (text === '') logEmptyBody(bodyElement, chars, scan.techniques);
+  if (text === '') logEmptyBody(bodyElement, chars, [...techniques]);
 
   return {
     text,
-    ...(chars > 0 ? { hidden: { chars, techniques: scan.techniques } } : {}),
+    ...(chars > 0 ? { hidden: { chars, techniques: [...techniques] } } : {}),
     /*
      * Removals are reported when they account for the *whole* body, because reading an inline style cannot
      * be exact — a declaration's effect depends on the subtree under it and on stylesheets this cannot see —
@@ -644,8 +685,26 @@ function extractBody(bodyElement: Element | null): {
      * Saying "this could not be read" costs a score on the rare message that really does hide all of its
      * text, and never accuses anyone.
      */
-    ...(chars > 0 && text === '' ? { prunedToNothing: true } : {}),
+    ...(chars > 0 && text === '' ? { unreadable: true } : {}),
   };
+}
+
+/**
+ * Removes the hidden subtrees under `container`, keeping in place whatever inside them escaped.
+ *
+ * The escapes go back where the subtree was rather than being dropped with it, because they are text the
+ * reader can see: a `font-size:0` wrapper hides its own stray characters, not the paragraph that names a
+ * size of its own.
+ */
+function pruneHidden(container: Element): { chars: number; techniques: string[] } {
+  const scan = findHiddenSubtrees(container);
+  let chars = 0;
+  for (const hidden of scan.roots) {
+    chars += hidden.chars;
+    hidden.element.before(...hidden.visible);
+    hidden.element.remove();
+  }
+  return { chars, techniques: scan.techniques };
 }
 
 /**
@@ -658,8 +717,8 @@ function extractBody(bodyElement: Element | null): {
  * wording is simply unremarkable.
  *
  * Four causes look identical in the score and are told apart by the counts here: text that existed until
- * the quoted-content selectors removed all of it (`before` above zero), text Gmail renders somewhere
- * unreadable such as a sandboxed frame (`frames` above zero), a message that genuinely has no words
+ * the visibility scan or the quote selectors removed it (`before` above zero), text Gmail renders
+ * somewhere unreadable such as a sandboxed frame (`frames` above zero), a message that genuinely has no words
  * because its payload is a picture (`images` above zero), and a body candidate that matched the wrong
  * element (everything zero). The techniques are this project's own vocabulary, not the message's: naming
  * them is what turned "the hidden scan removed all of it" into "which declaration did". Counts and tag
@@ -674,7 +733,7 @@ function logEmptyBody(bodyElement: Element, hiddenChars: number, techniques: str
     quoted: queryAllUnion(bodyElement, SELECTORS.quotedContent).length,
     frames: bodyElement.querySelectorAll('iframe, frame, object, embed').length,
     images: bodyElement.querySelectorAll('img').length,
-    links: bodyElement.querySelectorAll('a[href]').length,
+    links: queryAll(bodyElement, SELECTORS.bodyLink).length,
   });
 }
 
@@ -693,26 +752,26 @@ function normalizeBodyWhitespace(text: string): string {
 // ---------------------------------------------------------------------------
 
 /**
- * Anchors the sender wrote, which is not the same as anchors in the element.
+ * Every anchor in the body, quoted or not.
  *
- * Quoted subtrees are skipped for the reason `extractBody` removes them from the text: what is analysed is
- * what *this* message added. Reading them left the two halves of one extraction disagreeing — a reply to a
- * phish contributed the phish's links, scored against the person who replied, while the body text that
- * would explain them had already been stripped. A finding pointing at a link whose surrounding sentence
- * the engine cannot see is exactly the unverifiable finding this project treats as worse than none.
+ * Quoted blocks are *not* skipped here, unlike in `extractBody`, and the asymmetry is deliberate. Which
+ * block counts as quoted is decided by markup inside the message, and some of that markup is the sender's
+ * to write: `.gmail_quote` is a class anyone can put on a `<div>`. Skipping quoted anchors made that class
+ * a way to take every link out of the analysis while the reader still sees and can click each one — and a
+ * link is the thing a phish exists to deliver. Dropping a quoted sentence costs a little wording; dropping
+ * a quoted link costs the finding that mattered.
  *
- * Containment rather than a second clone: the quoted nodes are located once and each anchor tested against
- * them, so Gmail's own nodes are never mutated and the clone in `extractBody` stays the only copy made.
+ * The price is paid on replies: a reply quoting a message with a misleading link carries that link's
+ * finding. That is a finding about a link the reader can see and click in what is on screen, which is a
+ * true statement, where the alternative was silence about one.
  */
 function extractLinks(bodyElement: Element | null): EmailLink[] {
   if (bodyElement === null) return [];
   const links: EmailLink[] = [];
   const seen = new Set<string>();
-  const quoted = queryAllUnion(bodyElement, SELECTORS.quotedContent).slice(0, MAX_QUOTED_SUBTREES);
 
   for (const anchor of queryAll(bodyElement, SELECTORS.bodyLink)) {
     if (links.length >= MAX_LINKS) break;
-    if (quoted.some((block) => block.contains(anchor))) continue;
 
     // `getAttribute` rather than `.href`: the property resolves relative URLs against the current
     // document, which would silently turn a broken href into a plausible mail.google.com URL.
@@ -789,7 +848,11 @@ function readVerdict(text: string): AuthVerdict | undefined {
  * unauthenticated-sender avatar. All are frequently absent, which is why the `authentication`
  * detectors are written to stay silent rather than guess. See `rules/authentication.ts`.
  */
-function extractAuth(root: Element, rows: ReadonlyMap<string, string>): EmailAuthInfo | undefined {
+function extractAuth(
+  root: Element,
+  rows: ReadonlyMap<string, string>,
+  inert: Document | null,
+): EmailAuthInfo | undefined {
   const info: EmailAuthInfo = {};
 
   const mailedBy = rows.get('mailed-by');
@@ -816,7 +879,7 @@ function extractAuth(root: Element, rows: ReadonlyMap<string, string>): EmailAut
     if (verdict !== undefined) info[key] = verdict;
   }
 
-  const via = readVia(root, rows);
+  const via = readVia(root, rows, inert);
   if (via !== undefined) info.via = via;
 
   const banner = queryFirst(root, SELECTORS.warningBanner)?.textContent ?? '';
@@ -876,14 +939,20 @@ const SECURITY_VERDICT =
  * Message bodies are excluded for the same reason, and more urgently — `queryFirst` on a header selector
  * can land inside quoted content in a threaded view.
  */
-function readVia(root: Element, details: ReadonlyMap<string, string>): string | undefined {
+function readVia(
+  root: Element,
+  details: ReadonlyMap<string, string>,
+  inert: Document | null,
+): string | undefined {
   const row = details.get('via');
   if (row !== undefined) return normalizeDomain(stripToDomain(row));
 
   const block = queryFirst(root, SELECTORS.senderHeaderBlock);
   if (block === null) return undefined;
 
-  const clone = block.cloneNode(true) as Element;
+  // The header block can contain the body itself on some layouts, images and all; see `inertCopy`.
+  const clone = inertCopy(block, inert);
+  if (clone === null) return undefined;
   for (const authored of queryAllUnion(clone, [...SELECTORS.senderSpan, ...SELECTORS.body])) {
     authored.remove();
   }
@@ -936,7 +1005,7 @@ function isExpanded(element: Element): boolean {
   for (const selector of SELECTORS.collapsedMessage) {
     try {
       if (element.matches(selector)) return false;
-      // A collapsed row contains the collapsed marker as a direct descendant of its header.
+      // A collapsed row can also carry the marker on one of its direct children rather than on itself.
       if (element.querySelector(`:scope > ${selector}`) !== null) return false;
     } catch {
       // Ignore unsupported selectors (`:scope` is broadly supported but be defensive).

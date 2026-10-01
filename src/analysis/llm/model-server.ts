@@ -10,8 +10,8 @@
  *    model is asked is exactly what Chrome's built-in model is asked, so the two modes are comparable
  *    and there is one prompt to reason about rather than two. In particular it still withholds the
  *    sending domain, the link destinations and the attachment types, which are judged deterministically.
- *  - **Egress stays in the service worker.** This class hands over two strings; the worker holds the
- *    URL, composes the request and opens the socket.
+ *  - **Egress stays in the service worker.** This class hands over the message half of the prompt; the
+ *    worker adds the system prompt, holds the URL, composes the request and opens the socket.
  *  - **The address is validated, not supplied.** `normalizeModelBaseUrl` has already reduced it to a
  *    loopback origin or an https one before it reaches storage.
  *  - **The cap does not move.** A 70B model on the user's own GPU is still bound by the `llm` category
@@ -29,7 +29,7 @@ import type {
   SemanticAnalyzer,
   Settings,
 } from '../../shared/types.js';
-import { SYSTEM_PROMPT, buildUserPrompt, describePromptShape } from './prompt.js';
+import { buildUserPrompt, describePromptShape } from './prompt.js';
 
 export class ModelServerAnalyzer implements SemanticAnalyzer {
   readonly id = 'model-server';
@@ -65,7 +65,7 @@ export class ModelServerAnalyzer implements SemanticAnalyzer {
 
     const response = await sendMessage({
       type: 'MODEL_SERVER_ANALYZE',
-      payload: { system: SYSTEM_PROMPT, user: buildUserPrompt(email) },
+      payload: { user: buildUserPrompt(email) },
     });
     if (isAborted(options.signal)) return null;
 

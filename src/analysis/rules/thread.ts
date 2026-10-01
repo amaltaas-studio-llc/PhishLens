@@ -166,28 +166,17 @@ export function findParticipantLookalike(
  *
  * Reused across unrelated organisations by design, so matching on them would report every thread where
  * two companies both answer from a desk called "Support".
+ *
+ * Stored as skeletons, because that is what they are compared with: `skeleton('info')` is `lnfo`, so a
+ * plain-spelled set never matched any name with an `i` in it — "Info", "Billing", "Admin", "IT".
  */
-const ROLE_NAMES: ReadonlySet<string> = new Set([
-  'support',
-  'info',
-  'team',
-  'sales',
-  'billing',
-  'accounts',
-  'admin',
-  'help',
-  'helpdesk',
-  'service',
-  'customerservice',
-  'noreply',
-  'donotreply',
-  'notifications',
-  'security',
-  'it',
-  'hr',
-  'payroll',
-  'finance',
-]);
+const ROLE_NAMES: ReadonlySet<string> = new Set(
+  [
+    'support', 'info', 'team', 'sales', 'billing', 'accounts', 'admin', 'help', 'helpdesk', 'service',
+    'customerservice', 'noreply', 'donotreply', 'notifications', 'security', 'it', 'hr', 'payroll',
+    'finance',
+  ].map((name) => skeleton(name)),
+);
 
 function isRoleName(name: string): boolean {
   const folded = skeleton(name);
@@ -215,3 +204,5 @@ export function detectThreadSignals(context: AnalysisContext): SecuritySignal[] 
     ...threadParticipantNameReuse(context, lookalike),
   ];
 }
+
+export const __testables = { isRoleName };

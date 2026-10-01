@@ -1,0 +1,12 @@
+{
+  "name": "visible-clipping-code-request",
+  "description": "A code solicitation displayed inside a clipping rectangle with nonzero area. Extraction must preserve the visible request.",
+  "email": {
+    "senderName": "Northwind Tools",
+    "senderEmail": "support@northwind-tools.com",
+    "subject": "Account support",
+    "bodyText": "Please send me your verification code.",
+    "links": [],
+    "attachments": []
+  }
+}

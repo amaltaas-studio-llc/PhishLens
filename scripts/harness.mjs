@@ -42,6 +42,9 @@ const context = await esbuild.context({
 
 await context.watch();
 const server = await context.serve({
+  // esbuild otherwise listens on every interface, which would serve the fixture corpus and a dev build to
+  // anyone on the same network.
+  host: '127.0.0.1',
   port,
   // Requests fall back to harness/, so index.html is served from source and .build/main.js resolves.
   servedir: harnessDir,

@@ -204,6 +204,11 @@ describe('navigation and partially rendered bodies', () => {
     expect(new GmailDomAdapter().currentMessage()?.messageId).toBe('');
   });
 
+  /**
+   * A body hidden in full is waited on briefly, because Gmail draws bodies hidden while building the view
+   * — and then reported as unreadable, because waiting on it for good meant a message that never emitted
+   * and so never got a badge, which on a quiet install is what a clean message looks like.
+   */
   it.each(['style', 'hidden'])('watches %s before the first readable extraction', async (attribute) => {
     observer.stop();
     document.querySelector('.aQH')?.remove();
@@ -214,14 +219,40 @@ describe('navigation and partially rendered bodies', () => {
     events = [];
     observer = new GmailObserver(new GmailDomAdapter(), (event) => events.push(event));
     observer.start();
-    await settle(5000);
+    await settle(1000);
     expect(messageEvents()).toHaveLength(0);
+
+    await settle(4000);
+    expect(messageEvents()).toHaveLength(1);
+    const unread = messageEvents().at(-1);
+    expect(unread?.kind === 'message' && unread.missing).toContain('body');
 
     paragraph.removeAttribute(attribute);
     await settle();
-    expect(messageEvents()).toHaveLength(1);
+    expect(messageEvents()).toHaveLength(2);
     const latest = messageEvents().at(-1);
     expect(latest?.kind === 'message' && latest.email.bodyText).toContain('verification code');
+    expect(latest?.kind === 'message' && latest.missing).toEqual([]);
+  });
+
+  /** A body Gmail finishes drawing inside the grace is read once, and never reported as unreadable. */
+  it('does not report a body as unreadable when it becomes readable within the grace', async () => {
+    observer.stop();
+    const paragraph = document.createElement('p');
+    paragraph.textContent = 'The invoice for August is attached for your records.';
+    paragraph.setAttribute('style', 'display:none');
+    document.querySelector('div.a3s')?.replaceChildren(paragraph);
+    document.querySelector('.aQH')?.remove();
+    events = [];
+    observer = new GmailObserver(new GmailDomAdapter(), (event) => events.push(event));
+    observer.start();
+    await settle(600);
+
+    paragraph.removeAttribute('style');
+    await settle(5000);
+    expect(messageEvents()).toHaveLength(1);
+    const latest = messageEvents().at(-1);
+    expect(latest?.kind === 'message' && latest.missing).toEqual([]);
   });
 
   it('ends reconciliation when the debounce reports the view before the interval', async () => {

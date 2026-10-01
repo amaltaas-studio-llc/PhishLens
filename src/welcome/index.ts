@@ -24,6 +24,13 @@ import {
 
 /** Chrome raises no event for a download this page did not start, so one in progress is polled. */
 const DOWNLOAD_POLL_MS = 5000;
+/**
+ * Polls without a progress event, or any change of state, before the wait is abandoned. `create()` is
+ * not guaranteed to return, and without a limit a stalled request leaves the button disabled and the
+ * page reading "Waiting for Chrome…" until it is reloaded. Two minutes is far past the few seconds
+ * Chrome takes to report a download it has started.
+ */
+const SILENT_POLLS_BEFORE_GIVING_UP = 24;
 
 class WelcomePage {
   readonly #modeInputs = [...document.querySelectorAll<HTMLInputElement>('input[name="aiMode"]')];
@@ -36,6 +43,7 @@ class WelcomePage {
   #watch: ReturnType<typeof setInterval> | undefined;
   /** Bumped when a download wait starts or ends, so a late answer from an earlier one is ignored. */
   #tracking = 0;
+  #silentPolls = 0;
 
   async init(): Promise<void> {
     for (const input of this.#modeInputs) {
@@ -140,11 +148,13 @@ class WelcomePage {
     const run = ++this.#tracking;
     this.#status.textContent = '';
     this.#progress = 'Waiting for Chrome to report progress…';
+    this.#silentPolls = 0;
     this.#render(state);
-    this.#watch = setInterval(() => void this.#watchDownload(run), DOWNLOAD_POLL_MS);
+    this.#watch = setInterval(() => void this.#watchDownload(run, state), DOWNLOAD_POLL_MS);
 
     const outcome = await downloadOnDeviceModel((fraction) => {
       if (run !== this.#tracking) return;
+      this.#silentPolls = 0;
       this.#progress =
         fraction >= 1
           ? 'Downloaded. Chrome is now unpacking and loading the model, which can take a few minutes.'
@@ -154,12 +164,16 @@ class WelcomePage {
     if (run === this.#tracking) this.#endDownload(outcome);
   }
 
-  async #watchDownload(run: number): Promise<void> {
+  async #watchDownload(run: number, started: OnDeviceModelState): Promise<void> {
     const state = await onDeviceModelState();
     if (run !== this.#tracking) return;
     if (state === 'available') this.#endDownload({ ok: true });
     else if (state === 'unavailable' || state === 'unsupported') {
       this.#endDownload({ ok: false, reason: state === 'unsupported' ? 'unsupported' : 'unavailable' });
+    } else if (state === started && ++this.#silentPolls >= SILENT_POLLS_BEFORE_GIVING_UP) {
+      this.#endDownload({ ok: false, reason: 'failed' });
+    } else if (state !== started) {
+      this.#silentPolls = 0;
     }
   }
 
@@ -170,7 +184,8 @@ class WelcomePage {
     if (!outcome.ok) {
       this.#status.textContent =
         outcome.reason === 'unavailable'
-          ? 'Chrome’s On-device AI setting is off (or blocked by policy), so the model cannot run. Turn it on under Settings → System, then try again.'
+          ? // Chrome reports a switched-off setting, a policy block and an ineligible device alike.
+            'Chrome says its model cannot run right now. The setting may be off, blocked by policy, or this device may not qualify — see below.'
           : 'Chrome did not start the download. Check the requirements below, then try again.';
     }
     void this.#refresh();
