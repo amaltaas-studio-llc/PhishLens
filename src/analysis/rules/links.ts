@@ -1121,6 +1121,133 @@ function linkOnlyBody(context: AnalysisContext): SecuritySignal[] {
   ];
 }
 
+/**
+ * A `label: value` line. The label is short and holds a letter, so a clock time or a URL's scheme is not
+ * a field; the colon may be full-width, as forms in Chinese and Japanese write it. The value may be empty
+ * here and arrive on the lines below, which is how a form laid out as a table reads once its cells are
+ * separated.
+ */
+const FORM_FIELD = /^([^:：\n]{0,40}\p{L}[^:：\n]{0,40}?)[:：] ?(.*)$/u;
+
+/** A line that is a URL on its own reads as `https: //…`, and is text, not a field. */
+function formField(line: string): RegExpExecArray | null {
+  const match = FORM_FIELD.exec(line);
+  return match === null || (match[2] ?? '').startsWith('//') ? null : match;
+}
+
+const ADDRESS_IN_TEXT = /[\p{L}\p{N}._%+-]{1,64}@[\p{L}\p{N}-]{1,63}(?:\.[\p{L}\p{N}-]{1,63}){1,8}/gu;
+const URL_IN_TEXT = /\bhttps?:\/\/\S{1,2000}/giu;
+const MAX_FORM_ECHO_LINES = 400;
+const MAX_FORM_ECHO_LINE_CHARS = 2000;
+
+/** Plus-tags and Gmail's ignored dots do not change whose mailbox an address is. */
+function mailboxKey(address: string): string {
+  const at = address.lastIndexOf('@');
+  if (at <= 0) return '';
+  let local = address.slice(0, at).toLowerCase().replace(/\+.*$/u, '');
+  let domain = address.slice(at + 1).toLowerCase().replace(/\.$/u, '');
+  if (domain === 'googlemail.com') domain = 'gmail.com';
+  if (domain === 'gmail.com') local = local.replace(/\./gu, '');
+  return local === '' ? '' : `${local}@${domain}`;
+}
+
+interface FormField {
+  line: number;
+  label: string;
+  /** The value with any lines that continue it, as free text does. */
+  value: string;
+}
+
+/**
+ * A web form's automatic reply, repeating a submission that gave the reader's address as the submitter's,
+ * with a link inside what the submitter typed.
+ *
+ * Contact-form abuse. A spammer types a lure into a real company's contact form, puts the victim's address
+ * in the email field, and the company's autoresponder mails a copy of the submission to the victim. Every
+ * identity check passes, because the mail really is from the company and authenticates as it; the words
+ * and the link are the spammer's, delivered with someone else's reputation. Nothing about a brand or a
+ * language is needed to see it: the form names the reader as its author, and the link sits in a field
+ * someone typed into.
+ *
+ * Each bound has a genuine message behind it:
+ *  - **The reader's address must be a field's whole value**, among at least `minFormEchoFields` fields.
+ *    An address in running text is a greeting or a footer, and an account notice states it on one line.
+ *  - **No outside address may be a field's value.** A forwarded message quotes a header block — From,
+ *    To, Date, Subject — whose To line is the reader, and its From line is what separates it from a form.
+ *    The sender's own addresses do not count, because an autoresponder's signature lists them.
+ *  - **The link must be inside free text**, `minFormEchoFreeTextChars` beyond its URL. An order
+ *    confirmation echoes "Tracking: https://…" and a profile form "Website: https://…", which are values
+ *    the reader would recognise; a link inside a paragraph is a message.
+ *  - **Not the sender's domain and not the reader's**, since a company linking itself and a reader who
+ *    typed their own site into the form are each what a genuine submission contains.
+ *
+ * `medium`, with no floor. A reader who really did fill in the form and pasted a link into it gets this
+ * finding too, and the wording tells them how to check it: they know whether they wrote that message.
+ */
+function echoedFormSubmission(context: AnalysisContext): SecuritySignal[] {
+  const reader = mailboxKey(context.email.recipientEmail ?? '');
+  if (reader === '') return [];
+
+  const lines = context.bodyText.split('\n', MAX_FORM_ECHO_LINES).map((line) => line.trim().slice(0, MAX_FORM_ECHO_LINE_CHARS));
+  const fields: FormField[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const match = formField(lines[i] ?? '');
+    if (match === null) continue;
+    let value = match[2] ?? '';
+    for (let next = i + 1; next < lines.length && next <= i + DETECTION_TUNING.formEchoWindowLines; next++) {
+      const continuation = lines[next] ?? '';
+      if (continuation === '' || formField(continuation) !== null) break;
+      value += ` ${continuation}`;
+    }
+    value = value.trim();
+    if (value !== '') fields.push({ line: i, label: (match[1] ?? '').trim(), value });
+  }
+
+  const own = fields.find((field) => mailboxKey(field.value.replace(/^<|>$/gu, '').replace(/^mailto:/iu, '')) === reader);
+  if (own === undefined) return [];
+
+  const window = DETECTION_TUNING.formEchoWindowLines;
+  const form = fields.filter((field) => Math.abs(field.line - own.line) <= window);
+  if (form.length < DETECTION_TUNING.minFormEchoFields) return [];
+  const strangerAddress = form.some((field) =>
+    [...field.value.matchAll(ADDRESS_IN_TEXT)].some(
+      (found) =>
+        mailboxKey(found[0]) !== reader &&
+        registrableDomain(found[0].slice(found[0].lastIndexOf('@') + 1)) !== context.senderRegistrable,
+    ),
+  );
+  if (strangerAddress) return [];
+
+  for (const field of form) {
+    if (field === own) continue;
+    const prose = field.value.replace(URL_IN_TEXT, ' ');
+    if (prose === field.value) continue;
+    if ((prose.match(/[\p{L}\p{N}]/gu)?.length ?? 0) < DETECTION_TUNING.minFormEchoFreeTextChars) continue;
+    const typed = field.value.toLowerCase();
+
+    for (const link of context.webLinks) {
+      if (!link.hosts.some((host) => typed.includes(host.hostname))) continue;
+      const destination = judgedHosts(link).at(-1);
+      if (destination === undefined) continue;
+      if (destination.registrable === context.senderRegistrable) continue;
+      if (destination.registrable === context.recipientRegistrable) continue;
+
+      return [
+        signal({
+          id: `link.echoed_form_link.${String(link.index)}`,
+          category: 'link',
+          severity: 'medium',
+          score: 22,
+          title: 'Form confirmation repeats a link submitted under your address',
+          description: `This reads as a web form's automatic confirmation, and the form gives your address as the person who filled it in. The text submitted in its "${field.label}" field links to ${destination.hostname}, which is not ${context.senderRegistrable}. Spammers type other people's addresses into a company's contact form so that the company's own mail server delivers their link: the sender is genuine, but those words are not theirs. If you did not fill in this form, nothing in it came from the company.`,
+          evidence: { text: field.value.slice(0, 300), url: link.link.href, value: destination.hostname },
+        }),
+      ];
+    }
+  }
+  return [];
+}
+
 const linkDetectors: Detect[] = [
   displayedUrlMismatch,
   anchorTextBrandMismatch,
@@ -1139,6 +1266,7 @@ const linkDetectors: Detect[] = [
   pageServedFromOpenStorage,
   filenameLookalikeTldLinks,
   fakeAttachmentLinks,
+  echoedFormSubmission,
   linkOnlyBody,
 ] as const;
 

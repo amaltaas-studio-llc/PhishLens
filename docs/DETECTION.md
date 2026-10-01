@@ -23,7 +23,7 @@ explanation, evidence); none computes the final score.
 | Category | File | Looks for |
 | --- | --- | --- |
 | Identity | `identity.ts`, `thread.ts` | Lookalikes, homoglyphs, brand-in-wrong-place, display names that do not match the domain, display names claiming the reader's own organisation from outside it, reply-chain impersonation |
-| Links | `links.ts` | Anchor ≠ destination, brand-prefix hosts, IPs, punycode, shorteners, credential wording to unrelated hosts, public object-storage pages, filenames that link to someone else's web page — on every host a click passes through |
+| Links | `links.ts` | Anchor ≠ destination, brand-prefix hosts, IPs, punycode, shorteners, credential wording to unrelated hosts, public object-storage pages, filenames that link to someone else's web page, a stranger's link echoed by a web form's autoresponder — on every host a click passes through |
 | Content | `content.ts`, `languages/` | Credential asks, OTP solicitation, payment changes, gift cards, urgency, secrecy, process bypass, … |
 | Attachments | `attachments.ts` | Executables, macros, archives, double extensions, RTLO tricks (filename only) |
 | Authentication | `authentication.ts` | SPF/DKIM/DMARC and Gmail’s warning as shown in the page — no raw headers |
@@ -61,6 +61,16 @@ after-verb forms in other languages) reverses a match. Conditionals like “if y
 reportable. “Enter the code” is the delivery's own instruction, so it counts only when the message
 carries no code beside the word naming it (“code: 482 910”); a number elsewhere in it does not count as
 one. Fixtures: `legitimate-verification-code`, `northwind-*-verification-code`.
+
+**Echoed web forms.** A spammer can type a lure into any company's contact form with the reader's
+address in the email field, and the company's autoresponder delivers it: genuine sender, passing
+authentication, nobody's brand. `link.echoed_form_link` recognises the shape instead. The reader's own
+address (plus-tags and Gmail's dots ignored) must be the whole value of a `label: value` line among at
+least three, no outside address may be another field's value (a quoted From/To header block), and a link
+to neither the sender's domain nor the reader's must sit inside free text of at least 40 letters — so a
+"Tracking:" or "Website:" URL does not count. `medium` with no floor, because a reader who filled in the
+form and pasted a link gets the same message; the finding says how to tell. Fixtures: `echoed-form-lure`,
+`legitimate-contact-form-confirmation`.
 
 ## The score
 
@@ -166,4 +176,6 @@ See [adr/0007](adr/0007-list-row-sender-only.md).
 - Body is `textContent` only (no OCR), with a line break at every block element so that adjacent cells
   and paragraphs do not fuse into one word. A block that CSS makes inline still gets a break.
 - Wording packs cover eight languages besides English; others lean on identity, links and attachments.
+- An echoed form is only recognised when its labels end in a colon; a form laid out as a two-column table
+  with bare labels is not, and its link is judged by the other link rules alone.
 - No reputation feeds; analysis is textual only ([adr/0010](adr/0010-hostile-input-posture.md)).

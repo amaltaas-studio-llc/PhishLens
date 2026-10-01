@@ -299,6 +299,20 @@ export const DETECTION_TUNING = Object.freeze({
    * Devanagari script, where function-word lists are less reliable than the script itself.
    */
   devanagariLetterShare: 0.12,
+  /**
+   * `label: value` lines, the reader's own address among them, that make a block of text an echoed form.
+   * Three, because an address on its own line under "Email:" is also how an account notice states whom it
+   * was sent to; a name, an address and a message is the smallest form anyone builds.
+   */
+  minFormEchoFields: 3,
+  /** Lines either side of the reader's address searched for the rest of the form. */
+  formEchoWindowLines: 8,
+  /**
+   * Letters and digits a field value needs, its URLs excluded, to be free text someone typed rather than a
+   * value the site filled in. Counted in characters so that unspaced scripts qualify; a tracking number,
+   * an order reference or a bare "Website:" URL stays well below it.
+   */
+  minFormEchoFreeTextChars: 40,
 });
 
 /**

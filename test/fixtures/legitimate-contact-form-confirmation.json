@@ -1,0 +1,23 @@
+{
+  "name": "legitimate-contact-form-confirmation",
+  "description": "The confirmation a shop's contact form sends to the person who really filled it in: the reader's own name and address, the website they typed, their question, and the shop's own contact details.",
+  "email": {
+    "senderName": "Northwind Garden Supply",
+    "senderEmail": "info@northwind-gardens.com",
+    "recipientEmail": "alex.morgan@gmail.com",
+    "subject": "We have received your enquiry",
+    "bodyText": "Thank you for contacting Northwind Garden Supply. We usually reply within one to three business days.\n\nYour submission:\n\nName: Alex Morgan\nEmail: alex.morgan@gmail.com\nPhone: 555-0187\nWebsite: https://alexmorgan-designs.com\nMessage: Hello, I would like to ask whether you deliver raised garden beds to the coast, and how long delivery usually takes. Thank you.\n\n--\nNorthwind Garden Supply\nWeb: https://northwind-gardens.com\nEmail: info@northwind-gardens.com\nPhone: 555-0100",
+    "links": [
+      { "text": "https://alexmorgan-designs.com", "href": "https://alexmorgan-designs.com" },
+      { "text": "https://northwind-gardens.com", "href": "https://northwind-gardens.com" }
+    ],
+    "attachments": [],
+    "auth": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass",
+      "signedBy": "northwind-gardens.com",
+      "mailedBy": "northwind-gardens.com"
+    }
+  }
+}

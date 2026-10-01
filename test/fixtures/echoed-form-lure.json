@@ -1,0 +1,23 @@
+{
+  "name": "echoed-form-lure",
+  "description": "Contact-form abuse: someone typed a prize lure into a real shop's contact form with the reader's address as their own, and the shop's autoresponder mailed the submission to the reader. The sender is genuine and authenticates, so the echoed form is the only evidence.",
+  "email": {
+    "senderName": "Northwind Garden Supply",
+    "senderEmail": "info@northwind-gardens.com",
+    "recipientEmail": "alex.morgan+shop@gmail.com",
+    "subject": "We have received your enquiry",
+    "bodyText": "Thank you for contacting Northwind Garden Supply. We usually reply within one to three business days.\n\nYour submission:\n\nName: Reward Desk Notification\nEmail: alex.morgan+shop@gmail.com\nPhone: 5550142\nMessage: Congratulations, you have been selected as this month's winner in the customer reward draw. Your entry is approved and your prize is waiting. Follow the link to claim your reward: https://reward-claims-desk.net/winner/0412\n\n--\nNorthwind Garden Supply\nWeb: https://northwind-gardens.com\nEmail: info@northwind-gardens.com\nPhone: 555-0100",
+    "links": [
+      { "text": "https://reward-claims-desk.net/winner/0412", "href": "https://reward-claims-desk.net/winner/0412" },
+      { "text": "https://northwind-gardens.com", "href": "https://northwind-gardens.com" }
+    ],
+    "attachments": [],
+    "auth": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass",
+      "signedBy": "northwind-gardens.com",
+      "mailedBy": "northwind-gardens.com"
+    }
+  }
+}

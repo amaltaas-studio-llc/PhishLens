@@ -52,6 +52,7 @@ const LEGITIMATE_FIXTURES = [
   'legitimate-help-desk-attachment',
   'legitimate-image-newsletter',
   'legitimate-drive-share',
+  'legitimate-contact-form-confirmation',
   ...LANGUAGE_IDS.flatMap((id) => [
     `northwind-${id}-verification-code`,
     `northwind-${id}-newsletter`,
@@ -108,7 +109,7 @@ const MALICIOUS_FIXTURES = [
  * ordinary mail. Leaving such fixtures unlisted would check them in neither direction; holding them to the
  * malicious corpus's bar would force a floor the evidence does not support.
  */
-const CAUTION_ONLY_FIXTURES = ['image-only-mailbox-lure'];
+const CAUTION_ONLY_FIXTURES = ['image-only-mailbox-lure', 'echoed-form-lure'];
 
 const FIXED_NOW = 1_760_000_000_000;
 
@@ -1367,6 +1368,73 @@ describe('a link labelled as an attached file', () => {
   it('says nothing when a mail tracker hides where the file goes', () => {
     const hidden = linked('Statement.pdf', 'https://northwind.us1.list-manage.com/track/click?u=4f2a&id=91c0');
     expect(fake(hidden)).toBeUndefined();
+  });
+});
+
+/**
+ * Contact-form abuse: a genuine company's autoresponder delivering what a stranger typed into its form.
+ * Both directions matter, because the same confirmation is what everyone who really fills in a form gets.
+ */
+describe('an automatic reply echoing a form submitted with the reader\'s address', () => {
+  const lure = analyzeFixture('echoed-form-lure');
+  const base = loadFixture('echoed-form-lure').email;
+  const echoed = (result: AnalysisResult) => signalFor(result, 'link.echoed_form_link');
+  const LURE_LINK = 'https://reward-claims-desk.net/winner/0412';
+  const withBody = (bodyText: string, overrides: Partial<EmailMessage> = {}) =>
+    analyzeDeterministic({ ...base, bodyText, ...overrides }, { now: FIXED_NOW });
+  const form = (fields: string) =>
+    `Thank you for contacting Northwind Garden Supply.\n\nYour submission:\n\n${fields}\n\n--\nNorthwind Garden Supply`;
+  const PROSE = 'Your entry is approved and your place in the members programme is reserved. Follow the link to join';
+
+  it('reports the link inside the echoed message, at medium and without a floor', () => {
+    expect(echoed(lure)?.severity).toBe('medium');
+    expect(echoed(lure)?.category).toBe('link');
+    expect(echoed(lure)?.description).toContain('reward-claims-desk.net');
+    expect(echoed(lure)?.description).toContain('"Message"');
+    expect(scoreFloor(lure.signals).basis).toBeNull();
+    expect(lure.classification).toBe('caution');
+  });
+
+  it('says nothing of the confirmation the reader gets for a form they filled in', () => {
+    expect(echoed(analyzeFixture('legitimate-contact-form-confirmation'))).toBeUndefined();
+  });
+
+  it('needs no prize wording, and reads full-width colons and unspaced scripts', () => {
+    const plain = withBody(form(`Name: R\nEmail: alex.morgan+shop@gmail.com\nPhone: 5550142\nMessage: ${PROSE}: ${LURE_LINK}`));
+    expect(echoed(plain)).toBeDefined();
+    const japanese = withBody(
+      form(`お名前：R\nメールアドレス：alex.morgan+shop@gmail.com\n電話番号：5550142\nお問い合わせ内容：${PROSE} ${LURE_LINK}`),
+    );
+    expect(echoed(japanese)).toBeDefined();
+  });
+
+  it('recognises the reader under a plus-tag or Gmail\'s ignored dots', () => {
+    const fields = `Name: R\nEmail: Alex.Morgan@gmail.com\nPhone: 5550142\nMessage: ${PROSE}: ${LURE_LINK}`;
+    expect(echoed(withBody(form(fields), { recipientEmail: 'alexmorgan+web@googlemail.com' }))).toBeDefined();
+    expect(echoed(withBody(form(fields), { recipientEmail: 'sam.okafor@gmail.com' }))).toBeUndefined();
+  });
+
+  it('reads a message field whose text is on the lines below its label', () => {
+    const below = withBody(form(`Name: R\nEmail: alex.morgan+shop@gmail.com\nPhone: 5550142\nMessage:\n${PROSE}\n${LURE_LINK}`));
+    expect(echoed(below)).toBeDefined();
+    const continued = withBody(form(`Name: R\nEmail: alex.morgan+shop@gmail.com\nPhone: 5550142\nMessage: ${PROSE}\n${LURE_LINK}`));
+    expect(echoed(continued)).toBeDefined();
+  });
+
+  it.each([
+    ['a quoted header block, whose From line is someone else', `From: Jordan Reyes <jordan@northwind-traders.com>\nTo: alex.morgan+shop@gmail.com\nDate: 3 March\nSubject: ${PROSE} ${LURE_LINK}`],
+    ['a bare URL a site filled in', `Name: R\nEmail: alex.morgan+shop@gmail.com\nPhone: 5550142\nTracking: ${LURE_LINK}`],
+    ['the reader named in running text', `Name: R\nPhone: 5550142\nOrder: 1182\nMessage: We sent this to alex.morgan+shop@gmail.com. ${PROSE}: ${LURE_LINK}`],
+    ['a form of two fields', `Email: alex.morgan+shop@gmail.com\nMessage: ${PROSE}: ${LURE_LINK}`],
+    ['a link to the sender\'s own site', `Name: R\nEmail: alex.morgan+shop@gmail.com\nPhone: 5550142\nMessage: ${PROSE}: https://northwind-gardens.com/members`],
+  ])('says nothing of %s', (_case, fields) => {
+    const links = [...fields.matchAll(/https:\/\/\S+/gu)].map(([href]) => ({ text: href, href, normalizedDomain: new URL(href).hostname }));
+    expect(echoed(withBody(form(fields), { links }))).toBeUndefined();
+  });
+
+  it('says nothing when the reader\'s address is unknown', () => {
+    const { recipientEmail: _omitted, ...unaddressed } = base;
+    expect(echoed(analyzeDeterministic(unaddressed, { now: FIXED_NOW }))).toBeUndefined();
   });
 });
 
