@@ -16,6 +16,7 @@
  * the exact character range — a slightly coarser highlight in exchange for not restructuring Gmail's
  * DOM.
  */
+import { BLOCK_BOUNDARY } from '../gmail/block-text.js';
 import { SELECTORS, queryAll, queryAllUnion } from '../gmail/selectors.js';
 import { collapseWhitespace } from '../shared/text.js';
 import type { SecuritySignal } from '../shared/types.js';
@@ -183,14 +184,29 @@ function locate(root: Element, needle: string, skip: (element: Element) => boole
       node instanceof Element && skip(node) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
   });
 
-  // The body as one collapsed, lower-cased string, with each text node's range in it.
+  // The body as one collapsed, lower-cased string, with each text node's range in it. A space marks
+  // every block boundary, as `separateBlocks` does for the body text the excerpt was taken from;
+  // without it an excerpt spanning two table cells could never be found.
   const spans: TextSpan[] = [];
   let haystack = '';
   let visited = 0;
+  let previousBlock: Element | null = null;
+  let breakPending = false;
   for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+    if (node instanceof Element) {
+      if (node.matches('br, hr')) breakPending = true;
+      continue;
+    }
     if (!(node instanceof Text)) continue;
     if (visited >= MAX_TEXT_NODES || haystack.length >= MAX_SEARCH_CHARS) break;
     visited += 1;
+
+    const block = node.parentElement?.closest(BLOCK_BOUNDARY) ?? null;
+    if ((breakPending || block !== previousBlock) && haystack !== '' && !haystack.endsWith(' ')) {
+      haystack += ' ';
+    }
+    previousBlock = block;
+    breakPending = false;
 
     let piece = node.data.replace(/\s+/gu, ' ').toLowerCase();
     if (piece.startsWith(' ') && (haystack === '' || haystack.endsWith(' '))) piece = piece.slice(1);

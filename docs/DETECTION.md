@@ -163,6 +163,7 @@ See [adr/0007](adr/0007-list-row-sender-only.md).
 
 - Brand and public-suffix tables are curated subsets.
 - No raw mail headers; authentication is best-effort from Gmail’s UI.
-- Body is `textContent` only (no OCR).
+- Body is `textContent` only (no OCR), with a line break at every block element so that adjacent cells
+  and paragraphs do not fuse into one word. A block that CSS makes inline still gets a break.
 - Wording packs cover eight languages besides English; others lean on identity, links and attachments.
 - No reputation feeds; analysis is textual only ([adr/0010](adr/0010-hostile-input-posture.md)).

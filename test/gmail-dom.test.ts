@@ -183,6 +183,25 @@ describe('reading an ordinary message out of the page', () => {
     expect(missing).toEqual([]);
   });
 
+  /**
+   * `textContent` joins text nodes exactly, so a footer of two cells reads `policyunsubscribe` and every
+   * rule anchored on a word boundary misses both words — the bulk-mail test among them, which is what
+   * stops a newsletter's wording being read as a scam. Inline markup must not split a word the same way.
+   */
+  it('keeps apart text that renders on separate lines, and together text that renders as one word', () => {
+    render({
+      bodyHtml:
+        '<table><tr><td>Privacy policy</td><td>Unsubscribe</td></tr></table>' +
+        '<div>Total</div><div>Delivered</div>Line one<br>line two <p>Con<b>sign</b>ment</p>',
+    });
+    const { bodyText } = extract().email;
+
+    expect(bodyText).toMatch(/policy\s+Unsubscribe/u);
+    expect(bodyText).toMatch(/Total\s+Delivered/u);
+    expect(bodyText).toMatch(/one\s+line two/u);
+    expect(bodyText).toContain('Consignment');
+  });
+
   it('reads attachment filenames from the footer chips', () => {
     render({ attachments: ['Consignment_4471.pdf'] });
     expect(extract().email.attachments.map((a) => a.extension)).toEqual(['pdf']);

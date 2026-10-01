@@ -41,6 +41,14 @@ describe('finding an excerpt in the message', () => {
     expect(findSmallestElementContaining(root, '…your account will be suspended…')?.id).toBe('target');
   });
 
+  /** Extraction breaks the body at blocks, so an excerpt may carry a space the text nodes do not. */
+  it('matches an excerpt spanning two blocks, which the body text separates', () => {
+    const cells = body('<table><tr id="row"><td>Privacy policy</td><td>Unsubscribe</td></tr></table>');
+    expect(findSmallestElementContaining(cells, 'privacy policy unsubscribe')?.id).toBe('row');
+    const lines = body('<p id="target">Your parcel is held<br>pending a customs fee.</p>');
+    expect(findSmallestElementContaining(lines, 'is held pending a customs')?.id).toBe('target');
+  });
+
   it('finds nothing for an excerpt that is not there', () => {
     const root = body('<p>Your consignment leaves the depot on Tuesday morning.</p>');
     expect(findSmallestElementContaining(root, 'reply with the verification code')).toBeNull();

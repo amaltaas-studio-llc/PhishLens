@@ -21,6 +21,7 @@ npm run clean        # remove dist/
 
 npm run harness      # UI harness on http://127.0.0.1:5199 (see below)
 npm run screenshots  # regenerate docs/assets/ from the harness
+npm run eval -- <path>...  # score a corpus of stored mail (see "Measuring against real mail")
 npm run eval:prompts # export paired prompt requests for a real-model comparison; contacts nothing
 
 npm run typecheck    # tsc --noEmit
@@ -180,6 +181,30 @@ in production while passing in CI.
 
 Fixture philosophy and the both-directions assertion are described in
 [DETECTION.md](DETECTION.md#the-score) and [AGENTS.md](../AGENTS.md).
+
+### Measuring against real mail
+
+Fixtures prove a rule does what it was written to do; only a corpus says what it does to mail nobody wrote
+for the test. `npm run eval` scores stored mail with the deterministic engine and prints, per corpus, how
+many messages landed in each band, which floors fired, and which rules at which severities:
+
+```bash
+npm run eval -- ~/corpora/hard_ham                       # a directory of single messages
+npm run eval -- --group lures ~/corpora/phishing-*.mbox  # several files reported as one
+npm run eval -- ~/Takeout/mail.mbox --since 2025-10-01   # your own mailbox; split into mail and spam
+npm run eval -- ~/corpora/dataset.csv                    # pre-extracted rows (columns in scripts/eval/main.ts)
+```
+
+A legitimate corpus measures false positives and a phishing corpus misses, and neither number means much
+alone: a change is judged by running both before and after. The conversion in `scripts/eval/message.ts`
+follows what Gmail renders — the HTML part over the plain one, hidden subtrees removed by the adapter's own
+scan — and the places it cannot, such as Gmail's warning banner, are listed there. A corpus result can
+differ from what a user sees exactly there.
+
+The report holds rule ids and counts only. `--rows <dir>` adds each flagged message's sender, subject, link
+hosts and findings for investigation, and refuses a directory inside the repository. Treat what it writes
+as the mail it came from: a finding traced to someone's own mailbox goes into a fixture as its *shape*,
+under an invented `northwind-*` name, never as the message (see [AGENTS.md](../AGENTS.md)).
 
 ## Continuous integration
 

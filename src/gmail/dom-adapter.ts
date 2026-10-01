@@ -34,6 +34,7 @@ import type {
 } from '../shared/types.js';
 import { normalizeDomain, parseUrl } from '../shared/url.js';
 import type { Extraction, MailAdapter, MessageHandle } from './adapter.js';
+import { separateBlocks } from './block-text.js';
 import { countContentChars, findHiddenSubtrees } from './hidden-text.js';
 import { SELECTORS, outermost, queryAll, queryAllUnion, queryFirst } from './selectors.js';
 
@@ -639,6 +640,7 @@ function extractBody(
   for (const block of quoted) block.remove();
 
   const own = pruneHidden(clone);
+  separateBlocks(clone);
   let text = truncate(normalizeBodyWhitespace(clone.textContent), MAX_BODY_CHARS);
   let chars = own.chars;
   const techniques = new Set(own.techniques);
@@ -656,6 +658,7 @@ function extractBody(
     const history = clone.ownerDocument.createElement('div');
     history.append(...quoted);
     const pruned = pruneHidden(history);
+    separateBlocks(history);
     const quotedText = truncate(normalizeBodyWhitespace(history.textContent), MAX_BODY_CHARS);
     if (countContentChars(quotedText) > 0) {
       text = quotedText;
