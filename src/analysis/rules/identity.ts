@@ -7,6 +7,7 @@
  */
 import { type Brand, BRANDS, brandOwningDomain, brandOwns } from '../../shared/brands.js';
 import { FREEMAIL_DOMAINS } from '../../shared/public-suffix.js';
+import { normalizeForMatching } from '../../shared/text.js';
 import type { SecuritySignal } from '../../shared/types.js';
 import {
   domainCore,
@@ -896,6 +897,147 @@ function lookalikeOfRecipientDomain(context: AnalysisContext): SecuritySignal[] 
 }
 
 /**
+ * Words that make a display name an internal function rather than the organisation as a correspondent.
+ * "Northwind" alone is how a supplier's portal or a shared workspace names the customer it serves;
+ * "Northwind IT Helpdesk" is a department, and departments write from the organisation's own domain.
+ */
+const INTERNAL_FUNCTION_NAME =
+  /\b(?:it|i\.t\.|it support|it department|help ?desk|service ?desk|tech(?:nical)? support|admin|administrator|administration|postmaster|webmaster|webmail|e-?mail|mail|mailbox|mail server|security|security team|system|systems|hr|human resources|payroll|it services|network|server)\b/u;
+
+/**
+ * The display name presents the message as coming from inside the recipient's own organisation, and it
+ * was sent from outside it.
+ *
+ * The commonest shape in current credential phishing names no brand at all: "northwind.com IT Support",
+ * "Mailbox Administrator northwind.com", the recipient's own address as the sender's name. The brand
+ * table cannot see it, and neither can the lookalike rule, because the sending domain imitates nothing —
+ * it is simply somebody else's. Like the lookalike rule, it needs no configuration: the organisation is
+ * read from the mailbox the message was delivered to.
+ *
+ * Two strengths, because they differ in how much they can mean anything else. The recipient's full
+ * domain or address in the name is a claim to be the organisation's own systems. The bare name only
+ * counts beside a word naming an internal function, since a supplier's portal or a shared workspace
+ * names the customer it serves ("Northwind (via the project tracker)") and is no impersonation. Both are
+ * `medium`: an organisation does run its helpdesk on a hosted service, so this stays a finding to check,
+ * never a floor on its own, and the trust list is how such a service is accepted. They carry different
+ * ids because only the domain-named form is certain enough to make a credential request a harvesting
+ * attempt in `correlate.ts`: "Northwind IT: your password expires" is also what that hosted helpdesk sends.
+ */
+function ownOrganisationImpersonation(context: AnalysisContext): SecuritySignal[] {
+  const recipientDomain = context.recipientRegistrable;
+  if (recipientDomain === '' || context.senderRegistrable === '') return [];
+  if (recipientDomain === context.senderRegistrable) return [];
+  if (FREEMAIL_DOMAINS.has(recipientDomain)) return [];
+  if (isSameNameInAnotherMarket(context.senderRegistrable, recipientDomain)) return [];
+
+  const name = normalizeForMatching(context.senderName);
+  if (name === '') return [];
+
+  const namesDomain = containsWholeToken(name, recipientDomain);
+  const core = domainCore(recipientDomain);
+  // A domain's hyphen is a display name's space: `northwind-logistics` is written "Northwind Logistics".
+  const spellings = new Set([core, core.replaceAll('-', ' '), core.replaceAll('-', '')]);
+  const namesFunction =
+    !namesDomain &&
+    core.length >= DETECTION_TUNING.minOwnOrganisationNameChars &&
+    [...spellings].some((spelling) => containsWholeToken(name, spelling)) &&
+    INTERNAL_FUNCTION_NAME.test(name);
+  if (!namesDomain && !namesFunction) return [];
+
+  return [
+    signal({
+      id: namesDomain ? 'identity.own_domain_in_sender_name' : 'identity.own_department_from_outside',
+      category: 'identity',
+      severity: 'medium',
+      score: namesDomain ? 22 : 16,
+      title: namesDomain
+        ? 'Sender’s name uses your own organisation’s domain'
+        : 'Sender’s name presents it as a department of your own organisation',
+      description: `The sender’s name "${context.senderName}" presents this message as coming from inside ${recipientDomain}, your own organisation, but it was sent from ${context.senderRegistrable}. Internal IT, mail and HR notices come from your organisation’s own domain.`,
+      evidence: { text: context.senderName, value: `${context.senderRegistrable} vs ${recipientDomain}` },
+    }),
+  ];
+}
+
+/**
+ * `token` as a whole word or domain in `text`: "northwind" in "northwind it", not in "northwinds", and
+ * `example.com` not in `example.com.au`, since a dot before a letter continues a domain.
+ */
+function containsWholeToken(text: string, token: string): boolean {
+  let at = text.indexOf(token);
+  while (at !== -1) {
+    const before = text.slice(Math.max(0, at - 2), at);
+    const after = text.slice(at + token.length, at + token.length + 2);
+    if (!/(?:[\p{L}\p{N}-]|[\p{L}\p{N}]\.)$/u.test(before) && !/^(?:[\p{L}\p{N}-]|\.[\p{L}\p{N}])/u.test(after)) {
+      return true;
+    }
+    at = text.indexOf(token, at + 1);
+  }
+  return false;
+}
+
+/**
+ * A subject announcing that a file, document or signing request was shared, capturing the item's name.
+ *
+ * The frames file-sharing and e-signature services write ("Item shared with you: …", "Complete with …:",
+ * "… shared "…" with you"), anchored so the item is the part a sender chose and the frame the part the
+ * service did. Bounded: an item name is a line, not a paragraph.
+ */
+const SHARED_ITEM_SUBJECT =
+  /^(?:(?:re|fwd?): )?(?:(?:items?|files?|documents?|folders?|spreadsheets?|presentations?) shared with you|(?:complete|sign|review) with [\p{L}\p{N}]{2,20}|please (?:review and )?sign|signature requested(?: on| for)?|[^"]{1,80}? (?:has )?shared(?: a (?:file|document|folder))?): ["“]?([^"”]{3,200})["”]?$/u;
+const QUOTED_SHARED_ITEM = /^[^"“]{1,80}? (?:has )?shared ["“]([^"”]{3,200})["”] with you$/u;
+
+/**
+ * The parts of an item name worded as an account-security alert: an account state ("ID locked", "limited
+ * … due to"), a security event ("unrecognized log-in", "security alert"), and a deadline to act ("verify
+ * immediately"). Each family is one regex so the rule can count how many a name carries.
+ *
+ * Narrow on purpose. "Invoice", "payment" and "remittance" are what genuine shared documents are called
+ * every day, so a money word here would report half of ordinary file sharing.
+ */
+const ALERT_ITEM_FAMILIES: readonly RegExp[] = [
+  /\b(?:(?:account|access|login|log-in|online|user|billing|sign-in)(?: id)? (?:has been |is |was )?(?:locked|limited|restricted|suspended|disabled|blocked|banned|closed|deactivated)|(?:locked|limited|restricted|suspended|disabled|blocked|banned|closed|deactivated)\b[^.!]{0,40}\bdue to)\b/u,
+  /\b(?:(?:unrecogni[sz]ed|unauthori[sz]ed|suspicious|fraudulent|unusual|scam|fraud) (?:log-?in|sign-?in|entry|access|activity)|security alert)\b/u,
+  /\b(?:verify|review|confirm|validate) (?:immediately|right now|now)\b/u,
+];
+
+/**
+ * A shared file or signing request whose name is an account-security alert.
+ *
+ * The lure in this shape is sent by the genuine service: the attacker shares a document from a free
+ * account and the service authenticates, words and links the notice itself, so every sender and link
+ * check passes, as it should. What is false is the item's name, which is the only part the attacker
+ * wrote. No genuine bank or provider delivers a security alert as a shared PDF, so a name worded as one
+ * is the claim to be that provider, which is why this is an identity finding: in `content` the genuine
+ * service's proven, aligned links would dampen it to nothing.
+ *
+ * One alert feature is `medium`: an IT team does share "Account locked due to inactivity — procedure".
+ * Two are `high` — a locked account *and* a fraud cause, or a security event *and* a deadline is the
+ * alert itself, not a document about one — and the floor is what lets the finding count at all, since
+ * the identity weight is already spent on such a lure's mismatched Reply-To.
+ */
+function alertNamedSharedItem(context: AnalysisContext): SecuritySignal[] {
+  const subject = normalizeForMatching(context.subject).slice(0, 400);
+  const item = (SHARED_ITEM_SUBJECT.exec(subject) ?? QUOTED_SHARED_ITEM.exec(subject))?.[1];
+  if (item === undefined) return [];
+  const parts = ALERT_ITEM_FAMILIES.flatMap((family) => family.exec(item)?.[0] ?? []);
+  const [alert] = parts;
+  if (alert === undefined) return [];
+  const certain = parts.length >= 2;
+  return [
+    signal({
+      id: 'identity.alert_named_shared_item',
+      category: 'identity',
+      severity: certain ? 'high' : 'medium',
+      score: certain ? 30 : 20,
+      title: 'A shared file is named as an account security alert',
+      description: `The subject "${context.subject.trim()}" shares an item worded as an account alert ("${parts.join('", "')}"). Banks and providers do not send security alerts as shared files; naming a file that way makes the sharing service carry a fake alert, with real links, from a real address.`,
+      evidence: { text: context.subject, value: alert },
+    }),
+  ];
+}
+
+/**
  * The recipient's own name, spelled identically, under a suffix that does not misspell theirs.
  *
  * An organisation's staff write from its `.net` and its `.com`, and a colleague abroad from its `.fr`,
@@ -924,6 +1066,7 @@ const identityDetectors: Detect[] = [
   lookalikeSenderDomain,
   unverifiedBrandDomain,
   lookalikeOfRecipientDomain,
+  ownOrganisationImpersonation,
   replyToMismatch,
   senderDomainUnicodeSpoofing,
   malformedSenderDomain,
@@ -932,6 +1075,7 @@ const identityDetectors: Detect[] = [
   disposableSender,
   suspiciousSenderSubdomainStructure,
   externalExecutiveClaim,
+  alertNamedSharedItem,
 ] as const;
 
 export function detectIdentitySignals(context: AnalysisContext): SecuritySignal[] {

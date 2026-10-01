@@ -1,0 +1,25 @@
+{
+  "name": "legitimate-help-desk-attachment",
+  "description": "A support reply sent through a hosted help desk, quoting the customer's photo as a link to the desk's attachment download. The download sits on the desk vendor's domain under an opaque token path and carries the filename only in its query, which is how such desks serve attachments.",
+  "email": {
+    "senderName": "Northwind Outfitters Support",
+    "senderEmail": "support@northwind-outfitters.com",
+    "recipientEmail": "sam.okafor@example.net",
+    "subject": "Re: I received the wrong item",
+    "bodyText": "Hi Sam,\n\nThanks for the photo. We have arranged a replacement, and a prepaid return label will follow in a separate email.\n\nIMG_7652.JPEG\n\nKind regards,\nNorthwind Outfitters Support",
+    "links": [
+      {
+        "text": "IMG_7652.JPEG",
+        "href": "https://northwind-outfitters.deskworks-hosting.com/attachments/token/Qm4x7Lp2Vb9/?name=IMG_7652.JPEG"
+      }
+    ],
+    "attachments": [],
+    "auth": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass",
+      "signedBy": "northwind-outfitters.com",
+      "mailedBy": "northwind-outfitters.com"
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "legitimate-drive-share",
+  "description": "A colleague sharing a working document through a file-sharing service. The same frame, sender and links as a shared-item lure, with an ordinary name: what the item is called is the only difference.",
+  "email": {
+    "senderName": "Priya Raman (via Google Drive)",
+    "senderEmail": "drive-shares-dm-noreply@google.com",
+    "recipientEmail": "sam.okafor@example.net",
+    "subject": "Item shared with you: \"Q3 Supplier Invoices - Reconciliation.xlsx\"",
+    "bodyText": "Priya Raman shared a spreadsheet\n\nQ3 Supplier Invoices - Reconciliation.xlsx\n\nCould you check the August rows before Thursday?\n\nOpen\n\nGoogle LLC, 1600 Amphitheatre Parkway, Mountain View, CA 94043, USA\nYou have received this email because this account shared a file with you from Google Drive.",
+    "links": [
+      { "text": "Open", "href": "https://docs.google.com/spreadsheets/d/1Rk3mPz8Qa/edit?usp=sharing_eip" }
+    ],
+    "attachments": [],
+    "auth": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass",
+      "signedBy": "google.com",
+      "mailedBy": "doclist.bounces.google.com"
+    }
+  }
+}

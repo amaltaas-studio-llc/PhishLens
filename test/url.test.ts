@@ -332,6 +332,34 @@ describe('unwrapRedirects', () => {
   });
 
   /**
+   * Link-protection gateways rewrite every link to carry the destination base64-encoded, so without
+   * decoding, every link in a protected mailbox goes "to the gateway" and nothing behind it is judged.
+   */
+  describe('a destination carried base64-encoded', () => {
+    const urlSafe = (text: string) => btoa(text).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/u, '');
+
+    it('decodes one in a path segment', () => {
+      const wrapped = new URL(`https://protect.gateway.example/v2/${urlSafe('https://evil.example/login?id=7')}/r`);
+      const result = unwrapRedirects(wrapped);
+      expect(result.url.hostname).toBe('evil.example');
+      expect(result.chain).toEqual(['protect.gateway.example', 'evil.example']);
+    });
+
+    it('decodes one in a parameter, padded and in the standard alphabet', () => {
+      const wrapped = new URL(`https://protect.gateway.example/click?d=${encodeURIComponent(btoa('https://evil.example/a'))}&t=1`);
+      expect(unwrapRedirects(wrapped).url.hostname).toBe('evil.example');
+    });
+
+    it.each([
+      ['a token that decodes to something other than a URL', `https://cdn.example/${urlSafe('httpbin is not a link at all')}`],
+      ['a token embedded in a longer word', `https://cdn.example/xaHR0cHM6Ly9ldmlsLmV4YW1wbGU`],
+      ['an ordinary opaque id', 'https://cdn.example/assets/aHR0cdeadbeef'],
+    ])('leaves %s alone', (_case, href) => {
+      expect(unwrapRedirects(new URL(href)).hops).toBe(0);
+    });
+  });
+
+  /**
    * Parameters are tried in a fixed order, so an unresolvable one early in that order must not end the
    * search — otherwise adding `?q=//` is enough to hide the destination from every comparison that
    * depends on it.
@@ -393,6 +421,17 @@ describe('parseDisplayedUrl', () => {
 
   it('ignores absurdly long text rather than parsing it', () => {
     expect(parseDisplayedUrl(`https://example.com/${'a'.repeat(4000)}`)).toBeNull();
+  });
+
+  it.each(['image0.jpeg', 'Statement_March.pdf', 'scan-0042.heic', 'notes.docx'])(
+    'reads the attachment filename %s as a filename, not an address',
+    (text) => {
+      expect(parseDisplayedUrl(text)).toBeNull();
+    },
+  );
+
+  it('still reads a filename-shaped name on a real TLD as an address', () => {
+    expect(parseDisplayedUrl('invoice-2041.zip')?.hostname).toBe('invoice-2041.zip');
   });
 });
 

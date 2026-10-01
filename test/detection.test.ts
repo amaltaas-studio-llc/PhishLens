@@ -47,6 +47,11 @@ const LEGITIMATE_FIXTURES = [
   'legitimate-brand-product-name',
   'legitimate-brand-tld',
   'legitimate-settlement-notice',
+  'legitimate-antivirus-renewal',
+  'legitimate-hosted-service-desk',
+  'legitimate-help-desk-attachment',
+  'legitimate-image-newsletter',
+  'legitimate-drive-share',
   ...LANGUAGE_IDS.flatMap((id) => [
     `northwind-${id}-verification-code`,
     `northwind-${id}-newsletter`,
@@ -89,8 +94,21 @@ const MALICIOUS_FIXTURES = [
   'storage-quota-bucket-page',
   'storage-payment-bucket-page',
   'settlement-credential-phish',
+  'antivirus-renewal-scam',
+  'own-organisation-mailbox-phish',
+  'fake-attachment-link',
+  'shared-item-alert-lure',
   ...LANGUAGE_IDS.map((id) => `northwind-${id}-credential-phish`),
 ];
+
+/**
+ * Phishing whose evidence is too thin for `suspicious`, held to `caution` instead of being left out.
+ *
+ * An image-only lure's one readable part is its subject, and a floor from a subject alone would land on
+ * ordinary mail. Leaving such fixtures unlisted would check them in neither direction; holding them to the
+ * malicious corpus's bar would force a floor the evidence does not support.
+ */
+const CAUTION_ONLY_FIXTURES = ['image-only-mailbox-lure'];
 
 const FIXED_NOW = 1_760_000_000_000;
 
@@ -498,7 +516,65 @@ describe('click tracking on the sender own domain', () => {
       { now: FIXED_NOW },
     );
     expect(hasSignal(fromElsewhere, 'link.displayed_url_mismatch')).toBe(true);
-    expect(signalFor(fromElsewhere, 'link.displayed_url_mismatch')?.severity).toBe('high');
+    // Proven, through a service whose destination cannot be seen: reported without a floor.
+    expect(signalFor(fromElsewhere, 'link.displayed_url_mismatch')?.severity).toBe('medium');
+
+    const unproven = analyzeDeterministic(
+      { ...base, senderEmail: 'the-brew-notes@unrelated-sender.example', links, auth: undefined },
+      { now: FIXED_NOW },
+    );
+    expect(signalFor(unproven, 'link.displayed_url_mismatch')?.severity).toBe('high');
+
+    const asking = analyzeDeterministic(
+      { ...base, senderEmail: 'helpdesk@unrelated-sender.example', subject: 'Password reset required', links },
+      { now: FIXED_NOW },
+    );
+    expect(signalFor(asking, 'link.displayed_url_mismatch')?.severity).toBe('high');
+
+    const ownDomain = analyzeDeterministic(
+      {
+        ...base,
+        senderEmail: 'notices@unrelated-sender.example',
+        links: [toEmailLink({ text: 'northwind-logistics.com', href: 'https://dripmail.example/redirect/77aa' })],
+      },
+      { now: FIXED_NOW },
+    );
+    expect(signalFor(ownDomain, 'link.displayed_url_mismatch')?.severity).toBe('high');
+  });
+
+  it('keeps a visible stranger destination high even from a proven sender', () => {
+    const base = loadFixture('legitimate-substack-newsletter').email;
+    const visible = analyzeDeterministic(
+      {
+        ...base,
+        senderEmail: 'the-brew-notes@unrelated-sender.example',
+        links: [toEmailLink({ text: 'northwind-roastery.com', href: 'https://northwind-roastery-shop.example/' })],
+      },
+      { now: FIXED_NOW },
+    );
+    expect(signalFor(visible, 'link.displayed_url_mismatch')?.severity).toBe('high');
+  });
+
+  it('says nothing when a proven sender shows another name and lands on its own site', () => {
+    const base = loadFixture('legitimate-substack-newsletter').email;
+    const own = analyzeDeterministic(
+      {
+        ...base,
+        senderEmail: 'hello@northwind-coffee.example',
+        links: [toEmailLink({ text: 'northwind-roasters.example', href: 'https://www.northwind-coffee.example/' })],
+      },
+      { now: FIXED_NOW },
+    );
+    expect(hasSignal(own, 'link.displayed_url_mismatch')).toBe(false);
+  });
+
+  it('holds one government name linking to another at medium', () => {
+    const base = loadFixture('legitimate-substack-newsletter').email;
+    const agency = analyzeDeterministic(
+      { ...base, links: [toEmailLink({ text: 'www.nwt.gov', href: 'https://www.northwind-transit.gov/' })] },
+      { now: FIXED_NOW },
+    );
+    expect(signalFor(agency, 'link.displayed_url_mismatch')?.severity).toBe('medium');
   });
 
   it('still reports the mismatch when the displayed domain belongs to a brand', () => {
@@ -521,6 +597,95 @@ describe('click tracking on the sender own domain', () => {
     const baited = analyzeDeterministic(bait, { now: FIXED_NOW });
     expect(hasSignal(baited, 'link.displayed_url_mismatch')).toBe(true);
     expect(signalFor(baited, 'link.displayed_url_mismatch')?.severity).toBe('critical');
+  });
+});
+
+/**
+ * The commonest shape in ordinary bulk mail: the footer shows the sender's own
+ * address and the href goes through the email provider's tracker, a domain nobody can list in advance.
+ * Excused only when authentication proves the sender, and only for a destination shaped like a tracker —
+ * the rest of the block is the forgery and compromised-account cases that look the same in the footer.
+ */
+describe("a proven sender showing its own address through an email provider's tracker", () => {
+  const base = loadFixture('legitimate-substack-newsletter').email;
+  const proven = { spf: 'pass', dkim: 'pass', dmarc: 'pass', signedBy: 'northwind-outfitters.com' } as const;
+  const sent = (href: string, overrides: Partial<EmailMessage> = {}) =>
+    analyzeDeterministic(
+      {
+        ...base,
+        senderName: 'Northwind Outfitters',
+        senderEmail: 'offers@northwind-outfitters.com',
+        auth: proven,
+        links: [toEmailLink({ text: 'northwind-outfitters.com', href })],
+        ...overrides,
+      },
+      { now: FIXED_NOW },
+    );
+
+  it('does not report the tracker as a displayed/actual mismatch', () => {
+    const result = sent('https://click.mailvendor.example/c/9c1d4e2a7b');
+    expect(hasSignal(result, 'link.displayed_url_mismatch')).toBe(false);
+  });
+
+  it('still reports it when nothing proved the sender', () => {
+    const result = sent('https://click.mailvendor.example/c/9c1d4e2a7b', { auth: undefined });
+    expect(signalFor(result, 'link.displayed_url_mismatch')?.severity).toBe('high');
+  });
+
+  it('still reports a destination dressed in the sender own name', () => {
+    const result = sent('https://northwind-outfitters.com.account-check.example/session');
+    expect(hasSignal(result, 'link.displayed_url_mismatch')).toBe(true);
+  });
+
+  it('still reports a destination that asks for a sign-in', () => {
+    const result = sent('https://portal.mailvendor.example/login');
+    expect(hasSignal(result, 'link.displayed_url_mismatch')).toBe(true);
+  });
+
+  it('gives a brand in the table no such excuse, so its own link hosts must be listed instead', () => {
+    const result = analyzeDeterministic(
+      {
+        ...base,
+        senderName: 'Dropbox',
+        senderEmail: 'no-reply@dropbox.com',
+        auth: { ...proven, signedBy: 'dropbox.com' },
+        links: [toEmailLink({ text: 'dropbox.com', href: 'https://click.mailvendor.example/c/1' })],
+      },
+      { now: FIXED_NOW },
+    );
+    expect(hasSignal(result, 'link.displayed_url_mismatch')).toBe(true);
+  });
+});
+
+/**
+ * A co-marketing offer shows another brand's address and routes the click through the sender's own
+ * host. The address shown is still not where the click goes, so it stays reported, but a brand in the
+ * table proven as itself is not a stranger borrowing the other brand's name. Anyone else doing it is.
+ */
+describe("a proven brand linking another brand's address through its own host", () => {
+  const base = loadFixture('legitimate-substack-newsletter').email;
+  const offer = (senderEmail: string, signedBy: string) =>
+    analyzeDeterministic(
+      {
+        ...base,
+        senderName: 'Partner Offers',
+        senderEmail,
+        auth: { spf: 'pass', dkim: 'pass', dmarc: 'pass', signedBy },
+        links: [
+          toEmailLink({ text: 'paypal.com', href: `https://www.${signedBy}/offers/redirect?id=8812` }),
+        ],
+      },
+      { now: FIXED_NOW },
+    );
+
+  it('reports it at medium for a table brand proven as itself', () => {
+    const result = offer('offers@dropbox.com', 'dropbox.com');
+    expect(signalFor(result, 'link.displayed_url_mismatch')?.severity).toBe('medium');
+  });
+
+  it('keeps it critical for a domain anyone could have authenticated', () => {
+    const result = offer('offers@northwind-rewards.com', 'northwind-rewards.com');
+    expect(signalFor(result, 'link.displayed_url_mismatch')?.severity).toBe('critical');
   });
 });
 
@@ -574,6 +739,55 @@ describe('a social footer routed through the sender own tracker', () => {
     expect(hasSignal(analyzeDeterministic(bait, { now: FIXED_NOW }), 'link.anchor_brand_mismatch')).toBe(
       true,
     );
+  });
+});
+
+/**
+ * A proven sender naming another brand in passing, through a host that is not its own: an email
+ * provider's tracker, a sister domain, a short link. Reported at `medium` so it sets no floor — and the
+ * three things a lure needs, a claim, an ask, or an unproven sender, each keep it `high`.
+ */
+describe('a proven sender mentioning another brand through a host of its provider', () => {
+  const base = loadFixture('legitimate-newsletter').email;
+  const anchored = (text: string, href: string, overrides: Partial<EmailMessage> = {}) =>
+    signalFor(
+      analyzeDeterministic({ ...base, links: [toEmailLink({ text, href })], ...overrides }, { now: FIXED_NOW }),
+      'link.anchor_brand_mismatch',
+    );
+  const tracker = 'https://t.mailvendor.example/c/7Qx2Lm9';
+
+  it.each(['Follow on Instagram', 'LinkedIn', 'Outlook for iOS'])('holds "%s" at medium', (text) => {
+    expect(anchored(text, tracker)?.severity).toBe('medium');
+  });
+
+  it('says nothing when the tracker leads to the sender own site', () => {
+    const href = 'https://t.mailvendor.example/CL0/https:%2F%2Fkestrelcoffee.co.uk%2Fpages%2Fslack/1/abc';
+    expect(anchored('Slack integration', href)).toBeUndefined();
+  });
+
+  it('keeps an action on the brand high', () => {
+    expect(anchored('Sign in to Microsoft 365', tracker)?.severity).toBe('high');
+    expect(anchored('Open in Dropbox', tracker)?.severity).toBe('high');
+  });
+
+  it('keeps it high when the sender is not proven', () => {
+    expect(anchored('LinkedIn', tracker, { auth: undefined })?.severity).toBe('high');
+  });
+
+  it('keeps it high from a freemail sender', () => {
+    const freemail = {
+      senderEmail: 'kestrel.coffee@gmail.com',
+      auth: { spf: 'pass', dkim: 'pass', dmarc: 'pass', signedBy: 'gmail.com', mailedBy: 'gmail.com' },
+    } as const;
+    expect(anchored('LinkedIn', tracker, freemail)?.severity).toBe('high');
+  });
+
+  it('keeps it high from a tenant of open hosting, which anyone can authenticate as', () => {
+    const tenant = {
+      senderEmail: 'noreply@kestrel-4b7db.firebaseapp.com',
+      auth: { spf: 'pass', dkim: 'pass', dmarc: 'pass', signedBy: 'kestrel-4b7db.firebaseapp.com' },
+    } as const;
+    expect(anchored('LinkedIn', tracker, tenant)?.severity).toBe('high');
   });
 });
 
@@ -949,6 +1163,338 @@ describe('a brand whose name is an ordinary word', () => {
   it('is still claimed by a qualified product name in the subject', () => {
     expect(claimsFor('Dana Whitfield', 'Your Ledger Live update is ready', 'Install it today.')).toContain('ledger');
   });
+
+  it.each(['Norton', 'Norton Security Team', 'NORTON Billing'])('treats a surname brand the same way: %s', (name) => {
+    expect(signalFor(from(name, 'notice@northwind-updates.com'), 'identity.display_name_impersonation')?.severity).toBe('high');
+  });
+
+  it.each(['Priya Norton', 'Norton & Hale LLP', 'Norton Street Dental'])(
+    'is not claimed by a person or firm sharing the surname: %s',
+    (name) => {
+      expect(claimsFor(name, 'Hello', 'Notes attached.')).not.toContain('norton');
+    },
+  );
+
+  it('is claimed by a Norton product name in the subject', () => {
+    expect(claimsFor('Dana Whitfield', 'Your Norton 360 renewal', 'Details inside.')).toContain('norton');
+  });
+});
+
+describe('security-software brands', () => {
+  const from = (senderName: string, senderEmail: string) =>
+    analyzeDeterministic(
+      { senderName, senderEmail, subject: 'Subscription renewal', bodyText: 'Your protection renews soon.', links: [], attachments: [] },
+      { now: FIXED_NOW },
+    );
+
+  it.each(['McAfee', 'McAfee Security Team', 'Avast Billing', 'Kaspersky Support'])(
+    'is impersonated by its name on an unrelated domain: %s',
+    (name) => {
+      expect(hasSignal(from(name, 'billing@renewal-desk-7731.com'), 'identity.display_name_impersonation')).toBe(true);
+    },
+  );
+
+  it.each([
+    ['McAfee', 'news@mcafee.com'],
+    ['Avast', 'billing@avg.com'],
+    ['Norton', 'noreply@mail.norton.com'],
+    ['Kaspersky', 'support@kaspersky.com'],
+  ])('is not impersonation from the brand itself: %s <%s>', (name, address) => {
+    expect(hasSignal(from(name, address), 'identity.display_name_impersonation')).toBe(false);
+  });
+
+  const anchored = (text: string) =>
+    hasSignal(
+      analyzeDeterministic(
+        {
+          senderName: 'Northwind Outfitters',
+          senderEmail: 'news@northwind-outfitters.com',
+          subject: 'New arrivals',
+          bodyText: `${text} is below.`,
+          links: [toEmailLink({ text, href: 'https://shop.northwind-promo.net/new' })],
+          attachments: [],
+        },
+        { now: FIXED_NOW },
+      ),
+      'link.anchor_brand_mismatch',
+    );
+
+  it.each(['Browse a vast range of tents', 'Pelaa vastuullisesti', 'Pineapple recipes'])(
+    'does not read a short brand name across word breaks in link text: %s',
+    (text) => {
+      expect(anchored(text)).toBe(false);
+    },
+  );
+
+  it.each(['Renew Avast One', 'Sign in to Apple', 'Open in Gmail'])('still reads a short brand name as a word: %s', (text) => {
+    expect(anchored(text)).toBe(true);
+  });
+
+  it.each([
+    'Norway cancels Microsoft contract',
+    'How Microsoft plans to take over your living room',
+    'Gaga for Google? When results do not count',
+    'Apple cider vinegar water',
+  ])('does not treat a headline that mentions a brand as a brand label: %s', (text) => {
+    expect(anchored(text)).toBe(false);
+  });
+
+  it.each([
+    'Microsoft 365',
+    'View the shared file on OneDrive',
+    'Update your PayPal payment details',
+    'Get started on WhatsApp today',
+  ])('still reports a brand label or an action on the brand: %s', (text) => {
+    expect(anchored(text)).toBe(true);
+  });
+});
+
+describe('security-software renewal scam', () => {
+  const result = analyzeFixture('antivirus-renewal-scam');
+
+  it('reports the brand on a domain it does not own and the threat paired with a card request', () => {
+    expect(signalFor(result, 'identity.display_name_impersonation')?.severity).toBe('high');
+    expect(signalFor(result, 'content.combo.billing_update_under_threat')?.severity).toBe('high');
+    expect(result.classification).toBe('high-risk');
+  });
+
+  it('leaves the genuine card-expiry notice it imitates at low', () => {
+    const genuine = analyzeFixture('legitimate-antivirus-renewal');
+    expect(genuine.classification).toBe('low');
+    expect(hasSignal(genuine, 'content.account_threat')).toBe(false);
+  });
+});
+
+/**
+ * Phishing that names no brand, only the reader's own organisation. Both directions matter: the claim to
+ * be the organisation's own systems is the commonest credential lure in current corpora, and the
+ * organisation's helpdesk really does run on hosted services that write under its name.
+ */
+describe('a sender presenting itself as part of your own organisation', () => {
+  const lure = analyzeFixture('own-organisation-mailbox-phish');
+  const base = loadFixture('legitimate-hosted-service-desk').email;
+  const named = (senderName: string, overrides: Partial<EmailMessage> = {}) =>
+    analyzeDeterministic({ ...base, senderName, ...overrides }, { now: FIXED_NOW });
+  const ownOrgIds = (result: AnalysisResult) =>
+    result.signals.map((s) => s.id).filter((id) => id.startsWith('identity.own_'));
+
+  it('reports the recipient domain used as a name, and pairs it with the credential ask', () => {
+    expect(signalFor(lure, 'identity.own_domain_in_sender_name')?.severity).toBe('medium');
+    expect(signalFor(lure, 'identity.own_domain_in_sender_name')?.description).toContain('mailbox-quota-notice.com');
+    expect(hasSignal(lure, 'identity.impersonation_with_credential_request')).toBe(true);
+    expect(lure.classification).toBe('high-risk');
+  });
+
+  it('reports a department of the organisation writing from outside, without a floor', () => {
+    const desk = analyzeFixture('legitimate-hosted-service-desk');
+    expect(signalFor(desk, 'identity.own_department_from_outside')?.severity).toBe('medium');
+    expect(desk.classification).toBe('low');
+  });
+
+  it('does not let the department form make a credential request a harvesting attempt', () => {
+    const reset = named('Northwind Logistics IT Service Desk', {
+      bodyText: 'Your password will expire in 3 days. Sign in to the self-service portal to update your password.',
+    });
+    expect(hasSignal(reset, 'identity.impersonation_with_credential_request')).toBe(false);
+  });
+
+  it.each([
+    'Northwind Logistics',
+    'Northwind Logistics (via the project tracker)',
+    'Priya at Deskworks',
+  ])('says nothing of a name that is the organisation as a customer, not a department: %s', (name) => {
+    expect(ownOrgIds(named(name))).toEqual([]);
+  });
+
+  it('says nothing when the organisation writes from its own domain', () => {
+    expect(ownOrgIds(named('northwind-logistics.com IT Support', { senderEmail: 'it@northwind-logistics.com' }))).toEqual([]);
+  });
+
+  it('says nothing when the organisation writes from its own name under another suffix', () => {
+    expect(ownOrgIds(named('northwind-logistics.com IT Support', { senderEmail: 'it@northwind-logistics.de' }))).toEqual([]);
+  });
+
+  it('says nothing for a personal mailbox, which has no organisation to impersonate', () => {
+    expect(ownOrgIds(named('gmail.com Mail Admin', { recipientEmail: 'sam.okafor@gmail.com' }))).toEqual([]);
+  });
+
+  it('needs a name long enough not to be a common word', () => {
+    expect(ownOrgIds(named('Ace IT Support', { recipientEmail: 'sam@acers.com' }))).toEqual([]);
+  });
+
+  it('reads the domain only as a whole token', () => {
+    expect(ownOrgIds(named('Updates from northwind-logistics.com.au'))).toEqual([]);
+    expect(ownOrgIds(named('Updates from sub.northwind-logistics.com'))).toEqual([]);
+    expect(ownOrgIds(named('Updates from northwind-logistics.com'))).toEqual(['identity.own_domain_in_sender_name']);
+  });
+});
+
+/**
+ * A filename in the body that is a link, not an attachment. Both directions matter: it is the commonest
+ * brand-free document lure, and help desks and file services legitimately show attachments as links.
+ */
+describe('a link labelled as an attached file', () => {
+  const lure = analyzeFixture('fake-attachment-link');
+  const base = loadFixture('fake-attachment-link').email;
+  const linked = (text: string, href: string, overrides: Partial<EmailMessage> = {}) =>
+    analyzeDeterministic(
+      { ...base, links: [{ text, href, normalizedDomain: new URL(href).hostname }], ...overrides },
+      { now: FIXED_NOW },
+    );
+  const fake = (result: AnalysisResult) => signalFor(result, 'link.fake_attachment');
+
+  it('reports a filename that opens a page on an unrelated site', () => {
+    expect(fake(lure)?.severity).toBe('high');
+    expect(fake(lure)?.description).toContain('docs-viewer-secure.net');
+    expect(fake(lure)?.evidence?.text).toBe('Annual-Leave-Compliance-Report-2026.pdf');
+    expect(lure.classification).not.toBe('low');
+  });
+
+  it('says nothing of a help desk serving the attachment under a token path', () => {
+    expect(fake(analyzeFixture('legitimate-help-desk-attachment'))).toBeUndefined();
+  });
+
+  it.each([
+    ['the file itself on another host', 'Q3-Results.pdf', 'https://cdn.example-files.net/reports/Q3-Results.pdf'],
+    ['the file on the sender\'s own site', 'Q3-Results.pdf', 'https://staff-records-portal.com/view?id=4'],
+    ['a brand\'s file share', 'Q3-Results.pdf', 'https://drive.google.com/file/d/1aBcD/view'],
+    ['a sentence that ends in a filename', 'Read the full terms set out in the guide at terms-and-conditions-of-sale-v2.pdf', 'https://docs-viewer-secure.net/x'],
+    ['an ordinary label', 'View report', 'https://docs-viewer-secure.net/portal/view.html'],
+  ])('says nothing of %s', (_case, text, href) => {
+    expect(fake(linked(text, href))).toBeUndefined();
+  });
+
+  it('says nothing when a mail tracker hides where the file goes', () => {
+    const hidden = linked('Statement.pdf', 'https://northwind.us1.list-manage.com/track/click?u=4f2a&id=91c0');
+    expect(fake(hidden)).toBeUndefined();
+  });
+});
+
+/**
+ * A lure the genuine service delivers. Every sender and link check rightly passes, so the item's name is
+ * the only evidence; both directions matter because the same service shares ordinary work all day.
+ */
+describe('a shared file named as a security alert', () => {
+  const lure = analyzeFixture('shared-item-alert-lure');
+  const base = loadFixture('legitimate-drive-share').email;
+  const shared = (subject: string) => analyzeDeterministic({ ...base, subject }, { now: FIXED_NOW });
+  const alertItem = (result: AnalysisResult) => signalFor(result, 'identity.alert_named_shared_item');
+
+  it('reports the alert wording in the shared item, and keeps the wording undampened', () => {
+    expect(alertItem(lure)?.severity).toBe('high');
+    expect(alertItem(lure)?.description).toContain('Online ID Locked');
+    expect(lure.signals.some((s) => s.dampened === true)).toBe(false);
+    expect(lure.classification).toBe('high-risk');
+  });
+
+  it.each([
+    'Item shared with you: "Suspicious Sign-In Noticed - Your Online ID Limited.pdf"',
+    'Complete with Docusign: Account Suspended Due to Unusual Activity.pdf',
+    'Northwind Bank shared "Security Alert - Review Immediately" with you',
+    'Document shared with you: "Billing Account Locked - Unrecognized Entry Detected"',
+  ])('reads an alert in: %s', (subject) => {
+    expect(alertItem(shared(subject))).toBeDefined();
+  });
+
+  it('holds a name with one alert feature at medium, since documents about an alert exist', () => {
+    const procedure = shared('Item shared with you: "Account locked due to inactivity - procedure.docx"');
+    expect(alertItem(procedure)?.severity).toBe('medium');
+    expect(procedure.classification).not.toBe('suspicious');
+  });
+
+  it('raises a name with two alert features to high', () => {
+    const alert = shared('Item shared with you: "Unrecognized Log-In Noticed - Confirm Now.pdf"');
+    expect(alertItem(alert)?.severity).toBe('high');
+  });
+
+  it.each([
+    'Item shared with you: "Q3 Supplier Invoices - Reconciliation.xlsx"',
+    'Item shared with you: "Payment remittance advice - September.pdf"',
+    'Complete with Docusign: Mutual NDA - Northwind Logistics.pdf',
+    'Item shared with you: "Incident review: blocked deployment pipeline"',
+    'Your account was locked due to too many sign-in attempts',
+  ])('says nothing of: %s', (subject) => {
+    expect(alertItem(shared(subject))).toBeUndefined();
+  });
+
+  it('leaves an ordinary share at low', () => {
+    expect(analyzeFixture('legitimate-drive-share').classification).toBe('low');
+  });
+});
+
+/**
+ * A body that is one linked picture. The picture is unread by design, so the subject is the only text;
+ * both directions matter because an image newsletter has the same shape. The lure is held to `caution`
+ * rather than the malicious corpus's `suspicious`: a subject alone is not evidence enough for a floor.
+ */
+describe('a message whose only words are its subject', () => {
+  const lure = analyzeFixture('image-only-mailbox-lure');
+  const base = loadFixture('image-only-mailbox-lure').email;
+  const withSubject = (subject: string, overrides: Partial<EmailMessage> = {}) =>
+    analyzeDeterministic({ ...base, subject, ...overrides }, { now: FIXED_NOW });
+  const linkOnly = (result: AnalysisResult) => signalFor(result, 'link.link_only_body');
+
+  it('reports the ask in the subject beside an empty body linked off-site', () => {
+    expect(linkOnly(lure)?.severity).toBe('medium');
+    expect(linkOnly(lure)?.description).toContain('release-queue-portal.net');
+    expect(lure.classification).toBe('caution');
+  });
+
+  it('keeps an image newsletter to the low note', () => {
+    const banner = analyzeFixture('legitimate-image-newsletter');
+    expect(linkOnly(banner)?.severity).toBe('low');
+    expect(banner.classification).toBe('low');
+  });
+
+  it.each(['Action required: confirm your details', 'Final reminder', 'Payment processed for order 4471', 'Your password expires soon'])(
+    'reads an ask in: %s',
+    (subject) => {
+      expect(linkOnly(withSubject(subject))?.severity).toBe('medium');
+    },
+  );
+
+  it('does not read the subject once the body has words of its own', () => {
+    const worded = withSubject('Action required', { bodyText: 'x'.repeat(200) });
+    expect(linkOnly(worded)).toBeUndefined();
+  });
+
+  it('does not escalate a table brand Gmail proves', () => {
+    const brand = withSubject('Your invoice is ready', {
+      senderEmail: 'billing@paypal.com',
+      auth: { spf: 'pass', dkim: 'pass', dmarc: 'pass', signedBy: 'paypal.com', mailedBy: 'paypal.com' },
+    });
+    expect(linkOnly(brand)?.severity).toBe('low');
+  });
+});
+
+describe('a threat to deactivate or delete the account', () => {
+  const threatened = (bodyText: string) =>
+    hasSignal(
+      analyzeDeterministic(
+        { senderName: 'Accounts', senderEmail: 'desk@northwind-updates.com', subject: 'Notice', bodyText, links: [], attachments: [] },
+        { now: FIXED_NOW },
+      ),
+      'content.account_threat',
+    );
+
+  it.each([
+    'Your account will be terminated within 24 hours.',
+    'Your Norton 360 subscription is scheduled for deactivation today.',
+    'Your mailbox has been deactivated.',
+    'Your account will be permanently deleted on Friday.',
+    'Your access has been restricted.',
+  ])('is reported: %s', (text) => {
+    expect(threatened(text)).toBe(true);
+  });
+
+  it.each([
+    'Reply within 30 days to avoid your subscription being deleted from the list archive.',
+    'At your request, the account for J. Rivera has been deactivated.',
+    'You can delete your account at any time from the settings page.',
+    'Deactivate your account from the privacy settings if you no longer need it.',
+  ])('is not reported for list footers, admin notices or settings help: %s', (text) => {
+    expect(threatened(text)).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1208,6 +1754,45 @@ describe('a warning not to share a code, and the request that quotes it', () => 
   });
 });
 
+/**
+ * "Enter the verification code" ends every genuine code delivery, with the code a line away, and opens
+ * the lure that sends the reader to a page harvesting the one their provider just texted them. What
+ * separates them is whether the message carries a code, and only one sitting against the word naming it
+ * counts: an order or phone number elsewhere in a lure must not pass for one.
+ */
+describe('an instruction to enter a code the message delivers, and a request to enter one', () => {
+  const base = loadFixture('legitimate-verification-code').email;
+  const withBody = (bodyText: string): AnalysisResult =>
+    analyzeDeterministic({ ...base, bodyText }, { now: FIXED_NOW });
+
+  it.each([
+    'Your sign-in code is 482 910. Enter the verification code on the page where you started.',
+    '482910 is your verification code. Enter this verification code to finish signing in.',
+    'Use the security code below.\n730215\nEnter the security code in the app to continue.',
+  ])('reads the instruction beside a delivered code as delivery: %s', (body) => {
+    const result = withBody(body);
+
+    expect(hasSignal(result, 'content.mfa_request')).toBe(false);
+    expect(result.classification).toBe('low');
+  });
+
+  it.each([
+    'Enter the verification code we texted you on the page below to keep your account open.',
+    'Enter the verification code sent to your phone ending 4471 at the link below.',
+    'Order 55821 is on hold. Enter the verification code at the link below to release it.',
+  ])('still reports a request to enter a code the message does not carry: %s', (body) => {
+    const result = withBody(body);
+
+    expect(signalFor(result, 'content.mfa_request')?.severity).toBe('high');
+  });
+
+  it('still reports a request to share the code it delivers', () => {
+    const result = withBody('Your verification code is 482915. Reply to this email with the verification code.');
+
+    expect(signalFor(result, 'content.mfa_request')?.severity).toBe('high');
+  });
+});
+
 describe('MFA code request', () => {
   const result = analyzeFixture('mfa-code-request');
 
@@ -1463,11 +2048,17 @@ describe('severe wording rules against the ordinary sentences that share their w
       'I have captured the network trace from the router, attached.',
       'The tool tells me the passphrase is correct but the key still will not import.',
       'I have been filming the conference talks all week.',
+      "I've installed the updated package on the build server.",
+      "I've recorded the demo for the team channel.",
+      'Pay the 2.50 deposit or we will release the booking to the next guest.',
     ])('stays silent on %s', (text) => {
       expect(fires(text, 'content.sextortion')).toBe(false);
     });
 
     it.each([
+      "I've recorded you through your webcam while you were browsing.",
+      "I've installed a trojan on your computer and I see everything.",
+      "Pay 0.1 BTC within 48 hours or I'll send the video to your contacts.",
       'I have recorded you through your webcam while you were browsing.',
       'I have installed a trojan on your computer and I see everything.',
       'I have full control of your device.',
@@ -1497,6 +2088,65 @@ describe('severe wording rules against the ordinary sentences that share their w
       'Send it to 1NwKq7rTmYp3ZbV8xJcF2hDsGe9LuA4Wo6. You have 48 hours.',
     ])('still recognises a wallet address: %s', (text) => {
       expect(fires(text, 'content.crypto_demand')).toBe(true);
+    });
+
+    it('reads a decimal amount between the verb and the coin as one demand', () => {
+      expect(fires('You must send 0.05 BTC to settle this.', 'content.crypto_demand')).toBe(true);
+    });
+
+    it('does not let the decimal allowance run past the end of a sentence', () => {
+      expect(fires('Please send the agenda. Bitcoin is on the list of topics.', 'content.crypto_demand')).toBe(
+        false,
+      );
+    });
+
+    it.each([
+      'You should never send bitcoin to a caller who claims to be from Northwind Bank.',
+      'If a stranger messages you about an investment, do not transfer USDT to them.',
+    ])('reads the scam warning as advice: %s', (text) => {
+      expect(fires(text, 'content.crypto_demand')).toBe(false);
+    });
+
+    it('still fires on a demand after the warning it quotes', () => {
+      const quoted = 'Never send crypto to strangers. Send 0.05 BTC to settle the invoice today.';
+      expect(fires(quoted, 'content.crypto_demand')).toBe(true);
+    });
+
+    const newsletter = loadFixture('legitimate-newsletter').email;
+    const inBulk = (bodyText: string) =>
+      hasSignal(
+        analyzeDeterministic(
+          { ...newsletter, bodyText: `${bodyText}\n\nYou are receiving this because you signed up. Unsubscribe at any time.` },
+          { now: FIXED_NOW },
+        ),
+        'content.crypto_demand',
+      );
+
+    it("drops an exchange's transfer-in offer from bulk mail", () => {
+      const offer = 'Transfer your bitcoin from any other exchange before June and we add 1% on top.';
+      expect(fires(offer, 'content.crypto_demand')).toBe(true);
+      expect(inBulk(offer)).toBe(false);
+    });
+
+    it('keeps a wallet address in bulk mail', () => {
+      expect(inBulk('Send 0.05 BTC to 1NwKq7rTmYp3ZbV8xJcF2hDsGe9LuA4Wo6 within 48 hours.')).toBe(true);
+    });
+  });
+
+  describe('payment_detail_change', () => {
+    it.each([
+      'Open a new savings deposit account online in minutes and earn a higher rate.',
+      'Opening a new bank account with us takes five minutes.',
+    ])('stays silent on a bank inviting the reader to open an account: %s', (text) => {
+      expect(fires(text, 'content.payment_detail_change')).toBe(false);
+    });
+
+    it.each([
+      'We have opened a new bank account, so please send future payments to the new deposit account below.',
+      'Please update the bank account on file before paying our next invoice.',
+      'We need to open a new account, so please use the new bank details below for this invoice.',
+    ])('still fires on a payee announcing where to pay: %s', (text) => {
+      expect(fires(text, 'content.payment_detail_change')).toBe(true);
     });
   });
 
@@ -3119,9 +3769,13 @@ describe('invariants across all fixtures', () => {
   // A fixture in neither list is asserted in neither direction, which is how a malicious case can stop
   // being checked for detection, or a legitimate one for staying out of the severity floors.
   it('classifies every fixture on disk as honest or malicious, exactly once', () => {
-    const listed = [...HONEST_FIXTURES, ...MALICIOUS_FIXTURES];
+    const listed = [...HONEST_FIXTURES, ...MALICIOUS_FIXTURES, ...CAUTION_ONLY_FIXTURES];
     expect(new Set(listed).size).toBe(listed.length);
     expect(fixtures.map((f) => f.name).sort()).toEqual([...listed].sort());
+  });
+
+  it.each(CAUTION_ONLY_FIXTURES)('raises %s above low', (name) => {
+    expect(analyzeFixture(name).classification).not.toBe('low');
   });
 
   for (const fixture of fixtures) {

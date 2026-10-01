@@ -1,0 +1,29 @@
+{
+  "name": "legitimate-antivirus-renewal",
+  "description": "False-positive resistance: a genuine card-expiry notice from a security vendor's own authenticated domain. It asks the reader to update a payment method and names the date protection lapses — the same vocabulary as the scam it is imitated by — so it must be separated by the sender, not by the wording.",
+  "email": {
+    "senderName": "Norton",
+    "senderEmail": "noreply@mail.norton.com",
+    "recipientEmail": "sam.okafor@northwind-logistics.com",
+    "subject": "Your card on file expires soon",
+    "bodyText": "Hi Sam,\n\nThe card ending in 4471 that pays for your Norton 360 subscription expires at the end of this month.\n\nTo keep your protection renewing automatically, update your payment method in your account. If we cannot charge a valid card, your subscription will expire on 12 November and your devices will stop receiving protection updates.\n\nUpdate payment method\n\nYou are receiving this because you have a Norton account. Manage your email preferences.",
+    "links": [
+      {
+        "text": "Update payment method",
+        "href": "https://my.norton.com/extspa/billing"
+      },
+      {
+        "text": "Manage your email preferences",
+        "href": "https://my.norton.com/extspa/preferences"
+      }
+    ],
+    "attachments": [],
+    "auth": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass",
+      "signedBy": "norton.com",
+      "mailedBy": "mail.norton.com"
+    }
+  }
+}

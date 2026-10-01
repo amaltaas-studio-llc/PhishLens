@@ -295,6 +295,39 @@ export const BRANDS: readonly Brand[] = [
     domains: ['trustwallet.com'],
     lookalikeTargets: ['trustwallet.com'],
   },
+  // Security-software renewals are the most common English lure in public phishing corpora: a lapsed
+  // subscription, a failed payment, a link to "update billing". Norton is also a surname and a law firm's
+  // name, so it claims the brand only in a product name or as the whole display name, and has no lookalike
+  // target for the reason given for Ledger above.
+  {
+    id: 'mcafee',
+    label: 'McAfee',
+    keywords: ['mcafee'],
+    domains: ['mcafee.com'],
+    lookalikeTargets: ['mcafee.com'],
+  },
+  {
+    id: 'norton',
+    label: 'Norton',
+    keywords: ['norton 360', 'norton antivirus', 'norton security', 'norton lifelock', 'nortonlifelock', 'norton internet security'],
+    standaloneNames: ['norton'],
+    domains: ['norton.com', 'nortonlifelock.com', 'lifelock.com', 'gendigital.com'],
+    lookalikeTargets: [],
+  },
+  {
+    id: 'avast',
+    label: 'Avast',
+    keywords: ['avast'],
+    domains: ['avast.com', 'avg.com', 'gendigital.com'],
+    lookalikeTargets: ['avast.com'],
+  },
+  {
+    id: 'kaspersky',
+    label: 'Kaspersky',
+    keywords: ['kaspersky'],
+    domains: ['kaspersky.com'],
+    lookalikeTargets: ['kaspersky.com'],
+  },
   {
     id: 'okta',
     label: 'Okta',

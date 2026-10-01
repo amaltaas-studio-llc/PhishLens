@@ -220,6 +220,23 @@ export const DETECTION_TUNING = Object.freeze({
    * enough for a reader to trust it.
    */
   minThreadNameChars: 5,
+  /**
+   * Shortest organisation name (the recipient's domain without its suffix) that may be read as claimed
+   * by a display name. Below this the name is a common word or an initialism, and "Ace IT" says nothing
+   * about a reader at `ace.com`.
+   */
+  minOwnOrganisationNameChars: 5,
+  /**
+   * Shortest brand keyword that may match inside a word of link text. Shorter ones must be a whole word,
+   * since folding joins the words up and a five-letter name is found inside ordinary phrases: "a vast
+   * range" reads as Avast, "pineapple" as Apple.
+   */
+  minAnchorSubstringKeywordChars: 6,
+  /**
+   * Longest link text, in words, that reads as a label for a brand ("Microsoft 365", "Open in OneDrive")
+   * rather than a sentence mentioning one. Longer text is a headline unless it asks for an action.
+   */
+  maxBrandLabelWords: 3,
   /** Subdomain label count above which the structure itself is suspicious. */
   maxReasonableSubdomainLabels: 4,
   /** Number of links above which a message is bulk-mail shaped. */

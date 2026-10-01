@@ -1,0 +1,22 @@
+{
+  "name": "image-only-mailbox-lure",
+  "description": "A mailbox lure whose notice is a single linked picture: the body has no words for any wording check to read, so the subject is the only text, and the picture links to a page on an unrelated site.",
+  "email": {
+    "senderName": "Mail Administrator",
+    "senderEmail": "notice@mail-delivery-centre.com",
+    "recipientEmail": "sam.okafor@northwind-logistics.com",
+    "subject": "Incoming messages for sam.okafor@northwind-logistics.com on hold",
+    "bodyText": "",
+    "links": [
+      { "text": "", "href": "https://release-queue-portal.net/m/sam.okafor" }
+    ],
+    "attachments": [],
+    "auth": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass",
+      "signedBy": "mail-delivery-centre.com",
+      "mailedBy": "mail-delivery-centre.com"
+    }
+  }
+}

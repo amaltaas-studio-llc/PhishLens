@@ -1,0 +1,23 @@
+{
+  "name": "legitimate-image-newsletter",
+  "description": "A retailer's sale announcement drawn as one linked banner, sent through a mailing platform whose link host is not the retailer's own domain. The same shape as an image-only lure without the ask: the subject announces, it does not demand.",
+  "email": {
+    "senderName": "Northwind Outfitters",
+    "senderEmail": "news@northwind-outfitters.com",
+    "recipientEmail": "sam.okafor@example.net",
+    "subject": "The autumn sale starts today",
+    "bodyText": "View in browser",
+    "links": [
+      { "text": "", "href": "https://links.mailvendor.example/c/northwind-outfitters/autumn" },
+      { "text": "View in browser", "href": "https://view.mailvendor.example/northwind-outfitters/autumn" }
+    ],
+    "attachments": [],
+    "auth": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass",
+      "signedBy": "northwind-outfitters.com",
+      "mailedBy": "mailvendor.example"
+    }
+  }
+}

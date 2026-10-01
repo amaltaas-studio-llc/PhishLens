@@ -1,0 +1,24 @@
+{
+  "name": "antivirus-renewal-scam",
+  "description": "A fake security-software renewal: the brand's name on an unrelated domain, a subscription said to be scheduled for deactivation, and a link to update billing on a host the brand does not own. The commonest English lure in public phishing corpora, and one that reads word for word like the genuine notice it copies.",
+  "email": {
+    "senderName": "Norton Security Team",
+    "senderEmail": "billing@renewal-desk-7731.com",
+    "recipientEmail": "sam.okafor@northwind-logistics.com",
+    "subject": "Final notice: your Norton 360 renewal payment failed",
+    "bodyText": "PROTECTION EXPIRING TODAY\n\nDear Customer,\n\nYour Norton 360 subscription is scheduled for deactivation today because we were unable to process your renewal payment.\n\nWe tried to charge your card three times. To keep your devices protected, please update your billing information now.\n\nUpdate Payment Now\n\nIf you have already updated your payment details, please disregard this message.\n\nRef: KQ-551920",
+    "links": [
+      {
+        "text": "Update Payment Now",
+        "href": "https://secure-billing-portal.renewal-desk-7731.com/update?ref=KQ-551920"
+      }
+    ],
+    "attachments": [],
+    "auth": {
+      "spf": "pass",
+      "dkim": "none",
+      "dmarc": "none",
+      "mailedBy": "renewal-desk-7731.com"
+    }
+  }
+}

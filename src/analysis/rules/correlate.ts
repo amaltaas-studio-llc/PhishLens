@@ -153,6 +153,8 @@ const IMPERSONATION_DESCRIPTIONS: Record<string, string> = {
     'sends from a non-Latin domain spelled to resemble a familiar one',
   'identity.lookalike_of_recipient_domain':
     'sends from a domain that imitates the recipient’s own',
+  'identity.own_domain_in_sender_name':
+    'uses the recipient’s own organisation’s domain as its name while sending from outside it',
 };
 
 const IMPERSONATION_SIGNALS = Object.keys(IMPERSONATION_DESCRIPTIONS);

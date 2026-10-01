@@ -1,0 +1,25 @@
+{
+  "name": "fake-attachment-link",
+  "description": "A document-sharing lure with no attachment: the body shows a filename as though a report were attached, and the filename is a link to a sign-in page on an unrelated site. The shape survives every brand check, because it names no brand.",
+  "email": {
+    "senderName": "HR Department",
+    "senderEmail": "hr-notices@staff-records-portal.com",
+    "recipientEmail": "sam.okafor@northwind-logistics.com",
+    "subject": "Annual leave compliance report for review",
+    "bodyText": "Hello,\n\nPlease review the attached annual leave compliance report before Friday and confirm your remaining balance.\n\nAnnual-Leave-Compliance-Report-2026.pdf\n\nRegards,\nHR Department",
+    "links": [
+      {
+        "text": "Annual-Leave-Compliance-Report-2026.pdf",
+        "href": "https://docs-viewer-secure.net/portal/view.html?id=88213"
+      }
+    ],
+    "attachments": [],
+    "auth": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass",
+      "signedBy": "staff-records-portal.com",
+      "mailedBy": "staff-records-portal.com"
+    }
+  }
+}

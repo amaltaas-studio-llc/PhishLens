@@ -1,0 +1,22 @@
+{
+  "name": "legitimate-hosted-service-desk",
+  "description": "False-positive resistance: the recipient's own IT service desk, run on a hosted ticketing service, writing from that service's domain under the organisation's name. It is reported as a department of the recipient's organisation writing from outside, because from the message alone that is what it is, but it must stay low with nothing at high: an organisation's helpdesk on a hosted service is ordinary, and the trust list is how a reader accepts it.",
+  "email": {
+    "senderName": "Northwind Logistics IT Service Desk",
+    "senderEmail": "servicedesk@northwind-logistics.deskworks-hosting.com",
+    "recipientEmail": "sam.okafor@northwind-logistics.com",
+    "subject": "Ticket #4821 resolved: printer on floor 3 not responding",
+    "bodyText": "Hi Sam,\n\nYour ticket #4821 has been resolved. The printer on floor 3 had a stuck job in its queue; we cleared it and printed a test page.\n\nIf it happens again, reply to this email and the ticket will reopen.\n\nThanks,\nPriya\nIT Service Desk",
+    "links": [
+      { "text": "View ticket #4821", "href": "https://northwind-logistics.deskworks-hosting.com/tickets/4821" }
+    ],
+    "attachments": [],
+    "auth": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass",
+      "signedBy": "deskworks-hosting.com",
+      "mailedBy": "deskworks-hosting.com"
+    }
+  }
+}

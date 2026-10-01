@@ -54,6 +54,9 @@ const SENDER_ONLY_RULES: ReadonlySet<string> = new Set([
   'identity.unverified_brand_domain',
   // Sender-only too, and silent on a row at `medium` for the same reason.
   'identity.brand_named_in_legal_notice',
+  // The sender line plus the reader's own address, as for the recipient lookalike; silent at `medium`.
+  'identity.own_domain_in_sender_name',
+  'identity.own_department_from_outside',
 ]);
 
 /**
@@ -68,6 +71,8 @@ const NEEDS_MORE_THAN_SENDER: ReadonlySet<string> = new Set([
   // Reads the body, so from a row it would fire on a display name alone.
   'identity.external_executive_claim',
   'identity.external_financial_request',
+  // Reads the subject's shared-item name, which a row may show but the identity rules never see.
+  'identity.alert_named_shared_item',
   // Correlations, by definition: each is an inference drawn from a sender finding plus a body or link
   // finding, and neither of the latter exists in a row.
   'identity.impersonation_with_credential_request',

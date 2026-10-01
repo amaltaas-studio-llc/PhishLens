@@ -1,0 +1,22 @@
+{
+  "name": "shared-item-alert-lure",
+  "description": "A bank-alert lure delivered by a genuine file-sharing service: the attacker shared a document from a free account, so the notice is the service's own, authenticated and linked to the service. The only part the attacker wrote is the file's name, which is worded as a security alert.",
+  "email": {
+    "senderName": "Northwind Bank Access (via Google Drive)",
+    "senderEmail": "drive-shares-dm-noreply@google.com",
+    "recipientEmail": "sam.okafor@example.net",
+    "subject": "Item shared with you: \"Online ID Locked Due to Unrecognized Log-In - Verify Immediately.pdf\"",
+    "bodyText": "Northwind Bank Access shared a file\n\nOnline ID Locked Due to Unrecognized Log-In - Verify Immediately.pdf\n\nOpen\n\nGoogle LLC, 1600 Amphitheatre Parkway, Mountain View, CA 94043, USA\nYou have received this email because this account shared a file with you from Google Drive.",
+    "links": [
+      { "text": "Open", "href": "https://drive.google.com/file/d/1nW8xK2pQ7v/view?usp=sharing_eip" }
+    ],
+    "attachments": [],
+    "auth": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass",
+      "signedBy": "google.com",
+      "mailedBy": "doclist.bounces.google.com"
+    }
+  }
+}

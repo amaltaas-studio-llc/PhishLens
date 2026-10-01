@@ -81,6 +81,8 @@ export const OPEN_HOSTING_SUFFIXES: readonly string[] = [
   'r2.cloudflarestorage.com', 'digitaloceanspaces.com', 'backblazeb2.com', 'wasabisys.com',
   'storage.yandexcloud.net', 'githubusercontent.com', 'dropboxusercontent.com',
   'googleusercontent.com', 'mcusercontent.com',
+  // IPFS gateways: content is addressed by hash, so anyone's upload is served under the gateway's name.
+  'ipfs.io', 'dweb.link', 'cf-ipfs.com', 'w3s.link', 'nftstorage.link',
   // Deliberately absent: `sharepoint.com`, `force.com` and `myshopify.com`. Anyone can open a tenant on
   // each, but they are also where organisations run their own document shares, customer portals and
   // shops, whose genuine mail links to a sign-in page there as a matter of course. Listing them would put

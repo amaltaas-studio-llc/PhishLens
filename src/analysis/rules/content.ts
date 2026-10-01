@@ -12,7 +12,7 @@
  *    "urgent" alone is noise and "urgent" + "verify your password" + a mismatched domain is not.
  */
 import type { SecuritySignal, Severity } from '../../shared/types.js';
-import { excerpt, firstMatch, formatList } from '../../shared/text.js';
+import { excerpt, firstMatch, formatList, normalizeForMatching } from '../../shared/text.js';
 import { hasStyledLetterforms } from '../../shared/unicode.js';
 import type { AnalysisContext } from '../context.js';
 import { DAMPENING, DETECTION_TUNING } from '../scoring/config.js';
@@ -51,6 +51,17 @@ interface ContentPattern {
   negationReverses?: boolean;
   /** Dropped for bulk-shaped mail, because legitimate marketing routinely trips it. */
   suppressedInBulk?: boolean;
+  /**
+   * Evidence that keeps a bulk-suppressed theme anyway: a match on this is not something marketing writes,
+   * so the newsletter shape cannot excuse it. Without it, an unsubscribe link would be all a mass-mailed
+   * demand needed to go quiet.
+   */
+  keptInBulkBy?: RegExp;
+  /**
+   * Patterns that read as an instruction rather than a request when the message itself carries what they
+   * ask for, and count only when `delivered` does not match. Both or neither.
+   */
+  unlessDelivered?: { patterns: readonly RegExp[]; delivered: RegExp };
 }
 
 /**
@@ -172,6 +183,18 @@ function isConditionalNegation(sentenceBefore: string, packs: readonly LanguageP
   return false;
 }
 
+/**
+ * A wallet address standing alone, spelled the way only an address can be. A legacy address is base58,
+ * which never uses `0`, and mixes case freely, so across its length it all but always carries a letter
+ * past `f`; a bech32 address uses its own 32-character alphabet. Without those two constraints every MD5
+ * checksum and hex Message-ID starting with 1 or 3 read as a ransom demand, since hex has no `g`–`z` and
+ * a hash of that length rarely avoids `0`. It must also stand alone: a run of base58-looking characters
+ * inside a URL path, a MIME boundary or a base64 signature block is a fragment of a longer token, joined
+ * to it by `/`, `+`, `-`, `=` or `.`.
+ */
+const WALLET_ADDRESS =
+  /(?<![\w/+=\-@.?&%#])(?:bc1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{25,59}|[13](?=[a-z1-9]*[g-z])[a-z1-9]{25,34})(?![\w/+=\-@&%#]|\.\w)/u;
+
 const CONTENT_PATTERNS: readonly ContentPattern[] = [
   {
     id: 'urgency',
@@ -240,7 +263,12 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
     severity: 'medium',
     score: 20,
     patterns: [
-      /\b(account|access|profile|mailbox|subscription)\b[^.!?]{0,40}\b(suspend|suspended|suspension|terminat|deactivat|disabl|delet|lock(ed)?|restrict|limit(ed|ation)?|block(ed)?|on hold)\b/u,
+      /\b(account|access|profile|mailbox|subscription)\b[^.!?]{0,40}\b(suspend|suspended|suspension|lock(ed)?|limit(ed|ation)?|block(ed)?|on hold)\b/u,
+      // Termination, deactivation and deletion need the reader's own account directly before a tense,
+      // because in a loose window they are the vocabulary of every mailing-list footer ("to stop your
+      // subscription being deleted") and admin notice. Measured on a public corpus of legitimate mail,
+      // the loose form matched 61 messages that the other patterns do not; this one matches 5.
+      /\byour (?:[a-z0-9-]+ ){0,3}(?:account|access|profile|mailbox|subscription) (?:will be|has been|have been|is|are|was|is now|is pending|is scheduled for|is set for|will soon be) (?:[a-z]+ ){0,2}(?:terminat(?:e|ed|ion)|deactivat(?:e|ed|ion)|disabled|delet(?:e|ed|ion)|restricted)\b/u,
       // Closure is separated from the verbs above and requires the reader's own account, because it is
       // the one that also describes a *bank* account: "my old account is being closed, use these details
       // instead" is the machinery of payment diversion, not a threat to anyone's access, and reporting it
@@ -263,8 +291,23 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
     severity: 'high',
     score: 30,
     negationReverses: true,
+    /*
+     * "Enter the verification code" is how every genuine code delivery ends, and the code is a line away.
+     * Sharing is the attack and entering is the instruction, so `enter` counts only when the message
+     * carries no code of its own. The code has to sit against the word naming it — "code: 482 910",
+     * "123456 is your code" — so an order number or a phone number elsewhere in a lure excuses nothing.
+     * A lure that prints a plausible code beside "enter it here" loses this finding and nothing else: the
+     * page it points at is what the link rules judge.
+     */
+    unlessDelivered: {
+      patterns: [
+        /\benter\b[^.!?]{0,40}\b(otp|one[- ]time (code|password|passcode|pin)|verification code|security code|authentication code|2fa code|mfa code|sms code|access code|upi pin)\b/u,
+      ],
+      delivered:
+        /\b(?:code|otp|passcode|pin)\b[^.!?\d]{0,40}(?:[.:!] ?)?(?<![\w,/-])(?<!\bending (?:in )?)(?:\d{4,8}|\d{3}[ -]\d{3})(?![\w,:/-]|\.\d)|(?<![\w.,:/-])(?:\d{4,8}|\d{3}[ -]\d{3}) is your\b/u,
+    },
     patterns: [
-      /\b(share|send|provide|forward|enter|give|tell (me|us)|read (me|us))\b[^.!?]{0,40}\b(otp|one[- ]time (code|password|passcode|pin)|verification code|security code|authentication code|2fa code|mfa code|sms code|access code|upi pin)\b/u,
+      /\b(share|send|provide|forward|give|tell (me|us)|read (me|us))\b[^.!?]{0,40}\b(otp|one[- ]time (code|password|passcode|pin)|verification code|security code|authentication code|2fa code|mfa code|sms code|access code|upi pin)\b/u,
       // "reply to this email with the verification code" — the verb and the preposition are separated.
       /\b(reply|respond|get back)\b[^.!?]{0,40}\bwith\b[^.!?]{0,40}\b(otp|one[- ]time (code|password|passcode|pin)|verification code|security code|authentication code|2fa code|mfa code|sms code|access code|upi pin|code)\b/u,
       // Deliberately no pattern for "your verification code is 123456". A message *containing* a code is
@@ -309,9 +352,11 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
     // Where money is *sent*, not how the reader pays. "Update your payment information" and "update your
     // account information" are what every subscription says about a card on file, and a `high` finding
     // there made ordinary billing mail Suspicious; the fraud is a payee announcing a new account to pay
-    // into, which is spelled with bank, remittance, payee or account-number wording.
+    // into, which is spelled with bank, remittance, payee or account-number wording. "Open a new deposit
+    // account" is a bank selling one, so the invitation is excluded; "we have opened a new account" is a
+    // payee's announcement and is not.
     patterns: [
-      /\b(update|change|amend|revise|new|different|updated)\b[^.!?]{0,40}\b(?:(?:bank|banking|remittance|payee|deposit) (?:details|information|account|instructions|number)|account (?:number|instructions)|payment (?:instructions|account))\b/u,
+      /(?<!\bopen(?:ing)? (?:a |an |your )?)\b(update|change|amend|revise|new|different|updated)\b[^.!?]{0,40}\b(?:(?:bank|banking|remittance|payee|deposit) (?:details|information|account|instructions|number)|account (?:number|instructions)|payment (?:instructions|account))\b/u,
       /\b(our|the|my) (bank|banking|account) (details|information) (have|has) (changed|been (changed|updated))\b/u,
       /\b(please )?(use|note) (the )?(new|updated|following) (bank|account|remittance|payment (details|instructions|account))\b/u,
       /\bchange (of|to) (bank|banking|payment|remittance) (details|instructions)\b/u,
@@ -377,7 +422,10 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
     severity: 'low',
     score: 12,
     patterns: [
-      /\b(invoice|inv\.?\s?#?\d|bill|statement|receipt|purchase order|po\s?#?\d)\b[^.!?]{0,40}\b(attach|enclos|overdue|outstanding|unpaid|due|past due|payment|settle)\b/u,
+      // Bare `attach` is the broken English of "find invoice attach", and is kept as that. "Attached"
+      // and "enclosed" are deliberately absent: "your statement is attached" is ordinary mail, and
+      // spelling them in moved a plain notice into this theme.
+      /\b(invoice|inv\.?\s?#?\d|bill|statement|receipt|purchase order|po\s?#?\d)\b[^.!?]{0,40}\b(attach|overdue|outstanding|unpaid|due|past due|payment|settle)\b/u,
       /\b(overdue|outstanding|unpaid|past due|final demand)\b[^.!?]{0,30}\b(invoice|balance|amount|payment|account)\b/u,
       /\b(payment|amount) (is )?(now )?(due|overdue|required|pending|outstanding)\b/u,
       /\b(your (order|purchase|subscription|payment) (of|for)|you (have been|were) charged)\b/u,
@@ -392,7 +440,7 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
     score: 24,
     patterns: [
       /\b(keep (this|it) (between us|confidential|private|discreet|quiet)|don'?t (tell|discuss|mention|share|inform)|do not (tell|discuss|mention|share|inform))\b/u,
-      /\b(confidential|discreet|discretion|private) (matter|request|transaction|arrangement|deal)\b/u,
+      /\b(confidential|discreet|private) (matter|request|transaction|arrangement|deal)\b/u,
       /\b(no one|nobody) (else )?(should|needs to|must) know\b/u,
       /\b(before|until) (i|we) (announce|tell|inform|go public)\b/u,
       /\bstrictly (confidential|between)\b/u,
@@ -431,6 +479,14 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
   },
   {
     id: 'crypto_demand',
+    // "Never send money or crypto to someone you met online" is the scam warning genuine financial mail
+    // carries, written in the demand's own words.
+    negationReverses: true,
+    // An exchange's offer — a bonus for transferring your own coins in from another wallet — is the
+    // demand's vocabulary pointed the other way, and it arrives as bulk mail. A wallet address does not:
+    // nobody markets by printing one, so it keeps the theme in a newsletter-shaped message.
+    suppressedInBulk: true,
+    keptInBulkBy: WALLET_ADDRESS,
     title: 'Message requests cryptocurrency',
     description:
       'The message asks for payment in cryptocurrency. Like gift cards, crypto payments are irreversible.',
@@ -438,15 +494,10 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
     score: 28,
     patterns: [
       /\b(bitcoin|btc|ethereum|eth|usdt|tether|crypto(currency)?|wallet address)\b[^.!?]{0,50}\b(send|transfer|pay|payment|deposit|address)\b/u,
-      /\b(send|transfer|pay|deposit)\b[^.!?]{0,40}\b(bitcoin|btc|ethereum|eth|usdt|crypto)\b/u,
-      // A wallet address standing alone, spelled the way only an address can be. A legacy address is
-      // base58, which never uses `0`, and mixes case freely, so across its length it all but always
-      // carries a letter past `f`; a bech32 address uses its own 32-character alphabet. Without those
-      // two constraints every MD5 checksum and hex Message-ID starting with 1 or 3 read as a ransom
-      // demand, since hex has no `g`–`z` and a hash of that length rarely avoids `0`. It must also stand
-      // alone: a run of base58-looking characters inside a URL path, a MIME boundary or a base64 signature
-      // block is a fragment of a longer token, joined to it by `/`, `+`, `-`, `=` or `.`.
-      /(?<![\w/+=\-@.?&%#])(?:bc1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{25,59}|[13](?=[a-z1-9]*[g-z])[a-z1-9]{25,34})(?![\w/+=\-@&%#]|\.\w)/u,
+      // The window may cross a decimal point, because the amount sits between the verb and the coin and
+      // is written "send 0.05 BTC"; stopping at every `.` missed the commonest form of the demand.
+      /\b(send|transfer|pay|deposit)\b(?:[^.!?]|(?<=\d)\.(?=\d)){0,40}\b(bitcoin|btc|ethereum|eth|usdt|crypto)\b/u,
+      WALLET_ADDRESS,
     ],
   },
   {
@@ -459,14 +510,18 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
     // Each claim needs its object — *you*, *your device*, *one of your passwords*. The bare verbs are
     // the commonest first-person sentences in technical mail: "I have installed the package", "I have
     // captured the transaction", "it tells me the passphrase is correct" were each reported at `high`.
+    // A contraction joins its word with no space, so it is spelled `i(?: have|'ve)`; `i (have|'ve)` asks
+    // for "i 've" and never saw "I've", the form these letters are written in.
     patterns: [
-      /\bi (have|'ve) (been )?(recorded|filmed|captured)\b[^.!?]{0,30}\b(you|your)\b/u,
-      /\bi (have|'ve) installed\b[^.!?]{0,40}\b(on|in|into) your (device|computer|system|phone|pc|laptop|browser|webcam)\b/u,
+      /\bi(?: have|'ve) (been )?(recorded|filmed|captured)\b[^.!?]{0,30}\b(you|your)\b/u,
+      /\bi(?: have|'ve) installed\b[^.!?]{0,40}\b(on|in|into) your (device|computer|system|phone|pc|laptop|browser|webcam)\b/u,
       /\bi (have )?(full )?(access to|control of|control over) your (device|computer|webcam|phone|system|accounts?)\b/u,
       /\b(webcam|camera|screen) (recording|footage|video)\b[^.!?]{0,40}\b(send|release|publish|share|contacts)\b/u,
       /\b(i know|i have)\b[^.!?]{0,30}\byour (password|passphrase)\b/u,
       /\bis one of your (passwords?|passphrases?)\b/u,
-      /\b(pay|send)\b[^.!?]{0,40}\b(or (i|we) (will|'ll) (send|release|publish|share|expose))\b/u,
+      // The threat names what is released, like every claim above: "pay the deposit or we will release
+      // the booking" is a hotel's terms.
+      /\b(pay|send)\b(?:[^.!?]|(?<=\d)\.(?=\d)){0,40}\b(or (i|we)(?: will|'ll) (send|release|publish|share|expose))\b[^.!?]{0,30}\b(videos?|recordings?|footage|photos?|pictures?|images?|clips?|evidence|everything|(?:to )?(?:all )?your (?:contacts|family|friends|colleagues))\b/u,
     ],
   },
   {
@@ -478,7 +533,7 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
     severity: 'low',
     score: 12,
     patterns: [
-      /\b(you (have|'ve) (won|been (selected|chosen)|qualified)|congratulations)\b[^.!?]{0,50}\b(prize|winner|lottery|reward|award|gift|selected)\b/u,
+      /\b(you(?: have|'ve) (won|been (selected|chosen)|qualified)|congratulations)\b[^.!?]{0,50}\b(prize|winner|lottery|reward|award|gift|selected)\b/u,
       /\b(refund|rebate|compensation|settlement|overpayment|tax return)\b[^.!?]{0,40}\b(owed|due|waiting|pending|claim|approved|eligible)\b/u,
       /\b(claim|collect|receive) (your|the) (prize|reward|refund|winnings|inheritance|funds)\b/u,
       /\bunclaimed (funds|money|balance|inheritance)\b/u,
@@ -629,6 +684,17 @@ function prepareWording(text: string): Wording {
   return { folded, packs: detectLanguages(folded) };
 }
 
+/**
+ * Subject and body apart, not `matchText`, which joins them with a space: a subject ending "verification
+ * code" would otherwise reach a body opening with an order number and read it as the code delivered.
+ */
+function isDelivered(context: AnalysisContext, delivered: RegExp): boolean {
+  return (
+    delivered.test(normalizeForMatching(context.email.subject ?? '')) ||
+    delivered.test(normalizeForMatching(context.email.bodyText))
+  );
+}
+
 function matchThemes(context: AnalysisContext, wording = prepareWording(context.matchText)): ThemeMatch[] {
   // Pack patterns run against diacritic-folded text so accentless spellings still match; evidence is
   // always excerpted from the unfolded `matchText`, whose indices the fold preserves.
@@ -640,10 +706,15 @@ function matchThemes(context: AnalysisContext, wording = prepareWording(context.
     let matchCount = 0;
     let evidenceText = '';
     const packPatterns = packs.flatMap((pack) => pack.themes[pattern.id] ?? []);
-    for (const regex of [...pattern.patterns, ...packPatterns]) {
+    const conditional = pattern.unlessDelivered;
+    const own =
+      conditional === undefined || isDelivered(context, conditional.delivered)
+        ? pattern.patterns
+        : [...pattern.patterns, ...conditional.patterns];
+    for (const regex of [...own, ...packPatterns]) {
       // English patterns are written against unfolded text (ASCII `\b` is fine for them). Pack patterns
       // are written against the folded form and use Unicode boundaries from `compile()`.
-      const isPack = !pattern.patterns.includes(regex);
+      const isPack = !own.includes(regex);
       const haystack = isPack ? folded : text;
       const hit =
         pattern.negationReverses === true
@@ -708,7 +779,14 @@ function looksLikeBulkMail(context: AnalysisContext, wording: Wording): boolean 
  */
 function survivingThemes(context: AnalysisContext, themes: ThemeMatch[], wording: Wording): ThemeMatch[] {
   const bulk = looksLikeBulkMail(context, wording);
-  return themes.filter((theme) => !(bulk && theme.pattern.suppressedInBulk === true));
+  return themes.filter(
+    (theme) =>
+      !(
+        bulk &&
+        theme.pattern.suppressedInBulk === true &&
+        theme.pattern.keptInBulkBy?.test(context.matchText) !== true
+      ),
+  );
 }
 
 function themeSignals(themes: ThemeMatch[]): SecuritySignal[] {

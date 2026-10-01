@@ -10,8 +10,9 @@
  * All redirect analysis is textual.
  */
 import { brandOwningDomain, brandOwns, BRANDS } from '../../shared/brands.js';
+import { normalizeForMatching } from '../../shared/text.js';
 import type { SecuritySignal } from '../../shared/types.js';
-import { describeUrl, isPrivateIpHost, registrableDomain } from '../../shared/url.js';
+import { describeUrl, isPrivateIpHost, openHostingSuffix, registrableDomain } from '../../shared/url.js';
 import { decodeIdnHost, hasSuspiciousScriptMixing, scriptsUsed, skeleton } from '../../shared/unicode.js';
 import type { AnalysisContext, LinkAnalysis, LinkHost } from '../context.js';
 import { displayKey } from '../scoring/aggregate.js';
@@ -25,6 +26,21 @@ const CREDENTIAL_LINK_TERMS =
   // No `portal`: it names an intranet's front page as often as a sign-in form, and plain-HTTP intranet
   // portals made a `high` of ordinary internal mail. A portal's sign-in page still says `login`.
   /\b(sign\s?in|signon|log\s?in|logon|log-on|password|passwd|credential|authenticate|authentication|verify|verification|validate|confirm|secure\s?access|account\s?access|mfa|2fa|otp|sso|webmail|owa|unlock|reactivate|re-?activate)\b/u;
+
+/**
+ * TLDs whose registry admits only vetted government registrants. `.edu` is absent on purpose: it is
+ * restricted too, but compromised university sites host phishing pages often enough that a `.edu`
+ * destination proves nothing about the page.
+ */
+const VETTED_TLDS: ReadonlySet<string> = new Set(['gov', 'mil']);
+
+/** Link wording that acts on something a brand holds for the reader, which a headline does not. */
+const ANCHOR_ACTION_TERMS =
+  /\b(sign\s?in|log\s?in|logon|verify|confirm|update|review|view|open|access|download|reset|unlock|restore|secure|pay|payment|claim|activate|reactivate|validate|manage|accept|recover|account|password|document|file|invoice|voicemail|shared?|get started|start|join|continue|click|chat)\b/u;
+
+function anchorWordCount(text: string): number {
+  return text.split(/[^\p{L}\p{N}]+/u).filter((word) => word !== '').length;
+}
 
 /**
  * The brand table's strings, confusable-folded once. They are constants, and folding them inside the
@@ -151,6 +167,109 @@ function displayedUrlMismatch(context: AnalysisContext): SecuritySignal[] {
     // borrowing is real and the finding stands, which is why this yields to `impersonatesBrand`.
     if (link.onSenderDomain && !impersonatesBrand) continue;
 
+    // The sender showing its own address while the href goes through its email provider's tracker, which
+    // is how most bulk mail is sent. Authentication is what makes this safe to excuse: a
+    // spoof of the sender's domain fails it, and a sender proven to own a domain borrows nothing by
+    // displaying it. Without the proof this is exactly the phish, so it stays reported. A brand in the
+    // table is held to more, since its address is the one worth borrowing from a compromised account:
+    // its own link hosts belong in its `domains`, where they are recognised without excusing a stranger.
+    // A tracker is a plain host with an opaque path; a destination dressed in the sender's own name, or
+    // asking for a sign-in, is the compromised-account shape and is never excused.
+    const trackerShaped =
+      !destination.hostname.includes(link.displayedRegistrable) &&
+      !CREDENTIAL_LINK_TERMS.test(pathAndQuery(destination).toLowerCase());
+    if (
+      !impersonatesBrand &&
+      link.displayedRegistrable === context.senderRegistrable &&
+      context.senderProven &&
+      !context.senderIsFreemail &&
+      trackerShaped
+    ) {
+      continue;
+    }
+    // The converse: a proven sender showing some other ordinary address — a former name, a sister
+    // brand — whose link lands on the sender's own site. Nobody's reputation is borrowed.
+    if (!impersonatesBrand && context.senderProven && destination.registrable === context.senderRegistrable) {
+      continue;
+    }
+
+    // Two names under a TLD whose registry vets every registrant (`.gov`, `.mil`): an agency showing its
+    // short name and linking its long one. Neither end can be an attacker's registration, so the
+    // mismatch is reported without the floor a stranger's destination earns.
+    const vetted =
+      !impersonatesBrand && VETTED_TLDS.has(displayed.hostname.split('.').at(-1) ?? '') && VETTED_TLDS.has(destination.tld);
+    // An ordinary address shown through an opaque link service, from a proven sender of its own domain.
+    // Most bulk mail is sent through a provider whose tracker nobody can list, and its customers show
+    // their partners' and their own other addresses through it. The destination behind it cannot be
+    // seen, so this is reported rather than excused; a brand's address, a visible stranger destination,
+    // a sign-in path, or a sender on open hosting each keep it `high`. So do the reader's own domain on
+    // display, which is the reputation a mailbox lure borrows, and a subject asking for a sign-in, since
+    // a proven sender is only proven to own a domain, and phishers register those.
+    const opaqueService =
+      !impersonatesBrand &&
+      link.displayedRegistrable !== context.recipientRegistrable &&
+      !CREDENTIAL_LINK_TERMS.test(normalizeForMatching(context.subject)) &&
+      context.senderProven &&
+      !context.senderIsFreemail &&
+      openHostingSuffix(context.senderDomain) === null &&
+      destination.openHosting === null &&
+      link.redirectHops === 0 &&
+      trackerShaped &&
+      destination.url.pathname.length > 1;
+    if (vetted || opaqueService) {
+      findings.push(
+        signal({
+          id: `link.displayed_url_mismatch.${String(link.index)}`,
+          category: 'link',
+          severity: 'medium',
+          score: 16,
+          title: vetted
+            ? 'Displayed government address links to another government address'
+            : 'Displayed address goes through a link service',
+          description: vetted
+            ? `The link is shown as "${displayedHost}" but goes to ${destination.hostname}. Both are under a registry that vets every registrant, so this is one agency's names, not a stranger's — but the address shown is still not where the click goes.`
+            : `The link is shown as "${displayedHost}" but goes to ${destination.hostname}, a link service whose final destination is not visible. Bulk mail is routinely sent this way; check where it lands before entering anything.`,
+          evidence: {
+            text: link.link.text,
+            url: link.link.href,
+            value: `shown: ${displayedHost} → actual: ${destination.hostname}`,
+          },
+        }),
+      );
+      continue;
+    }
+
+    // A brand in the table, proven, showing another brand's address through its own click host, as a
+    // co-marketing offer does. Still reported — the displayed address is not where the click goes — but
+    // not at the severity of a stranger doing it. Only a table brand qualifies, because a phisher can
+    // authenticate a domain of their own in minutes and point a brand's address at it; what they cannot
+    // do is be proven as a brand the table lists.
+    const ownLinkService =
+      impersonatesBrand &&
+      link.onSenderDomain &&
+      context.senderProven &&
+      context.senderOwnedByBrand !== undefined &&
+      context.senderOwnedByBrand.id !== brand.id &&
+      context.primaryClaim?.brand.id !== brand.id;
+    if (ownLinkService) {
+      findings.push(
+        signal({
+          id: `link.displayed_url_mismatch.${String(link.index)}`,
+          category: 'link',
+          severity: 'medium',
+          score: 16,
+          title: "Displayed address goes through the sender's own link service",
+          description: `The link is shown as "${displayedHost}", which belongs to ${brand.label}, but clicking it goes to ${destination.hostname}, the sender's own domain, which decides where the click finally lands.`,
+          evidence: {
+            text: link.link.text,
+            url: link.link.href,
+            value: `shown: ${displayedHost} → actual: ${destination.hostname}`,
+          },
+        }),
+      );
+      continue;
+    }
+
     findings.push(
       signal({
         id: `link.displayed_url_mismatch.${String(link.index)}`,
@@ -191,9 +310,15 @@ function anchorTextBrandMismatch(context: AnalysisContext): SecuritySignal[] {
 
     const folded = skeleton(link.anchorText);
     if (folded.length < 4) continue;
+    const words = new Set(link.anchorText.split(/[^\p{L}\p{N}]+/u).map((word) => skeleton(word)));
 
     for (const { brand, keywords } of FOLDED_BRANDS) {
-      if (!keywords.some((f) => f.length >= 5 && folded.includes(f))) continue;
+      const named = keywords.some((f) =>
+        f.length >= DETECTION_TUNING.minAnchorSubstringKeywordChars
+          ? folded.includes(f)
+          : f.length >= 5 && words.has(f),
+      );
+      if (!named) continue;
       // Brand-scoped, because a domain two brands both list resolves to whichever the table names first.
       if (brandOwns(brand, destination.registrable)) break;
       // Bulk senders rewrite every href through their own click-tracking host, so a footer that links
@@ -206,13 +331,49 @@ function anchorTextBrandMismatch(context: AnalysisContext): SecuritySignal[] {
       // link: a message presenting itself as LinkedIn, with a "LinkedIn" link to its own domain, is the
       // deception this rule exists for.
       if (link.onSenderDomain && context.primaryClaim?.brand.id !== brand.id) break;
+      // The same footer behind an email provider's tracker: the entry host is the provider's, and the
+      // destination the sender's own site. Only for a proven sender, since the tracker hop is a stranger.
+      if (
+        context.senderProven &&
+        destination.registrable === context.senderRegistrable &&
+        context.primaryClaim?.brand.id !== brand.id
+      ) {
+        break;
+      }
+      // A newsletter's headline names brands in passing — "Norway cancels Microsoft contract" — and links
+      // to the article, wherever it is hosted. Bait reads differently: it is the brand as a label, or an
+      // action on something the brand holds, or it comes from a message presenting itself as the brand.
+      if (
+        context.primaryClaim?.brand.id !== brand.id &&
+        anchorWordCount(link.anchorText) > DETECTION_TUNING.maxBrandLabelWords &&
+        !ANCHOR_ACTION_TERMS.test(link.anchorText.toLowerCase())
+      ) {
+        break;
+      }
+
+      // A proven sender naming another brand as a bare label — "Follow on Instagram", a product it sells,
+      // "Outlook for iOS" in a signature — through a host of its own or its provider's is a mention, not
+      // bait: it neither claims to be the brand nor asks for anything the brand holds. The table brand
+      // itself, proven, linking a host the table does not list is the table's gap, not a deception.
+      // Both stay reported at `medium`; a phisher authenticating a domain of their own still meets the
+      // action wording, the claim, or the identity rules, any of which keeps this `high`. A sender on
+      // open hosting is proven only as one of its anonymous tenants, which proves nothing about them.
+      const lower = link.anchorText.toLowerCase();
+      const mention =
+        context.senderProven &&
+        ((context.senderOwnedByBrand?.id === brand.id) ||
+          (!context.senderIsFreemail &&
+            openHostingSuffix(context.senderDomain) === null &&
+            context.primaryClaim?.brand.id !== brand.id &&
+            !ANCHOR_ACTION_TERMS.test(lower) &&
+            !CREDENTIAL_LINK_TERMS.test(lower)));
 
       findings.push(
         signal({
           id: `link.anchor_brand_mismatch.${String(link.index)}`,
           category: 'link',
-          severity: 'high',
-          score: 28,
+          severity: mention ? 'medium' : 'high',
+          score: mention ? 14 : 28,
           title: `Link labelled as ${brand.label} points to an unrelated domain`,
           description: `The link text refers to ${brand.label}, but the link goes to ${destination.hostname}, which ${brand.label} does not own.`,
           evidence: { text: link.link.text, url: link.link.href, value: destination.hostname },
@@ -839,16 +1000,113 @@ function filenameLookalikeTldLinks(context: AnalysisContext): SecuritySignal[] {
 }
 
 /**
+ * Link text written as an attachment's filename, so it reads as a file in the message.
+ *
+ * Bounded to a single name of a few words ending in a document, archive or image extension, which is
+ * what an attachment chip shows; a sentence that ends in ".pdf" is not one.
+ */
+const FILE_LABEL =
+  /^(?:[^\s/\\<>:"|?*]+ ){0,8}[^\s/\\<>:"|?*]+\.(pdf|docx?|docm|xlsx?|xlsm|pptx?|csv|txt|rtf|odt|ods|eml|msg|zip|rar|7z|png|jpe?g|heic|tiff?)$/iu;
+
+/**
+ * Whether an address carries the labelled filename, as a hosted help desk's attachment download does
+ * (`/attachments/token/…?name=photo.jpeg`). Such a link serves the file under an opaque path, so a
+ * path-extension check alone would call every help-desk reply a fake attachment.
+ */
+function namesFile(host: LinkHost, filename: string): boolean {
+  const wanted = filename.toLowerCase();
+  let address: string;
+  try {
+    address = decodeURIComponent(pathAndQuery(host)).toLowerCase();
+  } catch {
+    address = pathAndQuery(host).toLowerCase();
+  }
+  return address.includes(wanted) || address.includes(wanted.replaceAll(' ', '+'));
+}
+
+/**
+ * A link labelled as an attached file that opens something other than that file somewhere else.
+ *
+ * "Annual-Leave-Compliance-Report-2024.pdf" in the body, linked to a web page on an unrelated site, is a
+ * fake attachment: the reader expects a document in the message and gets a page that asks for a sign-in.
+ * What a reader can check is the mismatch itself — the label names a file, and the address is not that
+ * file — so that is the whole condition, and each exemption is a place where it is ordinary:
+ *  - the sender's own hosts, where a support desk or document system serves its own attachments;
+ *  - a brand's file service (a Drive or OneDrive chip), where a shared file is a page by design;
+ *  - a destination that really is the named file, which is a download, not a disguise.
+ * A tracker that hides its destination is passed over rather than judged: the mismatch is the evidence,
+ * and a newsletter's tracked "Brochure.pdf" offers none a reader could check.
+ */
+function fakeAttachmentLinks(context: AnalysisContext): SecuritySignal[] {
+  for (const link of context.webLinks) {
+    if (link.onSenderDomain || link.displayed !== null || link.opaqueRedirect) continue;
+    const label = FILE_LABEL.exec(link.link.text.trim());
+    if (label === null) continue;
+
+    const destination = judgedHosts(link).at(-1);
+    if (destination === undefined || destination.registrable === '') continue;
+    if (destination.registrable === context.senderRegistrable) continue;
+    if (brandOwningDomain(destination.registrable) !== undefined && destination.openHosting === null) continue;
+    const extension = (label[1] ?? '').toLowerCase();
+    if (destination.url.pathname.toLowerCase().endsWith(`.${extension}`)) continue;
+    if (namesFile(destination, link.link.text.trim())) continue;
+
+    return [
+      signal({
+        id: `link.fake_attachment.${String(link.index)}`,
+        category: 'link',
+        severity: 'high',
+        score: 26,
+        title: 'Link is labelled as an attached file but opens a web page elsewhere',
+        description: `The link reads "${link.link.text.trim()}", like an attachment, but it opens ${destination.hostname}, which is not that file and not the sender's own site. A real attachment is in the message, not on someone else's web page.`,
+        evidence: { text: link.link.text, url: link.link.href, value: destination.hostname },
+      }),
+    ];
+  }
+  return [];
+}
+
+/**
+ * A subject that asks the reader to act on an account, a held message, a payment or a shared document.
+ *
+ * Read only when the body has no words, since then the subject is the one piece of the lure that is text:
+ * the rest is a picture of a sign-in notice, which nothing here reads.
+ */
+const SUBJECT_ACTION_TERMS =
+  /\b(action required|required action|immediate action|final (reminder|notice|warning)|(messages?|emails?|mails?) (on hold|held|pending|undelivered|suspended)|incoming messages|password (expir\w*|reset)|mailbox|account (suspended|locked|disabled|on hold|verification|update)|verify your|we (still )?need (some )?information|payment (processed|received|confirmation|declined|failed)|remittance|invoice|shared (a |an )?(file|document|folder)|sent you (a |an )?(message|document|file)|documento|signature (requested|required)|review and sign|expir(es|ation|ing) (on|soon|today)|renewing)\b/u;
+
+/**
  * Attacker-controlled destination for a message that also carries no readable text — a bare
  * "click here" body, which exists only to get the click.
+ *
+ * With an action-asking subject it is `medium`: an image-only lure has exactly this shape, its notice
+ * drawn as a picture so no wording check can read it, and the picture linked off-site. A table brand
+ * Gmail proves is exempt from the escalation, since image-heavy announcements are how some of them write.
+ * It stays below a floor because a bare image newsletter is the same shape without the subject's ask.
  */
 function linkOnlyBody(context: AnalysisContext): SecuritySignal[] {
   if (context.webLinks.length === 0) return [];
-  if (context.bodyText.trim().length >= DETECTION_TUNING.minimalBodyChars) return [];
+  const chars = context.bodyText.trim().length;
+  if (chars >= DETECTION_TUNING.minimalBodyChars) return [];
   const [first] = context.webLinks.filter(
     (l) => l.registrable !== '' && l.registrable !== context.senderRegistrable,
   );
   if (first === undefined) return [];
+
+  const ask = SUBJECT_ACTION_TERMS.exec(normalizeForMatching(context.subject));
+  if (ask !== null && !(context.senderProven && context.senderOwnedByBrand !== undefined)) {
+    return [
+      signal({
+        id: 'link.link_only_body',
+        category: 'link',
+        severity: 'medium',
+        score: 25,
+        title: 'Message asks for action but its body is only a link',
+        description: `The subject asks you to act ("${ask[0]}"), but the message has almost no readable text (${String(chars)} characters) and links to ${first.registrable}. A notice drawn as a picture says nothing that can be checked, and is how a lure avoids being read.`,
+        evidence: { text: context.subject, url: first.link.href },
+      }),
+    ];
+  }
 
   return [
     signal({
@@ -880,6 +1138,7 @@ const linkDetectors: Detect[] = [
   credentialTermsOnUnrelatedDomain,
   pageServedFromOpenStorage,
   filenameLookalikeTldLinks,
+  fakeAttachmentLinks,
   linkOnlyBody,
 ] as const;
 

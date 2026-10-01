@@ -369,7 +369,33 @@ function extractRedirectTarget(url: URL): { parsed: URL | null } | null {
     const parsed = parseUrl(safeDecode(embedded[0]));
     if (parsed !== null && WEB_SCHEMES.has(parsed.protocol)) return { parsed };
   }
+  const encoded = base64Target(`${url.pathname}${url.search}`);
+  if (encoded !== null) return { parsed: encoded };
   return opaque ? { parsed: null } : null;
+}
+
+/**
+ * A destination carried base64-encoded, as link-protection gateways rewrite every link in a message.
+ *
+ * Matched by its content rather than by any vendor's URL layout: base64 of `http` always begins `aHR0c`,
+ * so the token is found wherever a gateway puts it, in a path segment or a parameter, and a decode that
+ * is not a web URL is discarded. URL-safe and standard alphabets both occur; a `/` ends the token, since
+ * in a path it is a separator. Bounded, because the input is the attacker's.
+ */
+function base64Target(text: string): URL | null {
+  const token = /(?<![A-Za-z0-9+_-])aHR0c[A-Za-z0-9+_-]{8,2048}(?:={0,2}|(?:%3[dD]){0,2})/u.exec(text);
+  if (token === null) return null;
+  const body = token[0].replace(/(?:=|%3[dD])+$/u, '').replaceAll('-', '+').replaceAll('_', '/');
+  let decoded: string;
+  try {
+    decoded = atob(body + '='.repeat((4 - (body.length % 4)) % 4));
+  } catch {
+    return null;
+  }
+  const target = /^https?:\/\/[\x21-\x7e]+/u.exec(decoded);
+  if (target === null) return null;
+  const parsed = parseUrl(target[0]);
+  return parsed !== null && WEB_SCHEMES.has(parsed.protocol) ? parsed : null;
 }
 
 function safeDecode(value: string): string {
@@ -414,6 +440,10 @@ export function parseDisplayedUrl(text: string): URL | null {
     if (parsed === null) return null;
     // Reject things like `file.tar.gz` or `v1.2.3` being read as hostnames.
     if (isMalformedHost(parsed.hostname)) return null;
+    // An attachment link labelled `image0.jpeg` or `statement.pdf` is a filename, not an address a
+    // reader was shown. Only a delegated TLD makes bare text an address, which deliberately keeps the
+    // extensions that are also TLDs (`.zip`, `.mov`): a filename that resolves is the trick itself.
+    if (hasUnknownTld(parsed.hostname)) return null;
     return parsed;
   }
   return null;
