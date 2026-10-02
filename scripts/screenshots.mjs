@@ -29,30 +29,36 @@ const base = process.env['PHISHLENS_HARNESS_URL'] ?? 'http://127.0.0.1:5199';
  * Chrome clamps small windows to a platform minimum but still captures at the size asked for, so window
  * size cannot be used to crop to something positioned relative to the viewport. `view=card` lays the
  * card out at the top-left of the page for that reason, which makes these sizes simply "big enough":
- * 380x620 of card plus a 16px surround. Any excess is transparent (`--default-background-color`).
+ * 392x620 of card inside the frame `harness/index.html` gives it. Any excess is transparent
+ * (`--default-background-color`).
+ *
+ * The widths are the README's layout, not taste. GitHub's README column is 838px at every desktop width,
+ * two cards side by side take 2x404 of it, and each image is shown at exactly its width here, so a 2x
+ * capture lands one pixel per device pixel. Wider than its slot, GitHub scales it down and every line
+ * of text in it goes soft; change a width and change the `width` attribute in README.md with it.
  */
 const SHOTS = [
   {
     name: 'in-message.png',
     query: { fixture: 'microsoft-phish', semantic: 'ready', view: 'full', card: '1', bare: '1' },
-    width: 1180,
+    width: 838,
     height: 760,
     caption: 'badge in the header and the card open',
   },
   {
     name: 'card-light.png',
     query: { fixture: 'microsoft-phish', semantic: 'ready', view: 'card', bare: '1' },
-    width: 424,
+    width: 404,
     // Matches the ordinary-mail card below, which the README sets beside this one: different heights
     // there leave the two captions on different lines.
-    height: 628,
+    height: 636,
     caption: 'the explanation card',
   },
   {
     name: 'card-dark.png',
     query: { fixture: 'microsoft-phish', semantic: 'ready', view: 'card', bare: '1' },
-    width: 424,
-    height: 628,
+    width: 404,
+    height: 636,
     dark: true,
     caption: 'the same card in dark mode',
   },
@@ -61,37 +67,37 @@ const SHOTS = [
     // card on ordinary mail, where it finds nothing and says so.
     name: 'card-low.png',
     query: { fixture: 'legitimate-invoice', semantic: 'ready', view: 'card', bare: '1' },
-    width: 424,
-    height: 628,
+    width: 404,
+    height: 636,
     caption: 'the card on ordinary mail',
   },
   {
     name: 'card-low-dark.png',
     query: { fixture: 'legitimate-invoice', semantic: 'ready', view: 'card', bare: '1' },
-    width: 424,
-    height: 628,
+    width: 404,
+    height: 636,
     dark: true,
     caption: 'the same ordinary-mail card in dark mode',
   },
   {
     name: 'card-unreadable.png',
     query: { fixture: 'microsoft-phish', missing: 'sender', view: 'card', bare: '1' },
-    width: 424,
-    height: 508,
+    width: 404,
+    height: 520,
     caption: 'the card when a message could not be read',
   },
   {
     name: 'badges.png',
     query: { view: 'badges', semantic: 'ready', bare: '1' },
-    width: 900,
+    width: 760,
     // One row taller than the bands, for the "not checked" state at the bottom.
-    height: 266,
+    height: 336,
     caption: 'the badge at each risk level, and unable to read',
   },
   {
     name: 'inbox-list.png',
     query: { view: 'list', bare: '1' },
-    width: 920,
+    width: 760,
     // The whole fixture corpus as one inbox, so the shot shows how few rows are marked as well as which.
     height: 830,
     caption: 'markers on inbox rows',

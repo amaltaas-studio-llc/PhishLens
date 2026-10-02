@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The README banner. Punctuation is written as character references for the same reason as pipeline.svg:
+  an SVG is parsed as XML, so one mis-encoded byte replaces the whole image with an error.
+
+  The background is the same in both colour schemes on purpose: a deep indigo panel reads on GitHub's light
+  and dark themes alike, so the banner needs no second file and cannot drift from a twin. The colours are
+  the ones scripts/gen-icons.mjs paints the extension icon with, and the tile at the left is that icon
+  redrawn as vectors in the generator's own coordinates; change one and change the other.
+
+  The sender address is the invented lookalike from the README's screenshots (rnicrosoft-online.com), so
+  the banner shows the same case the page then explains in full.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 400" width="1280" height="400" role="img" aria-labelledby="hero-title hero-desc">
+  <title id="hero-title">PhishLens: a second look before you click</title>
+  <desc id="hero-desc">The PhishLens banner. The logo, a magnifying lens scanning a fish, sits beside the
+    tagline. On the right a lens magnifies the letters r and n in a sender address pretending to be
+    Microsoft, and a red High Risk badge scores the message 76 out of 100.</desc>
+
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    .word { fill: #ffffff; font-weight: 700; letter-spacing: -1px; }
+    .tag { fill: #e0e7ff; font-weight: 500; }
+    .chip { fill: rgba(255,255,255,0.08); stroke: rgba(255,255,255,0.22); }
+    .chip-t { fill: #eef2ff; font-weight: 500; }
+    .card { fill: #ffffff; }
+    .ink { fill: #1f2328; }
+    .muted { fill: #656d76; }
+    .hit { fill: #b42318; font-weight: 700; }
+    .pill { fill: #b42318; }
+    .pill-t { fill: #ffffff; font-weight: 600; }
+    .line { fill: #e5e7eb; }
+
+    .lens { animation: drift 7s ease-in-out infinite; transform-origin: 1110px 226px; }
+    .glow { animation: glow 3.5s ease-in-out infinite; }
+    .scan { animation: scan 3.2s ease-in-out infinite; }
+
+    @keyframes drift {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(6px, -4px); }
+    }
+    @keyframes glow {
+      0%, 100% { opacity: 0.35; }
+      50% { opacity: 0.75; }
+    }
+    @keyframes scan {
+      0%, 100% { transform: translateY(-30px); }
+      50% { transform: translateY(30px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .lens, .glow, .scan { animation: none; }
+    }
+  </style>
+
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1e1b4b" />
+      <stop offset="0.55" stop-color="#312e81" />
+      <stop offset="1" stop-color="#5b21b6" />
+    </linearGradient>
+    <radialGradient id="halo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#a5b4fc" stop-opacity="0.6" />
+      <stop offset="1" stop-color="#a5b4fc" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="spot" cx="0.25" cy="0.3" r="0.6">
+      <stop offset="0" stop-color="#818cf8" stop-opacity="0.35" />
+      <stop offset="1" stop-color="#818cf8" stop-opacity="0" />
+    </radialGradient>
+    <!-- The icon tile's paints, in the -1..1 space of scripts/gen-icons.mjs; see the tile below. -->
+    <linearGradient id="tile" gradientUnits="userSpaceOnUse" x1="-1" y1="-1" x2="1" y2="1">
+      <stop offset="0" stop-color="#6366f1" />
+      <stop offset="1" stop-color="#3b1f8c" />
+    </linearGradient>
+    <linearGradient id="tile-sheen" gradientUnits="userSpaceOnUse" x1="0" y1="-1" x2="0" y2="-0.2">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.096" />
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+    <!-- GLASS_CENTRE to GLASS_EDGE along t^1.5, sampled at quarters. -->
+    <radialGradient id="glass" gradientUnits="userSpaceOnUse" cx="-0.14" cy="-0.14" r="0.43">
+      <stop offset="0" stop-color="#3730a3" />
+      <stop offset="0.25" stop-color="#342d98" />
+      <stop offset="0.5" stop-color="#2e2984" />
+      <stop offset="0.75" stop-color="#27226a" />
+      <stop offset="1" stop-color="#1e1b4b" />
+    </radialGradient>
+    <linearGradient id="rim" gradientUnits="userSpaceOnUse" x1="-0.42" y1="-0.42" x2="0.14" y2="0.14">
+      <stop offset="0" stop-color="#ffffff" />
+      <stop offset="1" stop-color="#c7d2fe" />
+    </linearGradient>
+    <!-- Across the handle: the white ridge peaks at 0.42 on its axis and is gone at 0.7 of its radius. -->
+    <linearGradient id="grip-ridge" gradientUnits="userSpaceOnUse" x1="0.3906" y1="0.5094" x2="0.5094" y2="0.3906">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0" />
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.42" />
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+    <!-- Fish space. The body runs 0 to 0.85 of FISH_LIGHT..FISH_DARK top to bottom; tail and fin 0.15 darker. -->
+    <linearGradient id="fish" gradientUnits="userSpaceOnUse" x1="0" y1="-0.12" x2="0" y2="0.12">
+      <stop offset="0" stop-color="#fda4af" />
+      <stop offset="1" stop-color="#e53157" />
+    </linearGradient>
+    <linearGradient id="fin" gradientUnits="userSpaceOnUse" x1="0" y1="-0.12" x2="0" y2="0.12">
+      <stop offset="0" stop-color="#f990a0" />
+      <stop offset="1" stop-color="#e11d48" />
+    </linearGradient>
+    <!-- The scan line's two Gaussians (0.85 wide 0.012, 0.18 wide 0.07) about SCAN_Y. -->
+    <linearGradient id="scan-line" gradientUnits="userSpaceOnUse" x1="0" y1="-0.22" x2="0" y2="0.06">
+      <stop offset="0" stop-color="#c7d2fe" stop-opacity="0" />
+      <stop offset="0.125" stop-color="#c7d2fe" stop-opacity="0.019" />
+      <stop offset="0.25" stop-color="#c7d2fe" stop-opacity="0.066" />
+      <stop offset="0.375" stop-color="#c7d2fe" stop-opacity="0.14" />
+      <stop offset="0.4143" stop-color="#c7d2fe" stop-opacity="0.176" />
+      <stop offset="0.4571" stop-color="#c7d2fe" stop-opacity="0.488" />
+      <stop offset="0.4786" stop-color="#c7d2fe" stop-opacity="0.84" />
+      <stop offset="0.5" stop-color="#c7d2fe" stop-opacity="1" />
+      <stop offset="0.5214" stop-color="#c7d2fe" stop-opacity="0.84" />
+      <stop offset="0.5429" stop-color="#c7d2fe" stop-opacity="0.488" />
+      <stop offset="0.5857" stop-color="#c7d2fe" stop-opacity="0.176" />
+      <stop offset="0.625" stop-color="#c7d2fe" stop-opacity="0.14" />
+      <stop offset="0.75" stop-color="#c7d2fe" stop-opacity="0.066" />
+      <stop offset="0.875" stop-color="#c7d2fe" stop-opacity="0.019" />
+      <stop offset="1" stop-color="#c7d2fe" stop-opacity="0" />
+    </linearGradient>
+    <!-- A linear ramp 0.09 wide, as the generator fades the shadow, is closest to a Gaussian of 0.036. -->
+    <filter id="tile-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="0.036" />
+    </filter>
+    <linearGradient id="rim-dark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6366f1" />
+      <stop offset="1" stop-color="#312e81" />
+    </linearGradient>
+    <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6366f1" stop-opacity="0" />
+      <stop offset="0.5" stop-color="#6366f1" stop-opacity="0.55" />
+      <stop offset="1" stop-color="#6366f1" stop-opacity="0" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-20%" width="120%" height="150%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#0b0820" flood-opacity="0.5" />
+    </filter>
+    <clipPath id="tile-glass"><circle cx="-0.14" cy="-0.14" r="0.43" /></clipPath>
+    <clipPath id="big-glass"><circle cx="1110" cy="226" r="50" /></clipPath>
+  </defs>
+
+  <rect width="1280" height="400" rx="20" fill="url(#bg)" />
+  <rect width="1280" height="400" rx="20" fill="url(#spot)" />
+
+  <!-- Faint grid: texture without a picture competing with the words. -->
+  <g stroke="#ffffff" stroke-opacity="0.04">
+    <path d="M0 80 H1280 M0 160 H1280 M0 240 H1280 M0 320 H1280" />
+    <path d="M160 0 V400 M320 0 V400 M480 0 V400 M640 0 V400 M800 0 V400 M960 0 V400 M1120 0 V400" />
+  </g>
+
+  <!--
+    The extension icon, drawn in the space scripts/gen-icons.mjs uses: the tile spans -1..1 with y down,
+    scaled so it is 80px here. Every number below is one of the generator's constants (LENS, HANDLE,
+    FISH, SCAN_Y) or follows from one, at its full detail level, so the two can be compared shape by
+    shape. Paint order follows shade(): the handle covers the rim where they meet.
+  -->
+  <g transform="translate(108 128) scale(41.6667)">
+    <rect x="-0.96" y="-0.96" width="1.92" height="1.92" rx="0.4" fill="url(#tile)" />
+    <rect x="-0.96" y="-0.96" width="1.92" height="1.92" rx="0.4" fill="url(#tile-sheen)" />
+
+    <g filter="url(#tile-shadow)" opacity="0.45">
+      <circle cx="-0.09" cy="-0.07" r="0.56" fill="#1e1b4b" />
+      <path d="M0.34 0.36 L0.67 0.69" stroke="#1e1b4b" stroke-width="0.24" stroke-linecap="round" />
+    </g>
+
+    <circle cx="-0.14" cy="-0.14" r="0.495" fill="none" stroke="url(#rim)" stroke-width="0.13" />
+
+    <path d="M0.29 0.29 L0.62 0.62" stroke="#7367ba" stroke-width="0.24" stroke-linecap="round" />
+    <path d="M0.29 0.29 L0.3626 0.3626" stroke="#c7d2fe" stroke-width="0.24" />
+    <circle cx="0.29" cy="0.29" r="0.12" fill="#c7d2fe" />
+    <path d="M0.29 0.29 L0.62 0.62" stroke="url(#grip-ridge)" stroke-width="0.168" />
+
+    <circle cx="-0.14" cy="-0.14" r="0.43" fill="url(#glass)" />
+    <g clip-path="url(#tile-glass)">
+      <g transform="translate(-0.22 -0.11) scale(1.25)">
+        <path d="M-0.2245 0 A0.27 0.27 0 0 1 0.2245 0 A0.27 0.27 0 0 1 -0.2245 0 Z" fill="url(#fish)" />
+        <path d="M0.15 0 L0.31 -0.13 L0.31 0.13 Z" fill="url(#fin)" />
+        <path d="M-0.06 -0.1 L0.06 -0.21 L0.1 -0.08 Z" fill="url(#fin)" />
+        <path d="M-0.06 -0.0917 A0.1 0.1 0 0 0 -0.06 0.0917" fill="none" stroke="#e11d48" stroke-opacity="0.7" stroke-width="0.024" />
+        <circle cx="-0.15" cy="-0.025" r="0.045" fill="#ffffff" />
+        <circle cx="-0.15" cy="-0.025" r="0.024" fill="#1e1b4b" />
+      </g>
+      <rect x="-0.6" y="-0.22" width="1.2" height="0.28" fill="url(#scan-line)" />
+      <path d="M-0.4655 -0.2939 A0.36 0.36 0 0 1 -0.2564 -0.4807" fill="none" stroke="#ffffff" stroke-opacity="0.7" stroke-width="0.05" />
+    </g>
+  </g>
+  <text class="word" x="168" y="146" font-size="60">PhishLens</text>
+  <text class="tag" x="70" y="218" font-size="30">A second look before you click.</text>
+
+  <!--
+    GitHub shows this as an image, in whatever sans-serif the reader's system has, and those differ in
+    width by several percent. textLength holds each label to its width in Segoe UI, adjusting only the
+    spacing, so the 16px padding inside every chip and pill is the same on every platform.
+  -->
+  <g font-size="16">
+    <rect class="chip" x="70" y="252" width="178" height="36" rx="18" />
+    <text class="chip-t" x="159" y="275" text-anchor="middle" textLength="146">Explains every point</text>
+    <rect class="chip" x="260" y="252" width="203" height="36" rx="18" />
+    <text class="chip-t" x="361.5" y="275" text-anchor="middle" textLength="171">Runs on your computer</text>
+    <rect class="chip" x="475" y="252" width="164" height="36" rx="18" />
+    <text class="chip-t" x="557" y="275" text-anchor="middle" textLength="132">Free &#183; open source</text>
+  </g>
+
+  <!-- A Gmail-like sender line with the badge PhishLens adds. -->
+  <g filter="url(#shadow)">
+    <rect class="card" x="700" y="90" width="510" height="220" rx="16" />
+  </g>
+  <circle cx="748" cy="140" r="22" fill="#1a73e8" />
+  <text x="748" y="147" font-size="20" fill="#ffffff" font-weight="600" text-anchor="middle">M</text>
+  <text class="ink" x="784" y="137" font-size="18" font-weight="600">Microsoft 365 Message Center</text>
+  <text class="muted" x="784" y="164" font-size="16">no-reply@<tspan class="hit" text-decoration="underline">rn</tspan>icrosoft-online.com</text>
+
+  <rect class="pill" x="728" y="190" width="196" height="38" rx="19" />
+  <circle cx="752" cy="209" r="9" fill="#ffffff" />
+  <rect x="747" y="207" width="10" height="4" rx="1" fill="#b42318" />
+  <text class="pill-t" x="770" y="215" font-size="17" textLength="138">High Risk &#183; 76/100</text>
+
+  <rect class="line" x="728" y="250" width="300" height="9" rx="4.5" />
+  <rect class="line" x="728" y="270" width="250" height="9" rx="4.5" />
+  <rect class="line" x="728" y="290" width="200" height="9" rx="4.5" />
+
+  <!-- The lens magnifies the two letters that make the address a lookalike: "rn" posing as "m". -->
+  <path d="M872 172 Q 980 176 1062 214" fill="none" stroke="#b42318" stroke-width="2" stroke-dasharray="4 5" stroke-opacity="0.7" />
+  <g class="lens">
+    <circle class="glow" cx="1110" cy="226" r="80" fill="url(#halo)" />
+    <path d="M1146 262 L1178 294" stroke="#3b1f8c" stroke-opacity="0.35" stroke-width="15" stroke-linecap="round" transform="translate(3 4)" />
+    <path d="M1146 262 L1178 294" stroke="#312e81" stroke-width="14" stroke-linecap="round" />
+    <path d="M1146 262 L1154 270" stroke="#6366f1" stroke-width="14" stroke-linecap="round" />
+    <g clip-path="url(#big-glass)">
+      <circle cx="1110" cy="226" r="50" fill="#fff5f5" />
+      <text x="1110" y="244" font-size="50" font-weight="700" text-anchor="middle" fill="#b42318">rn</text>
+      <rect class="scan" x="1056" y="212" width="108" height="28" fill="url(#beam)" />
+      <rect class="scan" x="1056" y="225" width="108" height="2" fill="#4f46e5" opacity="0.8" />
+    </g>
+    <circle cx="1110" cy="226" r="50" fill="none" stroke="url(#rim-dark)" stroke-width="9" />
+    <circle cx="1110" cy="226" r="47.5" fill="none" stroke="#ffffff" stroke-opacity="0.6" stroke-width="1.5" />
+  </g>
+</svg>

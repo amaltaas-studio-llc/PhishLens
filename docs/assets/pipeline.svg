@@ -3,8 +3,11 @@
   Punctuation is written as character references rather than literal bytes. An SVG is parsed as XML, so a
   single mis-encoded byte is a hard parse error and the whole diagram is replaced by an error page;
   entities render identically and cannot be corrupted by whatever encoding an editor decides to use.
+
+  838 wide because that is GitHub's README column: drawn any wider, it is scaled down to fit, and the 11px
+  labels and 1px rules land between pixels. The accent is the indigo of the extension icon.
 -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 330" width="980" height="330" role="img" aria-labelledby="pipeline-title pipeline-desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 838 330" width="838" height="330" role="img" aria-labelledby="pipeline-title pipeline-desc">
   <title id="pipeline-title">How PhishLens analyses a message</title>
   <desc id="pipeline-desc">A message is read from the Gmail page, its fields are extracted, deterministic
     rules produce explainable signals, and those become a score from 0 to 100 shown as a badge and card.
@@ -17,7 +20,7 @@
     .frame { fill: none; stroke: #d0d7de; stroke-dasharray: 6 5; }
     .t { fill: #1f2328; font-weight: 600; }
     .s { fill: #656d76; }
-    .k { fill: #0969da; font-weight: 600; }
+    .k { fill: #4f46e5; font-weight: 600; }
     .arrow { stroke: #8c959f; fill: none; }
     .head { fill: #8c959f; }
     text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
@@ -28,7 +31,7 @@
       .frame { stroke: #30363d; }
       .t { fill: #e6edf3; }
       .s { fill: #9198a1; }
-      .k { fill: #58a6ff; }
+      .k { fill: #a5b4fc; }
       .arrow { stroke: #6e7681; }
       .head { fill: #6e7681; }
     }
@@ -40,47 +43,48 @@
     </marker>
   </defs>
 
-  <!-- Everything happens locally; the frame says so once instead of four times. -->
-  <rect class="frame" x="16" y="16" width="948" height="298" rx="14" />
-  <text class="s" x="34" y="42" font-size="12">Inside your browser &#183; no network requests &#183; nothing uploaded</text>
+  <!-- Everything happens locally; the frame says so once instead of four times. Half-pixel offsets keep
+       the 1px strokes on whole pixels. -->
+  <rect class="frame" x="12.5" y="16.5" width="813" height="297" rx="14" />
+  <text class="s" x="30" y="42" font-size="12">Inside your browser &#183; no network requests &#183; nothing uploaded</text>
 
-  <rect class="box" x="40" y="96" width="140" height="72" rx="8" />
-  <text class="t" x="110" y="126" font-size="13" text-anchor="middle">Open a message</text>
-  <text class="s" x="110" y="146" font-size="11" text-anchor="middle">read from the page</text>
+  <rect class="box" x="37.5" y="96.5" width="120" height="72" rx="8" />
+  <text class="t" x="97.5" y="126" font-size="13" text-anchor="middle">Open a message</text>
+  <text class="s" x="97.5" y="146" font-size="11" text-anchor="middle">read from the page</text>
 
-  <path class="arrow" d="M180 132 H204" marker-end="url(#a)" />
+  <path class="arrow" d="M157.5 132.5 H177.5" marker-end="url(#a)" />
 
-  <rect class="box" x="210" y="96" width="150" height="72" rx="8" />
-  <text class="t" x="285" y="120" font-size="13" text-anchor="middle">Extract</text>
-  <text class="s" x="285" y="139" font-size="11" text-anchor="middle">sender &#183; links</text>
-  <text class="s" x="285" y="154" font-size="11" text-anchor="middle">attachments &#183; auth</text>
+  <rect class="box" x="183.5" y="96.5" width="124" height="72" rx="8" />
+  <text class="t" x="245.5" y="120" font-size="13" text-anchor="middle">Extract</text>
+  <text class="s" x="245.5" y="139" font-size="11" text-anchor="middle">sender &#183; links</text>
+  <text class="s" x="245.5" y="154" font-size="11" text-anchor="middle">attachments &#183; auth</text>
 
-  <path class="arrow" d="M360 132 H384" marker-end="url(#a)" />
+  <path class="arrow" d="M307.5 132.5 H327.5" marker-end="url(#a)" />
 
-  <rect class="box" x="390" y="96" width="190" height="72" rx="8" />
-  <text class="t" x="485" y="120" font-size="13" text-anchor="middle">Deterministic checks</text>
-  <text class="s" x="485" y="139" font-size="11" text-anchor="middle">lookalike domains, link</text>
-  <text class="s" x="485" y="154" font-size="11" text-anchor="middle">mismatches, file types</text>
+  <rect class="box" x="333.5" y="96.5" width="160" height="72" rx="8" />
+  <text class="t" x="413.5" y="120" font-size="13" text-anchor="middle">Deterministic checks</text>
+  <text class="s" x="413.5" y="139" font-size="11" text-anchor="middle">lookalike domains, link</text>
+  <text class="s" x="413.5" y="154" font-size="11" text-anchor="middle">mismatches, file types</text>
 
-  <path class="arrow" d="M580 132 H604" marker-end="url(#a)" />
+  <path class="arrow" d="M493.5 132.5 H513.5" marker-end="url(#a)" />
 
-  <rect class="box" x="610" y="96" width="140" height="72" rx="8" />
-  <text class="k" x="680" y="126" font-size="13" text-anchor="middle">Score 0&#8211;100</text>
-  <text class="s" x="680" y="146" font-size="11" text-anchor="middle">and a verdict</text>
+  <rect class="box" x="519.5" y="96.5" width="116" height="72" rx="8" />
+  <text class="k" x="577.5" y="126" font-size="13" text-anchor="middle">Score 0&#8211;100</text>
+  <text class="s" x="577.5" y="146" font-size="11" text-anchor="middle">and a verdict</text>
 
-  <path class="arrow" d="M750 132 H774" marker-end="url(#a)" />
+  <path class="arrow" d="M635.5 132.5 H655.5" marker-end="url(#a)" />
 
-  <rect class="box" x="780" y="96" width="160" height="72" rx="8" />
-  <text class="t" x="860" y="120" font-size="13" text-anchor="middle">Badge and card</text>
-  <text class="s" x="860" y="139" font-size="11" text-anchor="middle">every finding shown,</text>
-  <text class="s" x="860" y="154" font-size="11" text-anchor="middle">in plain words</text>
+  <rect class="box" x="661.5" y="96.5" width="140" height="72" rx="8" />
+  <text class="t" x="731.5" y="120" font-size="13" text-anchor="middle">Badge and card</text>
+  <text class="s" x="731.5" y="139" font-size="11" text-anchor="middle">every finding shown,</text>
+  <text class="s" x="731.5" y="154" font-size="11" text-anchor="middle">in plain words</text>
 
   <!-- The optional model is drawn as a tributary rather than a stage, which is what it is. -->
-  <rect class="box-soft" x="540" y="228" width="280" height="66" rx="8" />
-  <text class="t" x="680" y="252" font-size="12" text-anchor="middle">On-device AI &#183; optional</text>
-  <text class="s" x="680" y="270" font-size="11" text-anchor="middle">reads wording only, never domains</text>
-  <text class="s" x="680" y="285" font-size="11" text-anchor="middle">at most 15 of the 100 points</text>
+  <rect class="box-soft" x="447.5" y="228.5" width="260" height="66" rx="8" />
+  <text class="t" x="577.5" y="252" font-size="12" text-anchor="middle">On-device AI &#183; optional</text>
+  <text class="s" x="577.5" y="270" font-size="11" text-anchor="middle">reads wording only, never domains</text>
+  <text class="s" x="577.5" y="285" font-size="11" text-anchor="middle">at most 15 of the 100 points</text>
 
-  <path class="arrow" stroke-dasharray="5 4" d="M680 228 V176" marker-end="url(#a)" />
-  <text class="s" x="694" y="204" font-size="11">adjusts, cannot originate</text>
+  <path class="arrow" stroke-dasharray="5 4" d="M577.5 228.5 V176.5" marker-end="url(#a)" />
+  <text class="s" x="591" y="204" font-size="11">adjusts, cannot originate</text>
 </svg>

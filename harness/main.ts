@@ -478,6 +478,11 @@ async function renderCardOnly(state: HarnessState): Promise<void> {
  *    Normal flow puts it at a known offset instead.
  *  - The entrance animation fades and rises over 140ms, so a capture can land mid-transition and come
  *    out faint or displaced.
+ *  - Below 481px the card spans the window, and a window sized to the card is always that narrow. The
+ *    still keeps the 392px a desktop Gmail window gives it, and clears the narrow layout's insets, which
+ *    in normal flow would shift the card instead of placing it.
+ *  - The 32px shadow is wider than the frame the README leaves room for, and an image edge cuts it off
+ *    as a grey rectangle. The still's shadow is drawn small enough to end inside the frame.
  *
  * The height cap is *kept*, at the value a normal window produces, so the card is the size and shape a
  * reader sees, scrolled content included. `tall=1` lifts it, for reviewing a whole card in one image;
@@ -491,7 +496,11 @@ function flattenForStillImage(host: Element): void {
       /* relative, not static: the state-colour strip is an absolutely positioned ::before, and a static
          panel is not its containing block, so the strip escapes to the page edge. */
       position: relative;
+      inset: auto;
+      width: 392px;
+      max-width: none;
       max-height: ${tall ? 'none' : '620px'};
+      box-shadow: 0 2px 5px rgb(0 0 0 / 10%), 0 1px 2px rgb(0 0 0 / 6%);
       animation: none;
     }
   `;

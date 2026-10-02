@@ -84,7 +84,11 @@
         display: none;
       }
 
-      /* Narrow enough that the card does not sit over the text in a screenshot. In Gmail it may. */
+      /*
+        The README's in-message shot is 838px wide, GitHub's README column, which is too narrow for the
+        message and the card side by side; the card sits over the body there, as it can in Gmail. Wider
+        windows keep the two apart.
+      */
       .reader {
         max-width: 640px;
         padding: 24px 28px 60px;
@@ -173,11 +177,12 @@
         ?view=card: the card alone, for a close-up image.
 
         The card is laid out in normal flow here (see flattenForStillImage), so the frame only supplies
-        room for its drop shadow. 16px, matching the inset it keeps from the window edge in Gmail.
+        room for its drop shadow. 6px at the sides keeps the image at 404px, so the README can set two
+        side by side inside its 838px column unscaled; the shadow falls downward, so the bottom keeps more.
       */
       .card-frame {
         display: inline-block;
-        padding: 16px;
+        padding: 6px 6px 10px;
       }
 
       /* Transparent so the capture has no background of its own to clash with a README theme. */
