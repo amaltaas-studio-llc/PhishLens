@@ -521,6 +521,43 @@ describe('when the page is hidden while work is in flight', () => {
 });
 
 /**
+ * After the extension is reloaded, a Gmail tab keeps the old script with Chrome's APIs cut away, and
+ * `pagehide` still reaches it. A throw there is uncaught and lands on the extension's error page.
+ */
+describe('when the extension has been reloaded under an open tab', () => {
+  function orphan(): void {
+    Object.defineProperty(globalThis, 'chrome', {
+      value: { runtime: { sendMessage: () => Promise.reject(new Error('context invalidated')) } },
+      configurable: true,
+      writable: true,
+    });
+  }
+
+  it('stops without throwing', () => {
+    orphan();
+    expect(() => {
+      controller.stop();
+    }).not.toThrow();
+  });
+
+  it('stays inert when started', async () => {
+    controller.stop();
+    document.body.replaceChildren();
+    orphan();
+
+    const orphaned = new Controller(new FakeAdapter());
+    await expect(orphaned.start()).resolves.toBeUndefined();
+    await vi.advanceTimersByTimeAsync(500);
+    await flush();
+
+    expect(badgeIsOnScreen()).toBe(false);
+    expect(() => {
+      orphaned.stop();
+    }).not.toThrow();
+  });
+});
+
+/**
  * An inference already in flight belongs to the settings that have just been replaced. Its late answer
  * must neither repaint the view nor be kept as the new model's reading.
  */

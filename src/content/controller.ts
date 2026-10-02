@@ -134,6 +134,18 @@ export class Controller {
   async start(): Promise<void> {
     const settings = await requestSettings();
     if (this.#stopped) return;
+    /*
+     * A tab restored from the back/forward cache after the extension was reloaded or updated still runs
+     * this script, but Chrome has cut it off: `chrome.storage` is gone and nothing can be asked of the
+     * worker. Scoring there would use default settings in place of the user's trust list and model, so
+     * the orphan stays inert until the tab is reloaded and the current version is injected.
+     */
+    if (!extensionContextAlive()) {
+      this.#stopped = true;
+      logger.info('extension was reloaded; reload the tab to analyse messages again');
+      return;
+    }
+    this.#settings = settings;
     this.#settings = settings;
     logger.info('starting', { aiMode: this.#settings.aiMode, adapter: this.#adapter.id });
 
@@ -151,8 +163,12 @@ export class Controller {
     this.#readings.clear();
     this.#observer.stop();
     this.#listMarks.stop();
-    chrome.storage.onChanged.removeListener(this.#handleStorageChanged);
-    chrome.runtime.onMessage.removeListener(this.#handleTabRequest);
+    // `pagehide` reaches a script orphaned by an extension reload, whose `chrome.storage` no longer
+    // exists; its listeners died with the context, so there is nothing left to remove.
+    if (extensionContextAlive()) {
+      chrome.storage.onChanged.removeListener(this.#handleStorageChanged);
+      chrome.runtime.onMessage.removeListener(this.#handleTabRequest);
+    }
     this.#panel.close();
     this.#badge.remove();
     this.#highlighter.dispose();
@@ -622,6 +638,15 @@ export class Controller {
       () => this.#adapter.accountAddress(),
     );
   }
+}
+
+/**
+ * Chrome clears `runtime.id` and removes `storage` on a content script whose extension has been reloaded
+ * or removed. The typings declare both always present, which is the assumption that fails here.
+ */
+function extensionContextAlive(): boolean {
+  const api = (globalThis as { chrome?: { runtime?: { id?: string }; storage?: unknown } }).chrome;
+  return api?.runtime?.id !== undefined && api.storage !== undefined;
 }
 
 /** The result is passed separately so this cannot be called before there is one to render. */
