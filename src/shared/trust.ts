@@ -1,8 +1,8 @@
 /**
  * Senders the user has said they trust.
  *
- * An allowlist is the most dangerous feature a phishing tool can have — the whole point of the attack is
- * to look like someone you trust — so the shape of this one is defensive by construction. Three rules,
+ * An allowlist is the most dangerous feature a phishing tool can have (the whole point of the attack is
+ * to look like someone you trust), so the shape of this one is defensive by construction. Three rules,
  * each enforced here or by the single caller in `rules/index.ts` rather than by convention:
  *
  *  1. **Trust needs proof.** An entry only applies to a message Gmail could cryptographically tie to that
@@ -11,8 +11,8 @@
  *  2. **Trust never silences.** It feeds the existing dampening stage, which lowers the weight of
  *     *wording* findings and leaves every finding visible. It cannot remove a finding, and any real
  *     technical finding cancels it outright.
- *  3. **Trust is as narrow as the sender is.** A domain nobody in particular controls — Gmail, Outlook,
- *     a disposable mailbox — cannot be trusted as a domain at all, only as one address, because trusting
+ *  3. **Trust is as narrow as the sender is.** A domain nobody in particular controls (Gmail, Outlook,
+ *     a disposable mailbox) cannot be trusted as a domain at all, only as one address, because trusting
  *     `gmail.com` would mean trusting everybody.
  *
  * Pure, and importable from both the analysis engine and the UI: deciding whether to *offer* trust is a
@@ -47,7 +47,7 @@ export function trustEntryFor(senderEmail: string): string | null {
 /**
  * Platforms that send every customer's mail from a subdomain of one domain: `acme.zendesk.com` is
  * Acme's help desk, and `northwind.zendesk.com` is anybody who signed up yesterday. The registrable
- * domain names the platform, so trusting it would trust every tenant — the `gmail.com` problem again —
+ * domain names the platform, so trusting it would trust every tenant (the `gmail.com` problem again),
  * and the entry is the tenant's full host instead.
  *
  * A short list on purpose, of platforms whose tenant subdomain *is* the sending address. Bulk senders
@@ -83,7 +83,7 @@ export function matchingTrustEntry(
  * Strict about *what* counts. DMARC passing means the message aligned with the From domain under a policy
  * that domain published, and an aligned DKIM signature means the domain signed the message itself. SPF
  * alone is never accepted: it authenticates the envelope rather than the From header, so it passes for
- * mail that merely *claims* the From address — the one case this function exists to exclude. A `?` avatar
+ * mail that merely *claims* the From address, the one case this function exists to exclude. A `?` avatar
  * means Gmail could not verify the sender at all, which overrides anything else read from the page.
  *
  * Liberal about *where* the evidence comes from, which it has to be. Named verdicts (`dkim: pass`) are
@@ -93,7 +93,7 @@ export function matchingTrustEntry(
  * verified, and omits it entirely when there is no valid signature. Presence *is* the verdict.
  *
  * Still best-effort, because a content script reads rendered HTML rather than headers, and the rows live
- * behind Gmail's "show details" toggle. No evidence returns `false` and trust does not apply — the safe
+ * behind Gmail's "show details" toggle. No evidence returns `false` and trust does not apply: the safe
  * direction, since the cost is a false positive the user has already seen and the alternative is an
  * allowlist that works on unauthenticated mail.
  */

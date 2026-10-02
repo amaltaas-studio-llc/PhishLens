@@ -25,7 +25,7 @@ list-row triage (sender only)
 | Pure engine | `src/analysis/` | No `chrome.*`, no `document`, no `fetch`, no `Date.now` (lint-enforced) |
 | Shared helpers | `src/shared/` | Pure, except the `chrome.*` wrappers in `messaging.ts`, which touch `chrome` only when called |
 | Gmail DOM | `src/gmail/` | Selectors only in `selectors.ts` |
-| UI | `src/ui/`, welcome, options, popup | `el({ text })` only — never `innerHTML` or any other HTML sink (lint-enforced, and grepped in bundles) |
+| UI | `src/ui/`, welcome, options, popup | `el({ text })` only, never `innerHTML` or any other HTML sink (lint-enforced, and grepped in bundles) |
 | Background | `src/background/` | Sole `fetch` site (lint-enforced); URL from settings only |
 
 The content script holds analysis state and the model session because MV3 workers die after idle
@@ -35,13 +35,13 @@ The content script holds analysis state and the model session because MV3 worker
 
 ![Pipeline: extract, deterministic checks, optional model, aggregate score, badge and card](assets/pipeline.svg)
 
-1. **Extract** the open message; if it is not scorable, show **Not checked** — never a Low Risk all-clear
+1. **Extract** the open message; if it is not scorable, show **Not checked**, never a Low Risk all-clear
    ([adr/0003](adr/0003-gmail-two-signals.md)).
-2. **Deterministic rules** — identity, links, content (with language packs), attachments, authentication
+2. **Deterministic rules**: identity, links, content (with language packs), attachments, authentication
    ([DETECTION.md](DETECTION.md)).
-3. **Optional model** — Chrome on-device or a user-run server; capped and corroboration-gated
+3. **Optional model**: Chrome on-device or a user-run server; capped and corroboration-gated
    ([LOCAL-AI.md](LOCAL-AI.md), [adr/0006](adr/0006-llm-cannot-outvote-checks.md)).
-4. **Aggregate** — category weights sum to 100; severity floors catch single-dimension attacks
+4. **Aggregate**: category weights sum to 100; severity floors catch single-dimension attacks
    ([adr/0004](adr/0004-scoring-floors-and-weights.md)). Numbers live in `src/analysis/scoring/config.ts`.
 
 ## Layout (contributor map)
@@ -80,7 +80,7 @@ Full index: [adr/README.md](adr/README.md).
 ## Known limitations
 
 - Curated public-suffix and brand tables, not exhaustive lists.
-- No raw RFC 5322 headers — authentication is what Gmail shows.
+- No raw RFC 5322 headers; authentication is what Gmail shows.
 - Body is `textContent` only (no OCR for image-only mail).
 - Wording packs: English plus Spanish, French, German, Portuguese, Italian, Dutch, Hindi, Hinglish;
   other languages lean on identity, link and attachment checks (and the model when enabled).

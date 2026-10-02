@@ -4,8 +4,8 @@
  * Split from `load.ts` so the UI harness can render the same corpus in a browser, where `node:fs` does
  * not exist. Everything deciding what a fixture *means* lives here; `load.ts` only finds the files.
  *
- * Fixture files describe a message the way a *human* would write it down — anchor text and href,
- * filenames — and this derives the fields the Gmail adapter derives (`normalizedDomain`, `extension`)
+ * Fixture files describe a message the way a *human* would write it down (anchor text and href,
+ * filenames), and this derives the fields the Gmail adapter derives (`normalizedDomain`, `extension`)
  * using the same shared helpers the adapter uses. That indirection is deliberate: if fixtures hard-coded
  * `normalizedDomain`, a bug in the real normalisation would be invisible to the fixture tests, because
  * the fixtures would carry the correct answer that production code failed to compute.
@@ -73,7 +73,7 @@ export function toFixture(raw: RawFixture): Fixture {
 /**
  * Applies the same normalisation the Gmail adapter applies, and carries the originals in `raw`.
  *
- * A fixture is written the way the *message* reads — `DoNoT.rEpLy@…`, a subject with its padding — and
+ * A fixture is written the way the *message* reads (`DoNoT.rEpLy@…`, a subject with its padding), and
  * the adapter case-folds the address and collapses the subject's whitespace before analysis sees them.
  * Reproducing that split here means a fixture cannot accidentally hand the detectors a raw value that
  * production would never give them, in either direction.

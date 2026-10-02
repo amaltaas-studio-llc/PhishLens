@@ -35,20 +35,20 @@ const MAX_TECHNIQUES = 6;
  * and deletes the paragraph they style.
  *
  * `font-size` is capped at 2px rather than 0: a one-pixel font is the standard preheader idiom and is
- * unreadable in the same way zero is. Offsets have to be large and negative — `left:-2px` is a nudge,
+ * unreadable in the same way zero is. Offsets have to be large and negative: `left:-2px` is a nudge,
  * `left:-9999px` is a removal. Zero is spelled out by `ZERO` rather than matched loosely, for the reason
  * recorded there.
  */
 const DECL = String.raw`(?:^|;)\s*`;
 
 /**
- * Zero however CSS spells it — `0`, `00`, `0.0`, `.0`, `0.` — and nothing else.
+ * Zero however CSS spells it (`0`, `00`, `0.0`, `.0`, `0.`) and nothing else.
  *
  * Written out because the obvious `0(\.\d+)?` reads the leading zero of `0.9em` as the whole value and
  * treats nine-tenths of the parent font as invisible. Relative units make that the common case rather than
  * a curiosity: `font-size:0.9em` is how a great deal of legitimate mail sets small print, and since a
  * caller strips what this matches, the mistake is not a spurious finding but a paragraph the reader can see
- * being removed from the analysis — the direction an attacker would choose.
+ * being removed from the analysis, the direction an attacker would choose.
  */
 const ZERO = String.raw`(?:0+(?:\.0+)?|\.0+)`;
 
@@ -65,7 +65,7 @@ const END = String.raw`\s*(?:!\s*important\b\s*)?(?:;|$)`;
 /**
  * Clipping, without which a zero dimension hides nothing.
  *
- * Content in a box with no height is not erased, it overflows and is drawn anyway — which is why the
+ * Content in a box with no height is not erased, it overflows and is drawn anyway, which is why the
  * preheader idiom is `max-height:0;overflow:hidden` and never `max-height:0` alone. Requiring the pair is
  * what separates concealment from the `height:0` of a spacer row or a layout reset, whose *children* hold
  * text the reader can see.
@@ -82,7 +82,7 @@ interface HidingDeclaration {
    *
    * `display:none` and `opacity:0` cannot be escaped from inside: the subtree is not rendered, or is
    * composited at zero as a whole, whatever its children ask for. A zero font size is only the parent's
-   * own, and a descendant naming a size that does not depend on the parent's is drawn at that size —
+   * own, and a descendant naming a size that does not depend on the parent's is drawn at that size,
    * which is the entire purpose of `font-size:0` on a container, since it collapses the whitespace between
    * tags without touching the text inside them. Treating the container as hidden deletes a paragraph the
    * reader is looking at.
@@ -98,7 +98,7 @@ interface HidingDeclaration {
  *
  * `em`, `%`, `ex` and `ch` are deliberately absent: each is a multiple of the inherited size, and any
  * multiple of zero is zero, so `font-size:1em` inside `font-size:0` hides exactly as well as nothing at
- * all. `rem` is present because it is the exception that looks like the rule — it resolves against the
+ * all. `rem` is present because it is the exception that looks like the rule: it resolves against the
  * root element, which here is Gmail's page, not the container. `initial` is `medium`. The values a hiding
  * declaration would itself match (`1px`, `.05rem`) are excluded where this is consulted, not here.
  */
@@ -116,7 +116,7 @@ const HIDING_DECLARATIONS: readonly HidingDeclaration[] = [
   },
   /*
    * Zero, or close enough that nothing is legible: `opacity:0.01` is a common way of writing it, chosen
-   * because some clients drop an element whose opacity is exactly zero. Five percent is the ceiling —
+   * because some clients drop an element whose opacity is exactly zero. Five percent is the ceiling;
    * faded secondary text sits at a half or more, never anywhere near this.
    */
   {
@@ -189,7 +189,7 @@ function declarationFor(technique: string): HidingDeclaration | undefined {
  * The descendants drawn in spite of the ancestor's declaration, outermost only.
  *
  * Bounded like the outer scan, and inline styles only, for the same reason: a class rule Gmail rewrote is
- * not readable from here. The consequence is the safe one — a subtree whose override lives in a stylesheet
+ * not readable from here. The consequence is the safe one: a subtree whose override lives in a stylesheet
  * is still treated as hidden, which under-reports the body rather than inventing concealment.
  *
  * An override with no text in it frees nothing anyone could read. Counting it was how one empty
@@ -250,7 +250,7 @@ export function countContentChars(text: string): number {
  * Neither appears in any selector, which is how the message observer came to ignore both: it derives the
  * attributes it watches from `selectors.ts`, and a watch list built only from what is used to *find*
  * elements misses what is used to *read* them. Removing `display:none` from a paragraph changes the
- * extracted body — the concealed text moves from `hiddenText` into it — and produced no re-assessment.
+ * extracted body (the concealed text moves from `hiddenText` into it) and produced no re-assessment.
  */
 export const VISIBILITY_ATTRIBUTES: readonly string[] = ['style', 'hidden'];
 
@@ -270,7 +270,7 @@ export interface HiddenSubtree {
 }
 
 export interface HiddenScan {
-  /** Hidden subtrees. Outermost only — a hidden child of a hidden parent is not extra. */
+  /** Hidden subtrees. Outermost only; a hidden child of a hidden parent is not extra. */
   roots: HiddenSubtree[];
   techniques: string[];
 }
@@ -282,7 +282,7 @@ export interface HiddenScan {
  * a hidden `<div>` of ten hidden `<span>`s as eleven findings and count its text eleven times.
  *
  * `aria-hidden="true"` is deliberately not treated as hiding. It instructs screen readers to skip an
- * element that is *on screen* — decorative arrows, icons, spacer cells — and mail uses it that way
+ * element that is *on screen* (decorative arrows, icons, spacer cells), and mail uses it that way
  * constantly. Since a caller removes what this returns from the visible body, honouring it would delete
  * text the reader can see, which both loses findings and hands an attacker a one-attribute way to keep
  * wording out of the analysis while still showing it.
@@ -296,7 +296,7 @@ export function findHiddenSubtrees(root: Element): HiddenScan {
     if (scanned >= MAX_ELEMENTS_SCANNED) break;
     scanned += 1;
 
-    // Document order, so an ancestor is always seen before its descendants — and since no root is
+    // Document order, so an ancestor is always seen before its descendants, and since no root is
     // inside another, only the most recent one can contain this element.
     if (roots.at(-1)?.element.contains(element) === true) continue;
 

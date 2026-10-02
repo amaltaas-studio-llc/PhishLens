@@ -2,7 +2,7 @@
  * Safe element construction.
  *
  * The single most important property of the UI layer: **attacker-controlled email content is never
- * parsed as HTML.** Rather than relying on remembering that, this helper makes it structurally true —
+ * parsed as HTML.** Rather than relying on remembering that, this helper makes it structurally true:
  * `el()` has no parameter that accepts markup, and text is only ever assigned via `textContent`.
  * ESLint additionally bans `innerHTML`, `outerHTML`, and `insertAdjacentHTML` project-wide.
  *
@@ -64,8 +64,8 @@ export interface SvgOptions {
  * The same guarantee as `el()`, for the few shapes the card draws.
  *
  * No text parameter at all, not even a safe one: nothing the card draws in SVG is a word, and every word
- * it shows is HTML text beside the drawing. That keeps the drawing decorative — it is marked
- * `aria-hidden` — and keeps message content out of a namespace `el()`'s callers never have to think about.
+ * it shows is HTML text beside the drawing. That keeps the drawing decorative (it is marked
+ * `aria-hidden`) and keeps message content out of a namespace `el()`'s callers never have to think about.
  */
 export function svg<K extends keyof SVGElementTagNameMap>(
   tag: K,

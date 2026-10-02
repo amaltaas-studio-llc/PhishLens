@@ -2,7 +2,7 @@
  * What the popup says, separated from how it is drawn.
  *
  * Pure: no DOM, no `chrome`, no storage. That is what lets the wording be asserted in Vitest, which
- * matters more here than anywhere else in the UI — the popup is the surface a user consults when
+ * matters more here than anywhere else in the UI: the popup is the surface a user consults when
  * something looks wrong, so a sentence that misdescribes the state is worse than no popup at all.
  *
  * The rule the whole file follows: never let "nothing was found" and "nothing was checked" share a
@@ -52,7 +52,7 @@ const PART_NOUNS: Readonly<Record<MessagePart, string>> = {
   body: 'body text',
 };
 
-/** "who it is from", "who it is from and its text" — a list a sentence can contain. */
+/** "who it is from", "who it is from and its text": a list a sentence can contain. */
 function describeParts(missing: readonly MessagePart[]): string {
   return formatList(
     missing.map((part) => PART_NAMES[part]),
@@ -164,7 +164,7 @@ export interface HealthRow {
  * What to say about how well Gmail is being read, or `null` when there is nothing to say.
  *
  * Silent in the healthy case on purpose. This row is the only place a *degrading* extraction becomes
- * visible — a selector list on its last fallback, a subject going unread on every message — but a row
+ * visible (a selector list on its last fallback, a subject going unread on every message), but a row
  * that were always present, usually saying "fine", is a row nobody reads by the time it matters.
  */
 export function healthRow(health: TabHealth): HealthRow | null {
@@ -174,7 +174,7 @@ export function healthRow(health: TabHealth): HealthRow | null {
     return {
       headline: `${String(health.unscorable)} of ${String(health.seen)} messages could not be read`,
       detail:
-        'Those were not scored. This is usually Gmail having changed its page structure, which is fixable — the report below names the part that stopped matching and contains none of your mail.',
+        'Those were not scored. This is usually Gmail having changed its page structure, which is fixable: the report below names the part that stopped matching and contains none of your mail.',
     };
   }
 
@@ -220,7 +220,7 @@ export interface ReportRow {
  * Disagreeing with a score is a bug report about a *working* install.
  *
  * Absent only when no content script answered, where a report would describe nothing. The note names
- * what the reader is about to paste, because that is the promise the report has to keep — a user who
+ * what the reader is about to paste, because that is the promise the report has to keep: a user who
  * cannot tell whether their mail is in it has no way to decide whether to attach it to a public issue.
  */
 export function reportRow(state: PopupState): ReportRow | null {
@@ -261,9 +261,9 @@ const MODE_LABELS: Readonly<Record<AiMode, string>> = {
 const STATUS_TEXT: Readonly<Record<SemanticStatus, string>> = {
   ready: 'Assessment ready',
   pending: 'Reading the message…',
-  off: 'Switched off — technical checks only',
+  off: 'Switched off: technical checks only',
   // Says why and what it means, because "skipped" alone reads as either a fault or an all-clear.
-  skipped: 'Not asked — no technical finding for it to weigh',
+  skipped: 'Not asked: no technical finding for it to weigh',
   unavailable: 'Unavailable',
   'no-output': 'Returned nothing usable for this message',
   error: 'Could not finish',
@@ -275,7 +275,7 @@ export interface AiRow {
   detail: string;
   /**
    * True when a connection test would tell the user something. Only ever set for a configured model
-   * server: the on-device model has nothing to test — it is either in the browser or it is not — and
+   * server: the on-device model has nothing to test (it is either in the browser or it is not), and
    * offering a button that cannot help is how a diagnostic surface loses its credibility.
    */
   testable: boolean;
@@ -303,7 +303,7 @@ export function aiRow(settings: Settings, state: PopupState): AiRow {
   // A message nothing could be read from never reached the semantic stage, and saying the model is
   // "ready when you open a message" while one is open reads as a second, contradictory failure.
   if (state.kind === 'unreadable') {
-    return { label, detail: 'Not used — this message was not read', testable, fix: null };
+    return { label, detail: 'Not used: this message was not read', testable, fix: null };
   }
 
   // Only a scored message has been through the semantic stage. Before that there is a configuration to
@@ -324,8 +324,8 @@ export function aiRow(settings: Settings, state: PopupState): AiRow {
 /**
  * The one line of advice, where there is any worth giving.
  *
- * `no-output` and `error` on a user-run server are the two that sent people to a console in practice —
- * a rejected origin and a reply truncated by a reasoning model both surface as silence — so those are
+ * `no-output` and `error` on a user-run server are the two that sent people to a console in practice
+ * (a rejected origin and a reply truncated by a reasoning model both surface as silence), so those are
  * the ones that name the button that explains them.
  */
 function fixFor(status: SemanticStatus, aiMode: AiMode): string | null {

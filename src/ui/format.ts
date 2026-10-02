@@ -40,14 +40,14 @@ export function ariaLabel(classification: Classification, score: number, finding
  */
 const UNREADABLE_CAUSES: Readonly<Record<MessagePart, string>> = {
   sender:
-    'PhishLens could not read who this message is from. Most of what it checks — whether the sending domain imitates a brand, whether it matches the display name, whether it belongs in this conversation — depends on that, so it has not produced a score.',
+    'PhishLens could not read who this message is from. Most of what it checks (whether the sending domain imitates a brand, whether it matches the display name, whether it belongs in this conversation) depends on that, so it has not produced a score.',
   body: 'PhishLens could not read the text of this message, so it has not checked its links, wording, or attachments.',
   subject: 'PhishLens could not read the subject of this message.',
 };
 
 /**
  * One paragraph of the card's explanation. `emphatic` travels with the text rather than being inferred
- * from position, because the number of preceding paragraphs depends on how many parts were unread — and
+ * from position, because the number of preceding paragraphs depends on how many parts were unread, and
  * the paragraph that must not be skimmed past would have moved.
  */
 export interface UnreadableNote {
@@ -125,8 +125,8 @@ export function isLocatable(signal: SecuritySignal): boolean {
  * a signal carrying both a URL and a value showed the value under the heading for a link.
  *
  * The kind is what the card styles by, and the distinction is one a reader needs: `quote` is words the
- * sender wrote, while `value` and `url` are things PhishLens measured — a domain, a filename, where a
- * link actually goes — and are drawn as code so they are never mistaken for prose.
+ * sender wrote, while `value` and `url` are things PhishLens measured (a domain, a filename, where a
+ * link actually goes) and are drawn as code so they are never mistaken for prose.
  */
 export interface Evidence {
   kind: 'value' | 'url' | 'quote';
@@ -193,7 +193,7 @@ export function scoreSummary(
  * The assessment's explanation without the reasons at its end, which the card lists separately.
  *
  * Split at the first occurrence of the prefix, which `semanticToSignals` places after its own sentences
- * and before the model's words — so nothing the model wrote can move the split earlier.
+ * and before the model's words, so nothing the model wrote can move the split earlier.
  */
 export function assessmentExplanation(description: string): string {
   const at = description.indexOf(` ${REASONING_PREFIX}`);
@@ -262,7 +262,7 @@ export function timingLine(
 
 /** Shown when there *is* an assessment: what the AI section is and is not. */
 export const AI_DISCLAIMER =
-  'The findings above are technical observations. The assessment below is a language model’s reading of the message’s intent — informed, but not proof.';
+  'The findings above are technical observations. The assessment below is a language model’s reading of the message’s intent: informed, but not proof.';
 
 /**
  * Why there is no assessment, keyed by how the semantic stage ended. `null` means there is one.
@@ -300,7 +300,7 @@ const AI_ABSENCE_NOTES: Readonly<Record<SemanticStatus, ((source: string) => str
  * modes differ in where the message went, and a note that says "the on-device model" while a server was
  * doing the reading misleads about exactly the thing a privacy-conscious reader is checking.
  *
- * The `off` entry is never rendered — that note takes no source — but a `Record` costs nothing and means
+ * The `off` entry is never rendered (that note takes no source), but a `Record` costs nothing and means
  * a fifth mode cannot be added without wording.
  */
 const ANALYZER_NAMES: Readonly<Record<AiMode, string>> = {

@@ -122,7 +122,7 @@ const fixtures: Fixture[] = (JSON.parse(__PHISHLENS_FIXTURES__) as RawFixture[])
  * A canned verdict, so the AI section renders without a model present.
  *
  * Shaped like something the on-device model actually returns: a risk it can justify in words, with
- * `reasons` that stay clear of domains and links — the boundary `llm/prompt.ts` draws, since those are
+ * `reasons` that stay clear of domains and links: the boundary `llm/prompt.ts` draws, since those are
  * claims the model cannot verify and deterministic code already checks.
  */
 function cannedVerdict(email: EmailMessage, aiMode: AiMode): SemanticAnalysis {
@@ -263,7 +263,7 @@ const panel = new Panel({
     panel.close();
     setParam('card', '0');
   },
-  // There is no storage here, so the button moves the URL instead — which is also the only way to see
+  // There is no storage here, so the button moves the URL instead, which is also the only way to see
   // what the card looks like after the click.
   onTrustChange: (_entry, trusted) => {
     setParam('trust', trusted ? 'trusted' : 'offer');
@@ -351,7 +351,7 @@ async function viewFor(state: HarnessState): Promise<PanelView> {
  * One header row per classification, to show the badge's range in a single image.
  *
  * The examples are chosen by analysing the corpus rather than by being listed here, so the image can
- * only ever show bands the fixtures genuinely produce — currently three, since nothing in the corpus is
+ * only ever show bands the fixtures genuinely produce: currently three, since nothing in the corpus is
  * designed to land in `caution`. A hardcoded list would quietly start lying the day a fixture's score
  * moved across a threshold.
  */
@@ -395,8 +395,8 @@ async function renderBadges(semantic: SemanticStatus): Promise<void> {
  * A message list, in Gmail's own row shape, with the real `ListMarks` scanner over it.
  *
  * The whole corpus as one inbox, which is the view that answers the question the feature lives or dies on:
- * how much of an ordinary inbox ends up marked. Reading that off a screenshot is the only way to judge it
- * — a test can assert that no legitimate fixture is marked, but not whether the result looks like a tool
+ * how much of an ordinary inbox ends up marked. Reading that off a screenshot is the only way to judge it:
+ * a test can assert that no legitimate fixture is marked, but not whether the result looks like a tool
  * worth leaving switched on.
  *
  * The markup mirrors `SELECTORS.listRow` and its neighbours rather than being styled to taste: the point
@@ -437,7 +437,7 @@ function renderList(): void {
               class: 'y6',
               children: [
                 el('span', { class: 'bog', text: email.subject ?? '(no subject)' }),
-                el('span', { class: 'snippet', text: ` — ${email.bodyText.slice(0, 90)}` }),
+                el('span', { class: 'snippet', text: ` - ${email.bodyText.slice(0, 90)}` }),
               ],
             }),
           ],
@@ -471,7 +471,7 @@ async function renderCardOnly(state: HarnessState): Promise<void> {
 
 /**
  * Removes the two behaviours that are right in Gmail and wrong in a photograph, by adding a stylesheet
- * to the card's shadow root. The component's own CSS is not modified — this applies only in `view=card`.
+ * to the card's shadow root. The component's own CSS is not modified; this applies only in `view=card`.
  *
  *  - `position: fixed` pins the card to a viewport corner, so where it lands in the picture depends on
  *    the window size, and Chrome clamps small windows while still capturing at the size asked for.

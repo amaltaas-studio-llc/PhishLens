@@ -45,7 +45,7 @@ export interface CloudAnalyzeRequest {
 }
 
 /**
- * The message half of a prompt for a model server the user runs — exactly what the on-device model is
+ * The message half of a prompt for a model server the user runs: exactly what the on-device model is
  * given, because that is the mode this one substitutes for.
  *
  * Note what is *not* here: no URL, no model name, and no system prompt. The worker reads the first two
@@ -121,8 +121,8 @@ function isResponse(value: unknown): boolean {
 /**
  * What the toolbar popup can ask the tab about the message on screen.
  *
- * A separate union from `ExtensionRequest` because it travels a different route — `chrome.tabs.
- * sendMessage`, which reaches only content scripts — and is answered by different code. Merging them
+ * A separate union from `ExtensionRequest` because it travels a different route (`chrome.tabs.
+ * sendMessage`, which reaches only content scripts) and is answered by different code. Merging them
  * would put requests the worker cannot handle into the worker's exhaustive switch, and requests the
  * content script cannot handle into its own.
  *
@@ -151,7 +151,7 @@ export type TabRequest = GetTabStatusRequest | OpenPanelRequest | GetHealthRepor
 /**
  * The state of the tab, as much of it as the popup needs.
  *
- * `headlines` carries finding *titles* — the extension's own wording, not message content — so the
+ * `headlines` carries finding *titles* (the extension's own wording, not message content), so the
  * popup can say what was found without re-deriving anything. The sender and subject are deliberately
  * absent: the popup is about whether PhishLens is working, and copying mail into a second surface buys
  * nothing when the card beside the message already names it.
@@ -202,8 +202,8 @@ export function isTabRequest(value: unknown): value is TabRequest {
 }
 
 /**
- * Asks one tab. Resolves to `null` for every reason a tab may not answer — no content script on the
- * page, a tab that has navigated away, a page still loading — because to the popup these are one case:
+ * Asks one tab. Resolves to `null` for every reason a tab may not answer (no content script on the
+ * page, a tab that has navigated away, a page still loading), because to the popup these are one case:
  * there is nothing to report about this tab.
  */
 export async function sendTabMessage(

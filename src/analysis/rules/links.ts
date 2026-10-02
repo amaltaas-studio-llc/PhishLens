@@ -3,7 +3,7 @@
  *
  * Everything here compares *what the user sees* against *where the click goes*. That comparison is
  * only sound because `buildContext` already normalised both sides through the platform URL parser
- * and unwrapped redirect wrappers — a raw string comparison would be trivially defeated by
+ * and unwrapped redirect wrappers; a raw string comparison would be trivially defeated by
  * `HTTPS://EVIL.EXAMPLE./x` versus `https://evil.example/x`.
  *
  * No detector in this file resolves DNS, issues a request, or follows a redirect over the network.
@@ -60,7 +60,7 @@ const FOLDED_BRANDS = BRANDS.map((brand) => ({
  * Three links to pages in one storage bucket produce three findings that read identically, and the panel
  * shows such a finding once (`distinctForDisplay`). The count is written here rather than there because
  * only here is it true: the list is about to be capped, and a panel counting what survived the cap would
- * report three of fifteen links. The cap and the scores are otherwise untouched — how much a repeated
+ * report three of fifteen links. The cap and the scores are otherwise untouched: how much a repeated
  * finding is worth is a scoring question, and collapsing a list for display is not the place to answer it.
  */
 function limit(findings: SecuritySignal[]): SecuritySignal[] {
@@ -85,7 +85,7 @@ function limit(findings: SecuritySignal[]): SecuritySignal[] {
  * Mail platforms rewrite hrefs to their own tracking host while the anchor still reads as the sender
  * wrote it, so the tracker's host disagreeing with the anchor is the expected state, not a finding. That
  * excuses the tracker and nothing behind it: when the destination could be decoded it is judged like any
- * other host, and when it could not, nothing is left to judge — which is the only case in which a tracker
+ * other host, and when it could not, nothing is left to judge, which is the only case in which a tracker
  * should silence a rule.
  */
 function judgedHosts(link: LinkAnalysis): LinkHost[] {
@@ -116,12 +116,12 @@ function displayedUrlMismatch(context: AnalysisContext): SecuritySignal[] {
 
     // One of a brand's own names linking to another of them. A footer reading "report a suspicious email
     // at brand.com/phishing" whose href is a short name under the brand's own TLD is the brand's own
-    // redirector, and the anti-phishing advice in genuine mail is where that shape appears most — so the
+    // redirector, and the anti-phishing advice in genuine mail is where that shape appears most, so the
     // rule was at its most confident, `critical`, on the one sentence written to prevent the attack.
     //
     // Scoped to the brand the *displayed* domain names, not to any brand, so it cannot launder a claim:
     // showing one brand's domain while linking to a different brand's is still a mismatch. The
-    // destination is checked with `brandOwns`, which counts the brand's top-level domains — comparing
+    // destination is checked with `brandOwns`, which counts the brand's top-level domains; comparing
     // against `domains` alone is what left the gap, since no list of second-level names covers a TLD
     // whose every registration is the brand's by registry agreement.
     const agrees = (host: LinkHost): boolean =>
@@ -133,8 +133,8 @@ function displayedUrlMismatch(context: AnalysisContext): SecuritySignal[] {
     if (agrees(destination)) {
       // The click does reach the address shown, by way of a host that is not it. A mail platform we
       // have not listed does exactly this, so on an ordinary address it is left to `redirect_chain`.
-      // Showing a *brand's* address while routing through somebody else is the laundering shape — an
-      // open redirect behind `paypal.com` lands wherever its owner likes next week — and is reported,
+      // Showing a *brand's* address while routing through somebody else is the laundering shape (an
+      // open redirect behind `paypal.com` lands wherever its owner likes next week) and is reported,
       // one step below a destination that plainly disagrees. The sender's own redirector is excused for
       // the reason given below.
       const via = hosts.find((host) => !agrees(host) && host.registrable !== context.senderRegistrable);
@@ -159,7 +159,7 @@ function displayedUrlMismatch(context: AnalysisContext): SecuritySignal[] {
 
     // The same rewrite, done by a platform we have not listed: the href points back at the sender's
     // own domain. Newsletter platforms (Substack, beehiiv, Kit) send from and redirect through one
-    // domain, so every outbound link in a newsletter reads as a mismatch — the observed false
+    // domain, so every outbound link in a newsletter reads as a mismatch: the observed false
     // positive this guard exists to remove.
     //
     // Suppressed rather than downgraded because there is nothing here to report: the sender is not
@@ -187,8 +187,8 @@ function displayedUrlMismatch(context: AnalysisContext): SecuritySignal[] {
     ) {
       continue;
     }
-    // The converse: a proven sender showing some other ordinary address — a former name, a sister
-    // brand — whose link lands on the sender's own site. Nobody's reputation is borrowed.
+    // The converse: a proven sender showing some other ordinary address (a former name, a sister
+    // brand) whose link lands on the sender's own site. Nobody's reputation is borrowed.
     if (!impersonatesBrand && context.senderProven && destination.registrable === context.senderRegistrable) {
       continue;
     }
@@ -227,7 +227,7 @@ function displayedUrlMismatch(context: AnalysisContext): SecuritySignal[] {
             ? 'Displayed government address links to another government address'
             : 'Displayed address goes through a link service',
           description: vetted
-            ? `The link is shown as "${displayedHost}" but goes to ${destination.hostname}. Both are under a registry that vets every registrant, so this is one agency's names, not a stranger's — but the address shown is still not where the click goes.`
+            ? `The link is shown as "${displayedHost}" but goes to ${destination.hostname}. Both are under a registry that vets every registrant, so this is one agency's names, not a stranger's, but the address shown is still not where the click goes.`
             : `The link is shown as "${displayedHost}" but goes to ${destination.hostname}, a link service whose final destination is not visible. Bulk mail is routinely sent this way; check where it lands before entering anything.`,
           evidence: {
             text: link.link.text,
@@ -240,7 +240,7 @@ function displayedUrlMismatch(context: AnalysisContext): SecuritySignal[] {
     }
 
     // A brand in the table, proven, showing another brand's address through its own click host, as a
-    // co-marketing offer does. Still reported — the displayed address is not where the click goes — but
+    // co-marketing offer does. Still reported (the displayed address is not where the click goes), but
     // not at the severity of a stranger doing it. Only a table brand qualifies, because a phisher can
     // authenticate a domain of their own in minutes and point a brand's address at it; what they cannot
     // do is be proven as a brand the table lists.
@@ -322,7 +322,7 @@ function anchorTextBrandMismatch(context: AnalysisContext): SecuritySignal[] {
       // Brand-scoped, because a domain two brands both list resolves to whichever the table names first.
       if (brandOwns(brand, destination.registrable)) break;
       // Bulk senders rewrite every href through their own click-tracking host, so a footer that links
-      // its social profiles by name — "LinkedIn", "Instagram", "YouTube" — has an anchor naming a brand
+      // its social profiles by name ("LinkedIn", "Instagram", "YouTube") has an anchor naming a brand
       // and a destination that is not that brand's. That is what a social footer *is*. The sender is
       // borrowing nobody's reputation, only routing through itself, which is the whole point of
       // `onSenderDomain`.
@@ -340,7 +340,7 @@ function anchorTextBrandMismatch(context: AnalysisContext): SecuritySignal[] {
       ) {
         break;
       }
-      // A newsletter's headline names brands in passing — "Norway cancels Microsoft contract" — and links
+      // A newsletter's headline names brands in passing ("Norway cancels Microsoft contract") and links
       // to the article, wherever it is hosted. Bait reads differently: it is the brand as a label, or an
       // action on something the brand holds, or it comes from a message presenting itself as the brand.
       if (
@@ -351,8 +351,8 @@ function anchorTextBrandMismatch(context: AnalysisContext): SecuritySignal[] {
         break;
       }
 
-      // A proven sender naming another brand as a bare label — "Follow on Instagram", a product it sells,
-      // "Outlook for iOS" in a signature — through a host of its own or its provider's is a mention, not
+      // A proven sender naming another brand as a bare label ("Follow on Instagram", a product it sells,
+      // "Outlook for iOS" in a signature) through a host of its own or its provider's is a mention, not
       // bait: it neither claims to be the brand nor asks for anything the brand holds. The table brand
       // itself, proven, linking a host the table does not list is the table's gap, not a deception.
       // Both stay reported at `medium`; a phisher authenticating a domain of their own still meets the
@@ -407,7 +407,7 @@ function ipAddressLinks(context: AnalysisContext): SecuritySignal[] {
         severity: 'low',
         score: 8,
         title: 'Link points to an address on a private network',
-        description: `${ipLinks.length === 1 ? 'A link goes' : `${String(ipLinks.length)} links go`} to ${local.host.hostname}, a private network address. It only works from inside that network, so it cannot lead to a page on the internet — it is how internal tools and home devices are reached.`,
+        description: `${ipLinks.length === 1 ? 'A link goes' : `${String(ipLinks.length)} links go`} to ${local.host.hostname}, a private network address. It only works from inside that network, so it cannot lead to a page on the internet; it is how internal tools and home devices are reached.`,
         evidence: { url: local.link.link.href, value: local.host.hostname },
       }),
     ];
@@ -440,7 +440,7 @@ function firstHostPerLink(
 const IP_IN_LABELS = /(?:^|[.-])(\d{1,3})[-.](\d{1,3})[-.](\d{1,3})[-.](\d{1,3})(?=$|[.-])/u;
 
 /**
- * A host named after its own IP address — the name a hosting provider gives every server it rents out.
+ * A host named after its own IP address: the name a hosting provider gives every server it rents out.
  *
  * It is the bare-IP link with a domain in front, and it serves the same purpose: a page on a rented
  * machine that nobody registered a name for, so there is nothing to take down but the machine. Ordinary
@@ -488,7 +488,7 @@ function unicodeSpoofedLinks(context: AnalysisContext): SecuritySignal[] {
         score: mixed || imitates !== null ? 40 : 18,
         title: 'Link uses an internationalised domain that renders as familiar text',
         description: imitates !== null
-          ? `The link's host is ${host.hostname}, which renders as "${rendered}" — visually indistinguishable from ${imitates.target}, but a different domain entirely.`
+          ? `The link's host is ${host.hostname}, which renders as "${rendered}", visually indistinguishable from ${imitates.target}, but a different domain entirely.`
           : mixed
             ? `The link's host is ${host.hostname}, which renders as "${rendered}" using a mix of ${scriptsUsed(rendered).join(' and ')} characters. Mixed scripts inside one name are how a domain is made to look like something it is not.`
             : `The link's host is ${host.hostname}, which renders as "${rendered}". Internationalised domains are legitimate but are commonly used to imitate familiar names.`,
@@ -558,7 +558,7 @@ function misleadingComposition(
   findings: SecuritySignal[],
 ): boolean {
   if (reported.has(host.hostname)) return false;
-  // A brand's own domain may name its subdomains as it likes — unless it is one where anybody can
+  // A brand's own domain may name its subdomains as it likes, unless it is one where anybody can
   // rent a subdomain or a bucket, where the label was chosen by the tenant and not by the brand.
   if (brandOwningDomain(host.registrable) !== undefined && host.openHosting === null) return false;
 
@@ -573,7 +573,7 @@ function misleadingComposition(
     // brand token (`paypal.security-login.example`). A short core has to *begin* a token, since an
     // English compound ends in one far more often than a phishing host does: `gmail` ends `bigmail`,
     // `chase` ends `purchase`, `apple` ends `pineapple`, and names like these were `critical` on
-    // ordinary mail. What phishing hosts do is lead with the brand — `chasesecure.`, `apple7.` —
+    // ordinary mail. What phishing hosts do is lead with the brand (`chasesecure.`, `apple7.`),
     // and that stays reported. The cost is a short brand fused after a word (`securechase.`); the
     // hyphenated form is still caught. A long core may appear anywhere (`securepaypal.example`).
     const domainHit = domains.some((f) => f.length >= 6 && foldedPrefix.includes(f));
@@ -587,8 +587,8 @@ function misleadingComposition(
       });
 
     if (!domainHit && !tokenHit) continue;
-    // A section of the sender's own site named after a subject it covers — a news site's `apple.`
-    // section — borrows nobody's reputation but its own, as a social footer on the sender's tracker
+    // A section of the sender's own site named after a subject it covers (a news site's `apple.`
+    // section) borrows nobody's reputation but its own, as a social footer on the sender's tracker
     // does in `anchorTextBrandMismatch`. It yields in the same place: a message presenting itself as
     // this brand, where a brand-named host on the sender's domain is the disguise.
     if (!domainHit && onSenderDomain && context.primaryClaim?.brand.id !== brand.id) return false;
@@ -601,7 +601,7 @@ function misleadingComposition(
         severity: 'critical',
         score: 42,
         title: `Link places ${brand.label}'s name in front of an unrelated domain`,
-        description: `The link reads as ${brand.label} at a glance, but the part of the address that determines where it actually goes is ${host.registrable}. Everything to the left of that — including "${beforeRegistrable}" — is chosen freely by whoever controls ${host.registrable}.`,
+        description: `The link reads as ${brand.label} at a glance, but the part of the address that determines where it actually goes is ${host.registrable}. Everything to the left of that, including "${beforeRegistrable}", is chosen freely by whoever controls ${host.registrable}.`,
         evidence: { url: link.link.href, value: host.hostname },
       }),
     );
@@ -718,7 +718,7 @@ function insecureCredentialLinks(context: AnalysisContext): SecuritySignal[] {
  * `file:` link *to another machine* (`file://host/share`, or a UNC path, which the parser turns into a path
  * beginning `//`) makes Windows offer the reader's credentials to that machine. Those are `critical`. Two
  * are not, and both were `critical` on ordinary technical mail: `ftp:` is a file download Chrome no longer
- * handles itself — it can hand a file to another program but cannot run anything or show a sign-in page —
+ * handles itself (it can hand a file to another program but cannot run anything or show a sign-in page),
  * and a `file:` link with no host names a path on the reader's own disk, a pasted local path or a
  * `file:///C` left behind by a word processor, which nothing remote can be fetched through.
  */
@@ -828,7 +828,7 @@ function excessiveSubdomains(context: AnalysisContext): SecuritySignal[] {
 }
 
 /**
- * A credential-related destination on a domain that has nothing to do with the claimed brand — the
+ * A credential-related destination on a domain that has nothing to do with the claimed brand: the
  * cross-signal case the brief calls out: "credentials/login terminology combined with unrelated
  * domains".
  */
@@ -837,7 +837,7 @@ function credentialTermsOnUnrelatedDomain(context: AnalysisContext): SecuritySig
   const findings: SecuritySignal[] = [];
 
   for (const link of context.webLinks) {
-    // The page that asks for the password is the one the click lands on, so that is the host judged —
+    // The page that asks for the password is the one the click lands on, so that is the host judged,
     // including when a tracker had to be peeled to find it.
     const destination = judgedHosts(link).at(-1);
     if (destination === undefined) continue;
@@ -858,12 +858,12 @@ function credentialHostFinding(
 ): SecuritySignal | null {
   const openHosting = host.openHosting;
   // Ownership excuses a host only where the owner chose what is published on it. A brand that rents out
-  // subdomains or buckets — Google's storage, Amazon's S3 — owns the domain and none of the pages, so
+  // subdomains or buckets (Google's storage, Amazon's S3) owns the domain and none of the pages, so
   // "the brand owns this" says nothing about who wrote a sign-in page served from it.
   if (openHosting === null) {
     if (claim !== undefined && brandOwns(claim.brand, host.registrable)) return null;
     /*
-     * A destination carrying the claimed brand's own name under a suffix the table does not list —
+     * A destination carrying the claimed brand's own name under a suffix the table does not list:
      * `paypal.it` on mail presenting itself as PayPal. Saying credentials entered there "would go to
      * whoever controls that domain" is true of every sign-in page and worthless unless the domain is
      * plainly not the brand's, which is exactly what cannot be established here. The sender-side finding
@@ -917,13 +917,13 @@ function describeOpenHost(hostname: string, openHosting: string): string {
  * destination is `storage.googleapis.com`, `s3.amazonaws.com` or a sibling: a real domain, owned by
  * Google or Amazon, with valid HTTPS and no lookalike spelling, no shortener, no redirect and no
  * punycode. Nothing about the *host* is wrong. What is wrong is that the host identifies the storage
- * provider and not the author — anyone with an account can upload `page.html` and serve it from an
+ * provider and not the author: anyone with an account can upload `page.html` and serve it from an
  * address that reads as impeccable, which is precisely why phishing kits are hosted this way.
  *
  * Two conditions keep it off ordinary mail. The path must name an **HTML document**, because that is what
  * separates a page pretending to be a website from the legitimate uses of object storage, which are
  * images, PDFs and downloads. And the escalation to `high` requires the *message* to be asking for
- * something — a sign-in, an unlock, a renewal, a payment — since a bare link to a hosted document is
+ * something (a sign-in, an unlock, a renewal, a payment), since a bare link to a hosted document is
  * unremarkable while the same link under "your account will be deleted" is the whole attack.
  */
 function pageServedFromOpenStorage(context: AnalysisContext): SecuritySignal[] {
@@ -1029,8 +1029,8 @@ function namesFile(host: LinkHost, filename: string): boolean {
  *
  * "Annual-Leave-Compliance-Report-2024.pdf" in the body, linked to a web page on an unrelated site, is a
  * fake attachment: the reader expects a document in the message and gets a page that asks for a sign-in.
- * What a reader can check is the mismatch itself — the label names a file, and the address is not that
- * file — so that is the whole condition, and each exemption is a place where it is ordinary:
+ * What a reader can check is the mismatch itself (the label names a file, and the address is not that
+ * file), so that is the whole condition, and each exemption is a place where it is ordinary:
  *  - the sender's own hosts, where a support desk or document system serves its own attachments;
  *  - a brand's file service (a Drive or OneDrive chip), where a shared file is a page by design;
  *  - a destination that really is the named file, which is a download, not a disguise.
@@ -1076,7 +1076,7 @@ const SUBJECT_ACTION_TERMS =
   /\b(action required|required action|immediate action|final (reminder|notice|warning)|(messages?|emails?|mails?) (on hold|held|pending|undelivered|suspended)|incoming messages|password (expir\w*|reset)|mailbox|account (suspended|locked|disabled|on hold|verification|update)|verify your|we (still )?need (some )?information|payment (processed|received|confirmation|declined|failed)|remittance|invoice|shared (a |an )?(file|document|folder)|sent you (a |an )?(message|document|file)|documento|signature (requested|required)|review and sign|expir(es|ation|ing) (on|soon|today)|renewing)\b/u;
 
 /**
- * Attacker-controlled destination for a message that also carries no readable text — a bare
+ * Attacker-controlled destination for a message that also carries no readable text: a bare
  * "click here" body, which exists only to get the click.
  *
  * With an action-asking subject it is `medium`: an image-only lure has exactly this shape, its notice
@@ -1172,8 +1172,8 @@ interface FormField {
  * Each bound has a genuine message behind it:
  *  - **The reader's address must be a field's whole value**, among at least `minFormEchoFields` fields.
  *    An address in running text is a greeting or a footer, and an account notice states it on one line.
- *  - **No outside address may be a field's value.** A forwarded message quotes a header block — From,
- *    To, Date, Subject — whose To line is the reader, and its From line is what separates it from a form.
+ *  - **No outside address may be a field's value.** A forwarded message quotes a header block (From,
+ *    To, Date, Subject) whose To line is the reader, and its From line is what separates it from a form.
  *    The sender's own addresses do not count, because an autoresponder's signature lists them.
  *  - **The link must be inside free text**, `minFormEchoFreeTextChars` beyond its URL. An order
  *    confirmation echoes "Tracking: https://…" and a profile form "Website: https://…", which are values

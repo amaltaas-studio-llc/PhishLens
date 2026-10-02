@@ -1,7 +1,7 @@
 /**
  * Attachment detectors. Two rules govern the file:
  *
- *  1. **Nothing is ever opened.** Only the filename string is inspected — no download, no read, no hash,
+ *  1. **Nothing is ever opened.** Only the filename string is inspected: no download, no read, no hash,
  *     no MIME sniff. Something that fetches attachments to inspect them is a delivery mechanism, not a
  *     scanner.
  *  2. **An extension is not a verdict.** A `.zip` is not malware. These detectors report what was
@@ -47,7 +47,7 @@ const MACRO_CAPABLE_EXTENSIONS: ReadonlySet<string> = new Set([
  * Formats commonly used as the first stage of a malware chain.
  *
  * No `.xml` or `.xsl`. A double-clicked `.xml` opens as a data tree, not a page, and it is the format
- * structured invoices travel in — national e-invoicing schemes deliver every supplier invoice as one —
+ * structured invoices travel in (national e-invoicing schemes deliver every supplier invoice as one),
  * so listing it reported each of those as a web page and paired it with the word "invoice" into a
  * `critical`. What actually renders a page from a local file is the rest of this list.
  */
@@ -185,7 +185,7 @@ function scriptContainerAttachments(context: AnalysisContext): SecuritySignal[] 
 }
 
 /**
- * `invoice.pdf.exe` — a real extension hidden behind a decoy one. The dangerous half is caught by
+ * `invoice.pdf.exe`: a real extension hidden behind a decoy one. The dangerous half is caught by
  * the rules above; this rule is about the *deception*, which is independently damning.
  */
 function doubleExtensionAttachments(context: AnalysisContext): SecuritySignal[] {
@@ -224,7 +224,7 @@ function doubleExtensionAttachments(context: AnalysisContext): SecuritySignal[] 
  * `exe.png`, and ones that render as nothing, so `invoice.ex\u00ade` is an `.exe` no blocklist matches.
  *
  * Two findings rather than one, because only the first makes the screen lie about the type. A reversed
- * name shows the reader an extension that is not the file's — `critical`, whatever the type. A hidden
+ * name shows the reader an extension that is not the file's: `critical`, whatever the type. A hidden
  * character shows the right letters with a gap nobody can see; it is evidence of an attempt to slip past
  * a filter, and when the type it hides is dangerous the executable rule says so at full weight already.
  */
@@ -282,7 +282,7 @@ function benignAttachmentsNote(context: AnalysisContext): SecuritySignal[] {
       severity: 'info',
       score: 0,
       title: 'No suspicious attachment detected',
-      description: `${context.attachments.length === 1 ? 'The attachment' : `All ${String(context.attachments.length)} attachments`} use file types that do not execute code. Note that attachment contents are never opened or downloaded by this extension — only the filenames were examined.`,
+      description: `${context.attachments.length === 1 ? 'The attachment' : `All ${String(context.attachments.length)} attachments`} use file types that do not execute code. Note that attachment contents are never opened or downloaded by this extension; only the filenames were examined.`,
       evidence: { value: formatList(context.attachments.map((a) => a.filename)) },
     }),
   ];

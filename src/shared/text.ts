@@ -31,7 +31,7 @@ export function collapseWhitespace(text: string): string {
  *
  * NFKC rather than NFKD for the fold: both map mathematical and fullwidth letters onto ASCII, but NFKD
  * would also decompose `café` into `cafe` plus a combining accent, leaving stray marks in text that is
- * shown to the reader as evidence. Letter-spacing (`p a s s w o r d`) is *not* flattened here — that is
+ * shown to the reader as evidence. Letter-spacing (`p a s s w o r d`) is *not* flattened here; that is
  * `skeleton()`'s job, and it is applied where brand claims are matched.
  */
 export function normalizeForMatching(text: string): string {
@@ -39,7 +39,7 @@ export function normalizeForMatching(text: string): string {
   // hiding text but this keeps would split `pass⁢word` past every content rule.
   return stripBidiAndInvisible(collapseWhitespace(truncate(text, MAX_BODY_CHARS)).normalize('NFKC'))
     .toLowerCase()
-    // NFKC leaves `ß` alone — it is a letter, not a compatibility form — so German "Schließung" and the
+    // NFKC leaves `ß` alone (it is a letter, not a compatibility form), so German "Schließung" and the
     // Swiss spelling "Schliessung" only meet if one is folded onto the other here.
     .replace(/ß/gu, 'ss')
     .replace(/[\u2018\u2019\u201b\u2032]/gu, "'")
@@ -50,7 +50,7 @@ export function normalizeForMatching(text: string): string {
 /**
  * Joins items for prose: `a`, `a and b`, `a, b and c`, and `a, b, c and 2 more` past `max`.
  *
- * Bounded by default because every list here is derived from attacker-controlled input — forty
+ * Bounded by default because every list here is derived from attacker-controlled input: forty
  * attachment names do not belong in a sentence.
  */
 export function formatList(items: readonly string[], max = 3): string {

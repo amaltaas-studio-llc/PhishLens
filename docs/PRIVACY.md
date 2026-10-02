@@ -17,9 +17,9 @@ for.
 The HTTPS entry is a broad pattern because Chrome grants only what a pattern in the manifest covers, and a
 model server reachable over TLS can be on any host. The plaintext entries are not broad, and deliberately:
 `http://` is accepted only for loopback, so a pattern matching any other host could never be used and would
-be asking for reach the code refuses to take. What matters for both is that they are *optional* — a default
+be asking for reach the code refuses to take. What matters for both is that they are *optional*: a default
 install holds two permissions, the grant is per-origin, made on a deliberate click, and visible in
-`chrome://extensions`. The alternative — putting `http://localhost/*` in `host_permissions` — would charge
+`chrome://extensions`. The alternative (putting `http://localhost/*` in `host_permissions`) would charge
 every user a permission for a feature most will never turn on.
 
 Not requested, and not needed: `activeTab`, `<all_urls>`, `tabs`, `scripting`, `webRequest`,
@@ -33,7 +33,7 @@ If a future feature seems to need something broader, that is a signal to reconsi
 
 ## Where data lives
 
-**Extracted from Gmail** — sender name and address, Reply-To, subject, visible body text (truncated,
+**Extracted from Gmail**: sender name and address, Reply-To, subject, visible body text (truncated,
 quoted replies removed unless they are all the message has), the anchor text and hrefs of every link in the
 message, quoted parts included, since a sender can mark anything as a quote, attachment filenames and extensions, the delivered-to
 address, Gmail's own authentication summary when it is exposed in the DOM, and the names and addresses of
@@ -42,44 +42,44 @@ party already in a thread from one imitating them, and like everything else it i
 already on screen: no message is fetched, and nothing outside the open thread is looked at. This lives in memory in the
 content script for as long as the message is on screen, then is dropped. It is never written to
 `chrome.storage` and never logged in a release build. It reaches the service worker in one case only:
-with your own model server configured, the prompt — display name, subject and body excerpt — is handed
+with your own model server configured, the prompt (display name, subject and body excerpt) is handed
 to the worker, which is the one part of the extension allowed to make the request.
 
-**Analysed locally** — all of it. Every deterministic detector and the whole scoring engine run inside
+**Analysed locally**: all of it. Every deterministic detector and the whole scoring engine run inside
 the tab, and so does Chrome's on-device model if you choose it; AI is off until you do. Nothing touches
 the network. Only the
 model's readings are kept, in the tab, capped at 50, and discarded when the tab closes.
 
-**Written to `chrome.storage`** — the settings you choose, and one list that comes from a message: the
+**Written to `chrome.storage`**: the settings you choose, and one list that comes from a message: the
 addresses and domains you mark as trusted. That is the deliberate exception to "nothing is stored", since
 a trust decision that did not outlive the tab would be useless. The list is capped at 50 entries, each
 bounded in length and required to look like an address or a hostname, and it is visible and editable in
-the options page. Nothing else — no subject, no body, no score, no history of what you have read.
+the options page. Nothing else: no subject, no body, no score, no history of what you have read.
 
-The session's **extraction health** — how many messages were seen, how many parts could not be found, and
-which selector groups fell through to a fallback — is counted in the tab and shown in the popup, so a
+The session's **extraction health** (how many messages were seen, how many parts could not be found, and
+which selector groups fell through to a fallback) is counted in the tab and shown in the popup, so a
 Gmail layout change is visible rather than silent. It is counts and selector names only; the diagnostic
 you can copy from the popup is asserted by a test to contain nothing from any message.
 
 That report also accounts for the score of the message on screen, so you can dispute one without
-installing a development build. It names the checks that ran — the identifiers used in this repository —
+installing a development build. It names the checks that ran (the identifiers used in this repository)
 with what each added to the score, and describes what was read as numbers: how many characters the body
 held, how many links and attachments, how many characters were concealed and by which CSS. No subject, no
 address, no filename, no excerpt, and no finding wording, since every one of those is built around
 something you were sent. The report is shown in full in the popup before you copy it, for the same reason
 the other one is: a report you cannot read is one you cannot decide to share.
 
-**Potentially leaving the browser** — nothing by default. Two modes can send message content, and both
+**Potentially leaving the browser**: nothing by default. Two modes can send message content, and both
 require an explicit choice *and* an address, neither of which has a default value:
 
 - *Your own model server* sends the sender's display name, the subject and a body excerpt to the address
-  you configure — and nothing else. No link targets, no sending domain, no attachment types, no recipient
+  you configure, and nothing else. No link targets, no sending domain, no attachment types, no recipient
   address, no API key. Plain `http://` is only accepted for `localhost`, so in the intended setup this data
   reaches a process on your own machine and no network. Point it at an `https://` address elsewhere and it
   crosses a network to that address; the options page says so where you type it. See
   [LOCAL-AI.md](LOCAL-AI.md#your-own-model-server).
 - *Cloud-assisted* is designed and inert, with no default backend, and the options page no longer offers
-  it — the radio appears only for someone who already had it selected. What such a payload would contain,
+  it; the radio appears only for someone who already had it selected. What such a payload would contain,
   and what it would strip, is in [adr/0009](adr/0009-model-server-and-inert-cloud.md).
 
 Nothing else ever leaves, in any configuration.
@@ -96,13 +96,13 @@ Three choices follow from this:
 
 ### Malicious email content
 
-Every string from a message — URL, filename, display name, subject, body — is hostile input. It is bounded
+Every string from a message (URL, filename, display name, subject, body) is hostile input. It is bounded
 on extraction, never `eval`'d, never used to build a URL that gets requested, and never parsed as HTML.
 
 All rendering goes through `src/ui/dom.ts`, which sets `textContent` and never `innerHTML`; `innerHTML`,
 `outerHTML` and `insertAdjacentHTML` are ESLint errors project-wide, so the safety property is mechanical
 rather than remembered. URL parsing uses the platform parser rather than regexes. Unicode is handled
-explicitly — punycode decoding, script-mixing detection, confusable folding, bidi stripping — so a
+explicitly (punycode decoding, script-mixing detection, confusable folding, bidi stripping), so a
 homoglyph domain cannot pass as a brand's. Regexes over message text are bounded and anchored to avoid
 catastrophic backtracking. `clamp()` fails closed on non-finite input, so a crafted value cannot
 manufacture a score.
@@ -116,7 +116,7 @@ selector break degrades to "fewer findings", never to "wrong findings" or a brok
 
 With one exception, which is handled separately: **fewer findings is not honest when the missing field is
 the sender.** Nearly every high-severity check reasons about the sending domain, so a message whose sender
-cannot be read produces no findings, and no findings scores as Low Risk — a confident all-clear on a
+cannot be read produces no findings, and no findings scores as Low Risk: a confident all-clear on a
 message nobody checked. The extension declines to score at all in that case, shows **Not checked**, and
 says on the card that nothing having been found is not a finding of nothing. See
 [adr/0003](adr/0003-gmail-two-signals.md).
@@ -124,7 +124,7 @@ says on the card that nothing having been found is not a finding of nothing. See
 That card offers a **diagnostic report** to paste into a bug report, because the project has no telemetry
 and a broken selector is otherwise unknowable. It contains selector strings from this repository, the
 extension and browser versions, and the names of the parts that were unread. It contains no message
-content, no address, and not the URL — which carries a thread id, i.e. an identifier for one specific
+content, no address, and not the URL, which carries a thread id, i.e. an identifier for one specific
 message in your mailbox. It is shown in full rather than only copied, so you can read it first, and it is
 sent nowhere unless you paste it somewhere yourself.
 
@@ -161,8 +161,8 @@ built than a model client. Nor can a message supply the model's instructions: th
 prompt itself.
 
 Before every request the worker also checks that the user granted access to that origin, and refuses
-otherwise. Chrome does not enforce this by itself — without a host permission an extension's request still
-leaves as an ordinary cross-origin one, and reaches any server that accepts extension origins — so the grant
+otherwise. Chrome does not enforce this by itself: without a host permission an extension's request still
+leaves as an ordinary cross-origin one, and reaches any server that accepts extension origins, so the grant
 is checked where the request is made. Settings that decide where content goes can be changed only from the
 extension's own pages; a Gmail tab may change the trust list and nothing else. No extension context can grant
 itself a host permission, so even settings edited some other way cannot direct a request at an origin the
@@ -186,7 +186,7 @@ beyond Chrome's own.
 ### What PhishLens does not defend against
 
 It is a reading aid, not a control. It does not stop anyone clicking a link, opening an attachment, or
-replying. It cannot detect a phishing message that is textually indistinguishable from legitimate mail — a
+replying. It cannot detect a phishing message that is textually indistinguishable from legitimate mail. A
 compromised real account of a real correspondent sending a plausible request from the usual domain will
 score low, correctly, on the evidence available. It is one layer, and the weakest assumption in it is that
 the user reads the card.

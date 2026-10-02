@@ -70,13 +70,13 @@ export const BADGE_CSS = `
  * The advisory card.
  *
  * Pinned to the bottom-right of the viewport rather than anchored to the badge. Anchoring meant the
- * card was positioned from the badge's viewport rect, so scrolling the message carried it off screen
- * — the explanation disappeared exactly when the user scrolled down to check the thing it described.
+ * card was positioned from the badge's viewport rect, so scrolling the message carried it off screen:
+ * the explanation disappeared exactly when the user scrolled down to check the thing it described.
  * A fixed corner has no such coupling: it needs no scroll listener, no reflow on resize, and it does
  * not fight Gmail's own scroll containers for space.
  *
  * It is deliberately *not* modal. There is no backdrop, so Gmail stays fully interactive while the
- * card is open — a security advisory the user must dismiss before they can look at the message is an
+ * card is open; a security advisory the user must dismiss before they can look at the message is an
  * advisory that gets dismissed unread.
  */
 export const PANEL_CSS = `
@@ -153,19 +153,19 @@ export const PANEL_CSS = `
 
 /*
  * Scrollbar, restyled to belong to the card. Chromium's default is a 15px grey channel with a hard
- * inner edge and arrow buttons, which inside a rounded card reads as a seam pinned to the right side —
+ * inner edge and arrow buttons, which inside a rounded card reads as a seam pinned to the right side,
  * and it runs straight through the rounded bottom corner, because the footer scrolls with the findings.
  *
  * Drawn instead as an overlay over the card's own surface: transparent track, and a thin thumb inset
  * from the edge so it floats clear of both the border and the corner radius. The inset comes from a
- * transparent border with \`background-clip: padding-box\` — scrollbar parts do not honour margin or
+ * transparent border with \`background-clip: padding-box\`: scrollbar parts do not honour margin or
  * padding, so the border is the only way to get breathing room around the thumb. For the same reason
  * the hover rule sets \`background-color\`, not the \`background\` shorthand, which would reset the clip
  * back to \`border-box\` and refill the inset.
  *
  * Uses the \`-webkit-\` pseudo-elements rather than the standard \`scrollbar-width\`/\`scrollbar-color\`
- * pair. The two are mutually exclusive in Chromium — declaring either standard property makes it
- * ignore the pseudo-elements — and only the pseudo-elements can inset the thumb. Chrome-only support is
+ * pair. The two are mutually exclusive in Chromium (declaring either standard property makes it
+ * ignore the pseudo-elements), and only the pseudo-elements can inset the thumb. Chrome-only support is
  * not a constraint for a Chrome extension.
  *
  * The thumb is quiet but always visible while the content overflows. It is the only cue that findings
@@ -226,15 +226,15 @@ export const PANEL_CSS = `
 .summary { margin: 6px 0 0; font-size: 12px; color: #3c4043; }
 
 /*
- * The "not checked" head. Alone in the row, the verdict *is* the headline — there is no score for it to
- * sit beside — so it is set as a heading rather than as a pill that would read like a risk level.
+ * The "not checked" head. Alone in the row, the verdict *is* the headline (there is no score for it to
+ * sit beside), so it is set as a heading rather than as a pill that would read like a risk level.
  */
 .score-row { display: flex; align-items: baseline; gap: 6px; margin-top: 6px; }
 .score-row .verdict:only-child { padding: 0; background: none; font-size: 18px; font-weight: 500; color: inherit; }
 
 /*
  * Which message this is about. The card does not sit beside the header it describes, so it has to
- * say — otherwise a stale card in the corner is indistinguishable from a current one.
+ * say; otherwise a stale card in the corner is indistinguishable from a current one.
  */
 .ref { margin-top: 12px; display: grid; gap: 1px; }
 .ref-line { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -311,7 +311,7 @@ li.finding:focus-visible { outline: 2px solid #1a73e8; outline-offset: -2px; }
 .sev[data-severity="info"] { background: #f1f3f4; color: #5f6368; }
 
 /*
- * Evidence, in two shapes. A measured value — a domain, where a link goes, a filename — is code: exact,
+ * Evidence, in two shapes. A measured value (a domain, where a link goes, a filename) is code: exact,
  * monospaced, breakable anywhere, and never mistaken for a sentence. Words from the email are a
  * quotation, ruled in the category's colour, so the sender's voice is never mistaken for PhishLens's.
  */
@@ -356,7 +356,7 @@ li.finding:focus-visible { outline: 2px solid #1a73e8; outline-offset: -2px; }
 }
 
 /*
- * Waiting on the model. Deliberately understated — the deterministic verdict is already on screen and
+ * Waiting on the model. Deliberately understated: the deterministic verdict is already on screen and
  * complete, so this is a footnote about a refinement, not a "loading" screen for the card. The counter
  * is what turns "is it stuck?" into "it is working, and this is how long it takes on this machine".
  */
@@ -439,7 +439,7 @@ li.row.floor { grid-template-columns: 8px 1fr auto; }
 .silent { margin-top: 8px; }
 
 /*
- * The "not checked" card. No score, no ring, no findings — so the explanation is the content, at body
+ * The "not checked" card. No score, no ring, no findings, so the explanation is the content, at body
  * size rather than the 11px used for notes, because it is the only thing there is to read.
  */
 .notes { margin: 8px 0 0; padding: 0; }
@@ -577,7 +577,7 @@ li.row.floor { grid-template-columns: 8px 1fr auto; }
  *
  * The highlight is applied by adding a single class token to an existing element and removing it
  * afterwards. Nothing is wrapped, re-parented, or replaced, so Gmail's event handlers on those
- * elements are untouched — which is the constraint the brief sets. `!important` is used because Gmail's
+ * elements are untouched, which is the constraint the brief sets. `!important` is used because Gmail's
  * own link styles are specific, and losing the highlight would make the feature silently useless.
  */
 export const HIGHLIGHT_CSS = `

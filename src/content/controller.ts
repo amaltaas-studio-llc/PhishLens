@@ -197,7 +197,7 @@ export class Controller {
      *
      * The rule engine would happily score it: with no sender there is nothing for the identity,
      * authentication or thread checks to object to, so it returns a near-zero score, `low`, and a green
-     * badge — the most reassuring output the extension can produce, at the moment it knows the least.
+     * badge: the most reassuring output the extension can produce, at the moment it knows the least.
      * The badge stays, saying so, because removing it would be indistinguishable from a clean message
      * on a `showBadgeWhenLow: false` install. That setting is not consulted here for the same reason:
      * this is not a low reading.
@@ -232,7 +232,7 @@ export class Controller {
     /*
      * Nothing any check found, so nothing the model says can count: an uncorroborated reading scores
      * zero. Asking anyway costs the reader seconds of inference per message for a sentence that cannot
-     * change the verdict, so by default the card offers the reading instead of running it — unless the
+     * change the verdict, so by default the card offers the reading instead of running it, unless the
      * reader already asked for this prompt, or a finished reading for it can be replayed for free.
      */
     const key = readingKey(active.email, aiMode, deterministic.signals.map((s) => s.id));
@@ -263,7 +263,7 @@ export class Controller {
    * Asks the model about the view on screen and folds its answer into the score.
    *
    * The deterministic result is passed in rather than recomputed, so the checks run once per view and
-   * the refined score is built on exactly the findings the first paint showed — the same trust list
+   * the refined score is built on exactly the findings the first paint showed, the same trust list
    * included, without which the score would climb back up the moment the model answered.
    */
   async #refine(
@@ -340,7 +340,7 @@ export class Controller {
       this.#badge.remove();
     }
 
-    // An open card is updated in place — the refined score replacing the deterministic one, without
+    // An open card is updated in place, the refined score replacing the deterministic one, without
     // re-animating or losing the reader's scroll position. This happens whether or not the badge is
     // shown: a refinement that lands on "low" hides the badge, and returning early there used to leave
     // the card displaying the score it had just superseded.
@@ -355,7 +355,7 @@ export class Controller {
    *
    * Written through the worker like every other setting, so the bound and the validation in
    * `normalizeTrustList` apply. The re-score is not just a repaint: trust changes what the rule engine
-   * does, so the cache is dropped and the message is analysed again — a user who clicks this expects the
+   * does, so the cache is dropped and the message is analysed again; a user who clicks this expects the
    * number to move, and a card that keeps its old score looks like the click did nothing.
    */
   async #changeTrust(entry: string, trusted: boolean): Promise<void> {
@@ -372,8 +372,8 @@ export class Controller {
   /**
    * Abandons analysis in flight and everything it would have produced.
    *
-   * Stopping the work and invalidating its results are one action, never two: the abort is advisory — a
-   * round trip already made cannot be recalled, and the adapters can only decline to use what comes back —
+   * Stopping the work and invalidating its results are one action, never two: the abort is advisory (a
+   * round trip already made cannot be recalled, and the adapters can only decline to use what comes back),
    * so the token is what actually keeps a superseded answer off the screen.
    */
   #supersedeAnalysis(): void {
@@ -423,7 +423,7 @@ export class Controller {
     respond: (response: TabResponse) => void,
   ): boolean => {
     // `sender.id` is set by Chrome. A page cannot forge it, so this rejects anything that did not
-    // originate in this extension — the popup being the only thing that ever does.
+    // originate in this extension, the popup being the only thing that ever does.
     if (sender.id !== chrome.runtime.id || !isTabRequest(message)) return false;
 
     if (message.type === 'OPEN_PANEL') {
@@ -577,7 +577,7 @@ export class Controller {
     } else if (impact.repaint) {
       /*
        * Repainted rather than re-analysed. `showBadgeWhenLow` decides whether a low verdict is shown at
-       * all, and the verdict itself is unchanged — so running the message through the engine again to
+       * all, and the verdict itself is unchanged, so running the message through the engine again to
        * make the badge appear would reset the AI status to pending, re-record a health sample, and on a
        * cache miss ask the model a question it has already answered. Without this the switch did nothing
        * until the reader opened another message, which looks like a setting that does not work.
@@ -612,7 +612,7 @@ export class Controller {
     }
     /*
      * A resolver rather than an element, because the answer changes: `document.body` when Gmail has not
-     * rendered its main region yet — which at `document_idle` it often has not — and the main region
+     * rendered its main region yet (which at `document_idle` it often has not), and the main region
      * afterwards, which Gmail then replaces on a view change. Widening the observed subtree to the body
      * costs nothing here: a pass is debounced and bounded, and the row selectors match list rows and
      * nothing else on the page.

@@ -1,6 +1,6 @@
 {
   "name": "legitimate-institutional-newsletter",
-  "description": "False-positive regression, observed in production: a university department's alumni newsletter whose footer links its social profiles by name — LinkedIn, Instagram, YouTube, Facebook — while every href is rewritten through the sender's own click-tracking subdomain. The anchor names a brand and the destination is not that brand's domain, so before the onSenderDomain guard each footer icon produced a separate 'high' anchor/brand mismatch, maxed the link category and floored the message at 50/100 'Suspicious'. Naming the network you have a profile on is what a social footer is for, and every bulk sender that rewrites links produces this shape.",
+  "description": "False-positive regression, observed in production: a university department's alumni newsletter whose footer links its social profiles by name (LinkedIn, Instagram, YouTube, Facebook) while every href is rewritten through the sender's own click-tracking subdomain. The anchor names a brand and the destination is not that brand's domain, so before the onSenderDomain guard each footer icon produced a separate 'high' anchor/brand mismatch, maxed the link category and floored the message at 50/100 'Suspicious'. Naming the network you have a profile on is what a social footer is for, and every bulk sender that rewrites links produces this shape.",
   "email": {
     "senderName": "Northwind Institute of Technology Communications",
     "senderEmail": "communications@news.northwind-tech.edu",

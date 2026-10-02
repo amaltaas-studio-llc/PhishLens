@@ -33,7 +33,7 @@ export interface EmailAttachment {
 export type AuthVerdict = 'pass' | 'fail' | 'softfail' | 'neutral' | 'none' | 'unknown';
 
 /**
- * Authentication information as surfaced by Gmail's UI (not real headers — a content script cannot
+ * Authentication information as surfaced by Gmail's UI (not real headers: a content script cannot
  * read RFC 5322 headers). Every field is best-effort and frequently absent.
  */
 export interface EmailAuthInfo {
@@ -67,7 +67,7 @@ export interface ThreadParticipant {
  * only way to see a reply-chain hijack: the attacker's message quotes a genuine history, so judged on
  * its own it looks like ordinary correspondence.
  *
- * Read from message headers already rendered on screen — never from a message body, which is
+ * Read from message headers already rendered on screen, never from a message body, which is
  * attacker-controlled and one `<span email="…">` away from inventing a participant.
  */
 export interface ThreadContext {
@@ -81,13 +81,13 @@ export interface ThreadContext {
  * Two distinct reasons this is extracted rather than ignored.
  *
  * It is **evidence**: filler that only a filter reads is evasion, and at volume it is the recognisable
- * shape of corpus poisoning — paragraphs of unrelated prose that dilute the ratio of suspicious words to
+ * shape of corpus poisoning: paragraphs of unrelated prose that dilute the ratio of suspicious words to
  * ordinary ones.
  *
  * It is also **an attack on this extension**. `bodyText` is read from `textContent`, which includes text
  * CSS has hidden, so hidden filler lands in the string the content rules match against and dilutes them
- * exactly as it dilutes anyone else's. Separating it restores `bodyText` to what it claims to be — what
- * the reader sees — and turns the filler from a blind spot into a finding.
+ * exactly as it dilutes anyone else's. Separating it restores `bodyText` to what it claims to be (what
+ * the reader sees) and turns the filler from a blind spot into a finding.
  *
  * A small amount is ordinary: nearly every marketing platform hides a one-line preheader this way. The
  * threshold that separates the two lives in `scoring/config.ts`.
@@ -144,8 +144,8 @@ export interface RawFields {
  * A part of a message the extraction has to find for the score to mean anything.
  *
  * Named so that "the adapter could not read this" can be *reported* instead of silently becoming an
- * absent field. Every field of `EmailMessage` is optional, which is right — real mail is missing
- * things — but it makes a Gmail markup change indistinguishable from a message that simply has no
+ * absent field. Every field of `EmailMessage` is optional, which is right (real mail is missing
+ * things), but it makes a Gmail markup change indistinguishable from a message that simply has no
  * sender, and those two want opposite treatment.
  *
  * Lives here rather than in `gmail/` because the UI has to name the gap and must not import a mail
@@ -207,7 +207,7 @@ export interface AnalysisResult {
   /**
    * Per-category capped subtotals, which the UI shows so the score can be checked rather than trusted.
    *
-   * They sum to `score` except when a severe finding established a minimum, where the sum is lower —
+   * They sum to `score` except when a severe finding established a minimum, where the sum is lower;
    * see `SCORE_FLOORS`. The panel labels that case rather than leaving the sum looking wrong.
    */
   categoryScores: Record<SignalCategory, number>;
@@ -271,7 +271,7 @@ export type SemanticStatus =
   /** The user switched AI analysis off. */
   | 'off'
   /**
-   * Not asked, because no technical check found anything for a reading to corroborate — and an
+   * Not asked, because no technical check found anything for a reading to corroborate, and an
    * uncorroborated reading scores nothing. A decision about cost, never a verdict: see
    * `Settings.aiOnlyWhenFlagged`.
    */
@@ -280,7 +280,7 @@ export type SemanticStatus =
   | 'unavailable'
   /** The model ran but returned nothing that passed schema validation. */
   | 'no-output'
-  /** The model is present but this attempt failed — a timeout, or a rejected session. */
+  /** The model is present but this attempt failed: a timeout, or a rejected session. */
   | 'error'
   /** The attempt was abandoned because the reader moved on; it says nothing about message or browser. */
   | 'cancelled';
@@ -357,7 +357,7 @@ export interface Settings {
    */
   backendBaseUrl: string;
   /**
-   * OpenAI-compatible base URL of a model server the user runs, as its own documentation gives it —
+   * OpenAI-compatible base URL of a model server the user runs, as its own documentation gives it:
    * `http://localhost:11434/v1` for Ollama, `http://localhost:12434/engines/v1` for Docker Model
    * Runner. `/chat/completions` is appended to it.
    */
@@ -368,7 +368,7 @@ export interface Settings {
    * Senders the user has chosen to trust: addresses for shared mailbox hosts, registrable domains
    * otherwise. See `shared/trust.ts` for what trust does and, more importantly, what it cannot do.
    *
-   * `readonly` because it is replaced rather than mutated — the normalising helpers return new lists, and
+   * `readonly` because it is replaced rather than mutated: the normalising helpers return new lists, and
    * an in-place `push` would bypass the bound and the validation.
    */
   trustedSenders: readonly string[];

@@ -1,7 +1,7 @@
 /**
  * Content / social-engineering detectors.
  *
- * These are deterministic keyword and shape heuristics — explicitly *not* semantic judgement. They
+ * These are deterministic keyword and shape heuristics, explicitly *not* semantic judgement. They
  * answer "does this message contain the recognisable machinery of a known scam pattern?", which is
  * a matching problem. Whether the tone is plausible in context is the LLM's job, and it lives in
  * `../llm/`.
@@ -27,7 +27,7 @@ import { signal } from './types.js';
 /**
  * A recognisable social-engineering theme.
  *
- * Patterns are intentionally bounded — no nested unbounded quantifiers — because they run against a
+ * Patterns are intentionally bounded (no nested unbounded quantifiers) because they run against a
  * body that an attacker controls. `src/shared/text.ts` also truncates the body first.
  */
 interface ContentPattern {
@@ -65,7 +65,7 @@ interface ContentPattern {
 }
 
 /**
- * A negation reaching the end of the text it is tested against — that is, one governing whatever comes
+ * A negation reaching the end of the text it is tested against: that is, one governing whatever comes
  * next.
  *
  * "Never share your verification code with anyone" is the advice attached to almost every genuine one-time
@@ -83,7 +83,7 @@ interface ContentPattern {
  *    negating the solicitation and merely preceding it. Any span of up to sixty characters allowed "do
  *    not hesitate to send me your verification code" to suppress itself: "do not" governs "hesitate"
  *    there, and the request it introduces is as plain as any. So the gap is either nothing at all, or the
- *    one construction in which a negation does reach across a verb — "will never *ask you to* share" —
+ *    one construction in which a negation does reach across a verb ("will never *ask you to* share"),
  *    which needs an asking verb followed by an infinitive to be that construction at all.
  */
 const NEGATED_UP_TO_HERE =
@@ -126,8 +126,8 @@ function firstUnnegatedMatch(
       return { match: found[0], index: found.index };
     }
     // Resume one character in, not after the match. A pattern with a bounded gap (`share[^.]{0,40}code`)
-    // can swallow a second, unnegated request into the negated one's span — "never share it with anyone,
-    // just send the code" — and skipping the whole span would hide it. `MAX_OCCURRENCES` still bounds
+    // can swallow a second, unnegated request into the negated one's span ("never share it with anyone,
+    // just send the code"), and skipping the whole span would hide it. `MAX_OCCURRENCES` still bounds
     // the work, and the step also keeps a zero-length match from looping on one position.
     scan.lastIndex = found.index + 1;
   }
@@ -223,8 +223,8 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
     patterns: [
       /\b(verify|confirm|validate|update|re-?enter|re-?confirm)\b[^.!?]{0,40}\b(your )?(account|identity|password|credentials?|login|sign[- ]?in|kyc)\b/u,
       // `details` and `information` need a qualifier naming what kind. Unqualified, they cover most of
-      // ordinary business correspondence — "confirm the delivery details", "once the payment details
-      // are updated", "we have updated our contact information" — none of which asks for a credential,
+      // ordinary business correspondence ("confirm the delivery details", "once the payment details
+      // are updated", "we have updated our contact information"), none of which asks for a credential,
       // and all of which would be reported under a title claiming it did. Payment and bank wording is
       // deliberately not a qualifier here: that is a funds request, which `payment_transfer` reports
       // with the right explanation.
@@ -273,7 +273,7 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
       // the one that also describes a *bank* account: "my old account is being closed, use these details
       // instead" is the machinery of payment diversion, not a threat to anyone's access, and reporting it
       // as one sends the reader looking for a warning about their login that the message never made.
-      // Payment diversion is not thereby missed — `payment_transfer` and `payroll_change` report it, with
+      // Payment diversion is not thereby missed: `payment_transfer` and `payroll_change` report it, with
       // the explanation that matches what the message actually says.
       /\byour\b[^.!?]{0,24}\b(account|access|profile|mailbox|subscription)\b[^.!?]{0,40}\bclos(e|ed|ure|ing)\b/u,
       /\bclos(e|ed|ure|ing)\b[^.!?]{0,24}\byour\b[^.!?]{0,24}\b(account|access|profile|mailbox|subscription)\b/u,
@@ -294,8 +294,8 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
     /*
      * "Enter the verification code" is how every genuine code delivery ends, and the code is a line away.
      * Sharing is the attack and entering is the instruction, so `enter` counts only when the message
-     * carries no code of its own. The code has to sit against the word naming it — "code: 482 910",
-     * "123456 is your code" — so an order number or a phone number elsewhere in a lure excuses nothing.
+     * carries no code of its own. The code has to sit against the word naming it ("code: 482 910",
+     * "123456 is your code"), so an order number or a phone number elsewhere in a lure excuses nothing.
      * A lure that prints a plausible code beside "enter it here" loses this finding and nothing else: the
      * page it points at is what the link rules judge.
      */
@@ -308,11 +308,11 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
     },
     patterns: [
       /\b(share|send|provide|forward|give|tell (me|us)|read (me|us))\b[^.!?]{0,40}\b(otp|one[- ]time (code|password|passcode|pin)|verification code|security code|authentication code|2fa code|mfa code|sms code|access code|upi pin)\b/u,
-      // "reply to this email with the verification code" — the verb and the preposition are separated.
+      // "reply to this email with the verification code": the verb and the preposition are separated.
       /\b(reply|respond|get back)\b[^.!?]{0,40}\bwith\b[^.!?]{0,40}\b(otp|one[- ]time (code|password|passcode|pin)|verification code|security code|authentication code|2fa code|mfa code|sms code|access code|upi pin|code)\b/u,
       // Deliberately no pattern for "your verification code is 123456". A message *containing* a code is
       // delivering one, which is the most ordinary transactional mail there is, and every service that
-      // sends one says so in those words — usually right next to "never share your verification code with
+      // sends one says so in those words, usually right next to "never share your verification code with
       // anyone", which is the opposite of the request this rule reports, and which the patterns above do
       // match verbatim. That sentence is what `negationReverses` is for; without it the rule reads the
       // warning as the attack. Solicitation needs a verb asking the
@@ -380,7 +380,7 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
       'The message asks to redirect salary or update direct-deposit details. This is a standard payroll-diversion attempt and normally belongs in an HR system, not in email.',
     severity: 'high',
     score: 30,
-    // First person throughout: the attack is an employee — or someone posing as one — asking for *their*
+    // First person throughout: the attack is an employee (or someone posing as one) asking for *their*
     // pay to go somewhere new. Payroll's own announcements talk about the same things in the second person
     // or none ("get your payroll information online", "to change the mailstop your paycheck goes to"),
     // and reading those as the request put ordinary HR mail at `high`.
@@ -399,7 +399,7 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
       'The message asks the recipient to buy gift cards or prepaid vouchers, or to send their codes. Gift cards are irreversible and untraceable, which is the entire reason they are requested.',
     severity: 'high',
     score: 32,
-    // A bare mention of "gift cards" is not a request — a shop selling them says it on every
+    // A bare mention of "gift cards" is not a request; a shop selling them says it on every
     // newsletter. Every pattern here requires an accompanying instruction to buy them or to hand
     // over their codes. "Buy" alone is not that instruction either: "spend $50 and get a $10 gift
     // certificate" and "why not buy a gift voucher" are what a shop says, so buying has to be asked of
@@ -482,7 +482,7 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
     // "Never send money or crypto to someone you met online" is the scam warning genuine financial mail
     // carries, written in the demand's own words.
     negationReverses: true,
-    // An exchange's offer — a bonus for transferring your own coins in from another wallet — is the
+    // An exchange's offer (a bonus for transferring your own coins in from another wallet) is the
     // demand's vocabulary pointed the other way, and it arrives as bulk mail. A wallet address does not:
     // nobody markets by printing one, so it keeps the theme in a newsletter-shaped message.
     suppressedInBulk: true,
@@ -507,7 +507,7 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
       'The message claims to possess compromising material or device access and demands payment. These claims are sent in bulk and are not backed by any actual access.',
     severity: 'high',
     score: 30,
-    // Each claim needs its object — *you*, *your device*, *one of your passwords*. The bare verbs are
+    // Each claim needs its object: *you*, *your device*, *one of your passwords*. The bare verbs are
     // the commonest first-person sentences in technical mail: "I have installed the package", "I have
     // captured the transaction", "it tells me the passphrase is correct" were each reported at `high`.
     // A contraction joins its word with no space, so it is spelled `i(?: have|'ve)`; `i (have|'ve)` asks
@@ -736,7 +736,7 @@ function matchThemes(context: AnalysisContext, wording = prepareWording(context.
  *
  * A marketing newsletter matches several themes ("act now", "expires", "your subscription") and has
  * dozens of links. Without recognising the shape, every newsletter scores like a phish. Detecting
- * it does not clear the message — it suppresses the *content* heuristics that bulk mail trivially
+ * it does not clear the message; it suppresses the *content* heuristics that bulk mail trivially
  * trips, while leaving every link and identity finding intact.
  */
 function looksLikeBulkMail(context: AnalysisContext, wording: Wording): boolean {
@@ -852,7 +852,7 @@ function genericSalutationWithBrandClaim(context: AnalysisContext, wording: Word
  * The subject is formatted to get past text-based filtering rather than to be read.
  *
  * The shape, as it appears in real mail: `<RECIPIENT NAME> ❋ WELCOME TO YOUR ❋ QUOTE PLANS!❋ - A2QJZ**`.
- * None of these markers is conclusive alone — marketing shouts, and emoji in subject lines are ordinary —
+ * None of these markers is conclusive alone (marketing shouts, and emoji in subject lines are ordinary),
  * so a signal is only raised when several coincide, and the severity follows how many.
  *
  * This is a formatting judgement about the envelope, not about meaning, which is why it is a rule and
@@ -903,7 +903,7 @@ function subjectObfuscation(context: AnalysisContext): SecuritySignal[] {
  * type it.
  *
  * A separate signal rather than another marker inside `subjectObfuscation` because it is far less
- * ambiguous than a caps ratio, and because it deserves its own line in the panel — "the subject is
+ * ambiguous than a caps ratio, and because it deserves its own line in the panel: "the subject is
  * padded with 700 spaces" is a concrete observation a reader can act on.
  *
  * Reads `rawSubject`: the normalised subject has had its whitespace collapsed by this point.
@@ -952,7 +952,7 @@ function repeatedDecorativeChar(subject: string): string | null {
 }
 
 /**
- * An opaque alphanumeric code, e.g. `A2QJZ**` — a per-recipient campaign tag rather than anything a
+ * An opaque alphanumeric code, e.g. `A2QJZ**`: a per-recipient campaign tag rather than anything a
  * reader needs. Requires upper case and digits with no lower case, which is what distinguishes a
  * generated tag from a word.
  */
@@ -974,7 +974,7 @@ function hasOpaqueCode(subject: string): boolean {
  * client*, borrowing the authority of the one party in the exchange the reader has no reason to doubt.
  *
  * Safe to state plainly because the reasoning is airtight in both directions. No mail client puts its
- * verdict inside the message — a verdict from the message it is judging would be worthless — so any such
+ * verdict inside the message (a verdict from the message it is judging would be worthless), so any such
  * sentence was written by the sender. And a genuine sender has no reason to write it: an organisation the
  * reader already deals with does not open by insisting it is trustworthy.
  *
@@ -985,7 +985,7 @@ function hasOpaqueCode(subject: string): boolean {
  * of sentence, because in practice it is written by legitimate senders far more often than by attackers.
  * Mail gateways append "this message has been scanned for viruses" to ordinary business mail on the way
  * out, and banks and clinics send "this is a secure message from …" from real portals. Both are useless to
- * a reader for the same reason the forged notice is — a claim inside the message about the message — but
+ * a reader for the same reason the forged notice is (a claim inside the message about the message), but
  * the population carrying them is overwhelmingly honest, and a finding that fires on ordinary business
  * correspondence costs more than the phish it occasionally catches.
  */
@@ -1015,7 +1015,7 @@ const FORGED_ASSURANCE =
  *
  * A little is ordinary: nearly every marketing platform hides a one-line preheader to control what the
  * inbox preview shows, which is why this is a *volume* test and not a technique test. Past the threshold
- * it is no longer a preheader — it is the filter-evasion pattern of pasting paragraphs of unrelated prose
+ * it is no longer a preheader; it is the filter-evasion pattern of pasting paragraphs of unrelated prose
  * into a message so that the ratio of suspicious wording to ordinary wording comes out looking innocent.
  *
  * The extension is one of the systems that dilutes, which is why the extraction separates this text

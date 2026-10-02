@@ -6,7 +6,7 @@
  * *confident* verdict from an almost empty message, and the verdict it produces is "Low Risk". A user
  * who has learned to trust a green badge is worse off than one with no extension at all.
  *
- * So the first test here does not test the guard — it demonstrates the danger, by scoring a phishing
+ * So the first test here does not test the guard; it demonstrates the danger, by scoring a phishing
  * message with its sender removed and showing what comes back. If a later change makes that message
  * score high on its own, this file should be revisited rather than deleted: the guard would then be
  * unnecessary, and a test asserting a near-zero score would be asserting the bug.
@@ -40,8 +40,8 @@ describe('why the guard exists', () => {
   /**
    * A thread hijack is the clearest case because it is *entirely* an identity attack: an outsider
    * replying into a real conversation, detectable only by comparing who they are against who has been
-   * in it. Take the sender away and there is nothing left to detect — no bad link, no attachment, no
-   * alarming wording — so the engine correctly reports a message with no findings, and the badge that
+   * in it. Take the sender away and there is nothing left to detect (no bad link, no attachment, no
+   * alarming wording), so the engine correctly reports a message with no findings, and the badge that
    * reports it says Low Risk.
    */
   it.each(['thread-hijack-lookalike', 'thread-hijack-name-reuse'])(
@@ -61,7 +61,7 @@ describe('why the guard exists', () => {
   /**
    * Recorded so the guard is not mistaken for a fix. Phishing that carries its payload in the body is
    * still caught with no sender at all, which is why the extension keeps working through a partial
-   * breakage rather than switching itself off — and why the gap is reported on the message it affects
+   * breakage rather than switching itself off, and why the gap is reported on the message it affects
    * instead of disabling the extension globally.
    */
   it('still catches a phish whose evidence is in the body', () => {
@@ -73,7 +73,7 @@ describe('why the guard exists', () => {
     const phish = loadFixture('thread-hijack-lookalike').email;
     const { subject: _subject, ...noSubject } = phish;
 
-    // Not a claim that the score is unchanged — some wording checks read the subject — only that what
+    // Not a claim that the score is unchanged (some wording checks read the subject), only that what
     // remains is a real assessment of a real sender, which is why a subject is not load-bearing.
     expect(analyzeDeterministic({ ...noSubject, subject: '' }).classification).not.toBe('low');
   });
@@ -113,7 +113,7 @@ describe('what the card says when nothing was checked', () => {
 
   /**
    * Asserted by *finding* the emphatic note rather than by position. The card marked one paragraph
-   * emphatic by index, which silently moved onto a cause line as soon as two parts were unread — the
+   * emphatic by index, which silently moved onto a cause line as soon as two parts were unread, leaving the
    * sentence that carries the whole point of this state, unemphasised.
    */
   it.each([[['sender']], [['sender', 'subject']], [[]]] as MessagePart[][][])(
@@ -199,7 +199,7 @@ describe('the diagnostic report', () => {
   /**
    * The privacy claim the card makes about the report, tested where it can be: no field of the input
    * carries message content, so no output can. A future author who adds `subject` or a body length to
-   * `DiagnosticInput` to make debugging easier will not be caught by this — hence the file header on
+   * `DiagnosticInput` to make debugging easier will not be caught by this, hence the file header on
    * `diagnostics.ts` listing what was excluded and why.
    */
   it('carries nothing from the message', () => {
@@ -272,7 +272,7 @@ describe('the session health tally', () => {
   /**
    * Observed in production: a healthy session reported drift in six groups and the popup warned that
    * Gmail had changed, because a no-match was counted as a fallback. Most of the selector table is
-   * *expected* to miss on any given message — nothing collapsed in a single-message thread, no quoted
+   * *expected* to miss on any given message: nothing collapsed in a single-message thread, no quoted
    * reply, no attachments, no list rows while a message is open, and no unauthenticated-sender avatar
    * exactly when the sender authenticated. A warning that fires on every ordinary session is one nobody
    * reads by the time it means something.
@@ -481,7 +481,7 @@ describe('the scoring half of the report', () => {
 
   /**
    * A check's own score is raw, before its category's cap, so the report sums what each category
-   * actually added and names a floor that decided the rest — "llm 23" beside a 15-point cap otherwise
+   * actually added and names a floor that decided the rest, since "llm 23" beside a 15-point cap otherwise
    * reads as the cap having failed.
    */
   it('shows what each category added after its cap, and what a floor added', () => {

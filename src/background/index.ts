@@ -8,7 +8,7 @@
  *
  * It does exactly four things, all of which are safe to lose at any instant:
  *   1. settings read/write
- *   2. the only place the extension opens a socket — the inert cloud path, and a model server the user
+ *   2. the only place the extension opens a socket: the inert cloud path, and a model server the user
  *      runs themselves
  *   3. seeding defaults on install
  *   4. painting the toolbar icon badge for the tab that asked (content scripts cannot call `chrome.action`)
@@ -16,7 +16,7 @@
  * Egress lives here rather than in the content script so that there is one file to audit for it, and so
  * that a Gmail page's execution context never holds the ability to make requests. Every endpoint is
  * composed from a URL that has already passed validation in `shared/settings.ts`; none is ever taken
- * from a message. The badge appearance likewise arrives complete — the worker does not re-derive a score.
+ * from a message. The badge appearance likewise arrives complete; the worker does not re-derive a score.
  *
  * It deliberately does **not** import the analysis engine or the on-device model adapter. Analysis
  * runs in the content script, where the execution context lives as long as the tab.
@@ -86,7 +86,7 @@ async function writeSettings(patch: Partial<Settings>): Promise<Settings> {
 
 /**
  * The settings a Gmail tab may change: the trust list, which the card's "trust this sender" button
- * edits. Everything else — above all where content is sent and which mode sends it — is changed only
+ * edits. Everything else (above all where content is sent and which mode sends it) is changed only
  * from the extension's own pages, so a defect that let a message run code in the content script could
  * not use this channel to point egress somewhere new.
  */
@@ -97,7 +97,7 @@ const TAB_WRITABLE_SETTINGS: ReadonlySet<string> = new Set(['trustedSenders']);
  *
  * Checked here, before every request, because the grant is the user's consent and Chrome does not
  * enforce it on its own: without a host permission an extension's fetch still leaves, as an ordinary
- * cross-origin request, and reaches any server that answers CORS for extension origins — which is the
+ * cross-origin request, and reaches any server that answers CORS for extension origins, which is the
  * configuration these servers are told to use. Settings can be edited without the options page (a
  * content script can write `chrome.storage` directly), so this is the check that holds either way: no
  * extension context can grant itself a host permission.
@@ -120,7 +120,7 @@ const NOT_GRANTED = 'access to this address has not been granted; press Connect 
  *
  * Inert in the MVP: without `aiMode: 'cloud'` *and* a configured `backendBaseUrl` this returns an
  * error without touching the network, and there is no default backend URL. When it is enabled it
- * talks only to our own backend — never to a model vendor — and carries no API key, because an API
+ * talks only to our own backend (never to a model vendor) and carries no API key, because an API
  * key shipped inside an extension is a public API key.
  */
 async function cloudAnalyze(request: CloudAnalyzeRequest): Promise<ExtensionResponse> {
@@ -170,7 +170,7 @@ async function cloudAnalyze(request: CloudAnalyzeRequest): Promise<ExtensionResp
  *
  * No cookies or cached credentials are attached: these are anonymous calls, and must not become a way
  * to correlate a browsing identity with mailbox content. A redirect would move message content to an
- * origin the user never approved — and, for a loopback server, potentially off the machine entirely.
+ * origin the user never approved and, for a loopback server, potentially off the machine entirely.
  * The signal stays attached while the body is read, so the timeout covers the whole exchange.
  */
 function privateFetch(url: string, init: RequestInit, signal: AbortSignal): Promise<Response> {
@@ -274,7 +274,7 @@ async function postCompletion(
 
     // The one failure in this function that used to be silent, and the most confusing: HTTP 200 with an
     // answer nothing can be done with. `scrub` reduces the text itself to a length, so what is recorded
-    // is its *shape* — enough to tell a truncated reply from a refusal from prose the parser gave up on,
+    // is its *shape*: enough to tell a truncated reply from a refusal from prose the parser gave up on,
     // which is the difference between raising a limit and changing a prompt.
     if (analysis === null) {
       logger.debug('model server returned no usable assessment', describeUnusable(body, content));
@@ -361,7 +361,7 @@ async function handle(
 
 /**
  * Applies a badge the content script already computed. `tabId` comes only from Chrome's `sender.tab`,
- * never from the message body — a forged id in the payload could not retarget another tab.
+ * never from the message body; a forged id in the payload could not retarget another tab.
  */
 async function setToolbarBadge(
   request: SetToolbarBadgeRequest,

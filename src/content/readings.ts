@@ -58,7 +58,7 @@ export class Readings {
 
   /**
    * An analyzer for `key` that answers from a settled reading, joins the one in flight, or asks
-   * `resolve()`'s analyzer — built only in the last case, so a replay constructs nothing.
+   * `resolve()`'s analyzer, built only in the last case, so a replay constructs nothing.
    *
    * The caller's abort signal is deliberately not forwarded to the shared inference. A view being
    * replaced by another view *of the same text* is the case this class exists for, and forwarding it

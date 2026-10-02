@@ -11,7 +11,7 @@
  * The card reads top to bottom in the order a reader asks their questions: how bad (the ring and the
  * verdict), why (the findings, grouped by what they are about), what the model thought (kept apart),
  * and how the number was reached (the breakdown). Three kinds of text are drawn three ways so they
- * cannot be confused — PhishLens's own statements in plain prose, words from the email as quotations,
+ * cannot be confused: PhishLens's own statements in plain prose, words from the email as quotations,
  * and measured values (domains, destinations, filenames) as code.
  *
  * All geometry is in `PANEL_CSS`; this file positions nothing. See docs/adr/0008-no-ui-framework-shadow-dom.md.
@@ -94,11 +94,11 @@ const FOCUS_TARGETS = [
  */
 const TRUST_NOTES: Readonly<Record<Exclude<TrustState['kind'], 'none'>, (entry: string) => string>> = {
   offer: (entry) =>
-    `If you get mail from ${entry} often, PhishLens can weight down findings about its wording — only its wording, and only while Gmail can confirm a message really came from there. Links, attachments and identity are always scored in full, and nothing is ever hidden from this card.`,
+    `If you get mail from ${entry} often, PhishLens can weight down findings about its wording: only its wording, and only while Gmail can confirm a message really came from there. Links, attachments and identity are always scored in full, and nothing is ever hidden from this card.`,
   trusted: (entry) =>
     `You trust ${entry}, and Gmail confirmed this message came from there, so findings about its wording are weighted down. Anything found in its links, attachments, or identity is scored in full.`,
   unproven: (entry) =>
-    `You trust ${entry}, but Gmail could not confirm that this message actually came from there — so that trust was not applied, and this score is exactly what it would be for any other sender.`,
+    `You trust ${entry}, but Gmail could not confirm that this message actually came from there, so that trust was not applied, and this score is exactly what it would be for any other sender.`,
 };
 
 /** The on-demand button, named for whatever would do the reading. */
@@ -123,8 +123,8 @@ export interface PanelCallbacks {
 /**
  * Everything the card renders, as one value.
  *
- * Grouped rather than passed positionally because the card is repainted from three places — first
- * paint, model refinement, cache hit — and a call site that updated the result but forgot the status
+ * Grouped rather than passed positionally because the card is repainted from three places (first
+ * paint, model refinement, cache hit), and a call site that updated the result but forgot the status
  * would claim the model is unavailable while it is still running.
  */
 export interface ResultView {
@@ -140,7 +140,7 @@ export interface ResultView {
 }
 
 /**
- * The message could not be read, so there is no score to explain — only why not.
+ * The message could not be read, so there is no score to explain, only why not.
  *
  * A separate shape rather than a flag on `ResultView`, because there is no `AnalysisResult` to supply
  * and inventing a zero-scored one is precisely the failure this card exists to prevent: it would
@@ -168,7 +168,7 @@ export class Panel {
    * The polite live region, built once with the shell and only ever given new text.
    *
    * Outside everything `#paint` replaces, which is the point: a live region announces changes to itself,
-   * and one rebuilt on every paint is a new region each time — removed before its change can be read, and
+   * and one rebuilt on every paint is a new region each time, removed before its change can be read, and
    * replaced by one whose first content screen readers treat as already there.
    */
   #live: HTMLElement | null = null;
@@ -213,7 +213,7 @@ export class Panel {
   /**
    * Removes the card. Returns whether focus was inside it, so the caller can put focus somewhere useful.
    *
-   * The caller decides where rather than this, because the card does not know what opened it — and
+   * The caller decides where rather than this, because the card does not know what opened it, and
    * because Escape is heard while focus is anywhere in Gmail, and moving focus out of a reply someone is
    * typing because they dismissed something else would be worse than leaving it.
    */
@@ -272,7 +272,7 @@ export class Panel {
   /**
    * Puts focus back on the control equivalent to the one that had it, after a paint replaced it.
    *
-   * A control that no longer exists — the ask button, once the reading it asked for is under way — sends
+   * A control that no longer exists (the ask button, once the reading it asked for is under way) sends
    * focus to the close button rather than letting it fall to the page, where a keyboard user would have
    * to find their way back into the card from the top of Gmail.
    */
@@ -326,7 +326,7 @@ export class Panel {
    * Counts up beside a reading in flight, so a slow model reads as working rather than stuck.
    *
    * Driven from the start time on the view rather than from when this paint happened, so a repaint
-   * mid-reading — the reader toggling the card, a trust click — carries on from the true elapsed time
+   * mid-reading (the reader toggling the card, a trust click) carries on from the true elapsed time
    * instead of restarting from zero.
    */
   #startTicker(view: ResultView): void {
@@ -436,8 +436,8 @@ export class Panel {
    *
    * Grouped by category, in the order the ring draws them, so the largest slice of the ring is the
    * first group a reader meets and the colour beside each group names the slice it accounts for.
-   * Findings that scored nothing go last under their own heading: they are context — authentication
-   * passed, a finding softened for a verified sender — and interleaving them with what raised the score
+   * Findings that scored nothing go last under their own heading: they are context (authentication
+   * passed, a finding softened for a verified sender), and interleaving them with what raised the score
    * makes the reasons harder to find.
    */
   #renderObserved(result: AnalysisResult): HTMLElement {
@@ -455,15 +455,15 @@ export class Panel {
         el('h3', { class: 'section-title', text: 'What the checks found' }),
         el('p', {
           class: 'section-note',
-          // "Nothing of concern" is only true when the notes below are transparency — authentication
+          // "Nothing of concern" is only true when the notes below are transparency: authentication
           // passed, no attachment was suspicious. A dampened finding is also scoreless, and saying nothing
           // was of concern directly above one contradicts the list a reader is looking at.
           text:
             scoring.length > 0
-              ? 'Observed — technical checks on this message.'
+              ? 'Observed: technical checks on this message.'
               : notes.some((s) => s.dampened === true)
-                ? 'Observed — nothing counted towards the score, for the reasons given.'
-                : 'Observed — technical checks found nothing of concern.',
+                ? 'Observed: nothing counted towards the score, for the reasons given.'
+                : 'Observed: technical checks found nothing of concern.',
         }),
         ...groups.map((group) =>
           this.#renderGroup(
@@ -572,7 +572,7 @@ export class Panel {
 
   /**
    * The AI section. It states plainly when no model ran, because silence would let a user assume the
-   * AI approved the message, and it distinguishes "no assessment" from "not one *yet*" — the two look
+   * AI approved the message, and it distinguishes "no assessment" from "not one *yet*": the two look
    * identical and mean opposite things.
    */
   #renderAssessment(view: ResultView): HTMLElement {
@@ -633,8 +633,8 @@ export class Panel {
   /**
    * The model's reading, laid out as a verdict with its particulars rather than as one paragraph.
    *
-   * The facts a reader weighs it by — who read it, how high it rated the message, how sure it was, what
-   * it added — are chips, because they are values to compare rather than sentences to read. The
+   * The facts a reader weighs it by (who read it, how high it rated the message, how sure it was, what
+   * it added) are chips, because they are values to compare rather than sentences to read. The
    * explanation stays prose, and the model's reasons become a list with each quoted excerpt set apart,
    * which is the part a reader can check against the message.
    */
@@ -695,8 +695,8 @@ export class Panel {
   /**
    * Shows the arithmetic. A score whose derivation is hidden is a score nobody can argue with.
    *
-   * Each bar is against its category's own ceiling, not against 100 — the ring already shows shares of
-   * the total — so "18 of 25" says how close that category came to the most it can add. Categories that
+   * Each bar is against its category's own ceiling, not against 100 (the ring already shows shares of
+   * the total), so "18 of 25" says how close that category came to the most it can add. Categories that
    * added nothing share one line: listing five empty bars pushes the two that matter out of view.
    */
   #renderBreakdown(result: AnalysisResult): HTMLElement {
@@ -812,7 +812,7 @@ export class Panel {
    * Why there is no score, and the report that makes it fixable.
    *
    * The report is rendered in full and selectable rather than hidden behind the copy button alone.
-   * `navigator.clipboard` can refuse — an unfocused document is enough — and a user who cannot see what
+   * `navigator.clipboard` can refuse (an unfocused document is enough), and a user who cannot see what
    * they are about to send has no way to satisfy themselves that it holds none of their mail, which is
    * the claim the paragraph above it makes.
    */
@@ -867,8 +867,8 @@ export class Panel {
 /**
  * What the live region says for a view: the verdict, and where the AI reading has got to.
  *
- * Short on purpose. It is read out on every change, so it carries only what changes — the verdict and
- * the reading's arrival — and leaves the reasons to the card, which the reader can move through.
+ * Short on purpose. It is read out on every change, so it carries only what changes (the verdict and
+ * the reading's arrival) and leaves the reasons to the card, which the reader can move through.
  */
 function announcement(view: PanelView): string {
   if (view.kind === 'unreadable') return `${UNREADABLE_LABEL}.`;
@@ -893,7 +893,7 @@ function categoryOrder(result: AnalysisResult): SignalCategory[] {
  *
  * Each slice is that category's share of the 100 points, in the colour its group and breakdown row
  * carry, so "most of this came from the links" is visible before a word is read. A score raised to a
- * minimum draws the raised part hatched, because it came from no category — it is the floor, and the
+ * minimum draws the raised part hatched, because it came from no category: it is the floor, and the
  * breakdown row of the same pattern says so.
  *
  * Decorative by construction: `aria-hidden`, and nothing in it is text. The number in the middle and
@@ -979,7 +979,7 @@ function renderRing(result: AnalysisResult): HTMLElement {
 }
 
 /**
- * The evidence under a finding, drawn by kind — see `evidenceOf`.
+ * The evidence under a finding, drawn by kind; see `evidenceOf`.
  *
  * Message-derived text in every branch, and set as text in every branch.
  */
@@ -1044,7 +1044,7 @@ function copyReport(button: HTMLButtonElement, report: string): void {
       button.textContent = 'Copied';
     },
     () => {
-      button.textContent = 'Copy failed — select the report above';
+      button.textContent = 'Copy failed: select the report above';
       button.disabled = true;
     },
   );

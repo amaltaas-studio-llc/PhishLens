@@ -5,7 +5,7 @@
  *
  * Everything else in this suite runs in plain Node, and for the detection engine that is a feature: the
  * rules are pure, so they need no DOM and the suite stays fast enough to run on every save. But it left
- * `src/gmail/` — the layer that decides whether any of it happens at all — asserted only through helpers
+ * `src/gmail/` (the layer that decides whether any of it happens at all) asserted only through helpers
  * reached via `__testables`. Two bugs walked straight through that gap:
  *
  *  - The trust gate required a named `dkim: pass`, which is only ever scraped from a tooltip most Gmail
@@ -18,7 +18,7 @@
  * **What these tests do and do not prove.** They prove the adapter's logic: that a details table becomes
  * an `EmailAuthInfo`, that a quoted reply is excluded, that an unread part is reported as unread rather
  * than silently dropped. They do *not* prove the selectors still match Gmail, because the markup here was
- * written from the same table the code reads. Nothing in a repository can prove that — it needs the live
+ * written from the same table the code reads. Nothing in a repository can prove that; it needs the live
  * product, which is what `src/content/health.ts` and the copied diagnostic are for. The structures below
  * follow a real session diagnostic (`table.cf.gJ` for the details table, `span[email]` for the sender)
  * rather than being invented, so they are at least a record of markup that existed.
@@ -27,7 +27,7 @@
  * suite is a strange place to make the one exception.
  *
  * Keep the markup *valid*. An HTML parser silently discards a `<td>` that is not inside a row, so invalid
- * fixture markup does not fail — it quietly tests a different tree than the one written here.
+ * fixture markup does not fail; it quietly tests a different tree than the one written here.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -82,7 +82,7 @@ function render(options: PageOptions = {}): void {
     .map((filename) => `<span class="aV3">${filename}</span>`)
     .join('');
 
-  // Both forms go *inside* the message, which is the only place `extractAuth` looks — and which the first
+  // Both forms go *inside* the message, which is the only place `extractAuth` looks, and which the first
   // candidate for the group (`.gJ .aiG`) already implies, since `.gJ` is part of the message header. An
   // unrelated live region placed on the page outside the message would make the negative case pass for
   // the wrong reason: nothing would have been found, rather than found and judged not to be a verdict.
@@ -162,7 +162,7 @@ describe('reading an ordinary message out of the page', () => {
 
   /**
    * A genuine reply: what was written is read, and what it quotes is not read as its wording. Its links
-   * are read regardless — which block is "quoted" is decided by a class the sender can write, and a link
+   * are read regardless: which block is "quoted" is decided by a class the sender can write, and a link
    * kept out of the analysis by one is still on screen to be clicked.
    */
   it('reads a reply’s own words, and every link including the ones it quotes', () => {
@@ -185,7 +185,7 @@ describe('reading an ordinary message out of the page', () => {
 
   /**
    * `textContent` joins text nodes exactly, so a footer of two cells reads `policyunsubscribe` and every
-   * rule anchored on a word boundary misses both words — the bulk-mail test among them, which is what
+   * rule anchored on a word boundary misses both words, the bulk-mail test among them, which is what
    * stops a newsletter's wording being read as a scam. Inline markup must not split a word the same way.
    */
   it('keeps apart text that renders on separate lines, and together text that renders as one word', () => {
@@ -226,7 +226,7 @@ describe('reading an ordinary message out of the page', () => {
   /**
    * A container of `font-size:0` around a newsletter, which is how bulk mail collapses the whitespace
    * between its tags while every paragraph inside names its own size. Removing the subtree took the whole
-   * body with it, and an empty body is not reported as a missing part — the element was there — so the
+   * body with it, and an empty body is not reported as a missing part (the element was there), so the
    * message was scored on its subject and sender alone with nothing on the card to say what had happened.
    */
   it('keeps body text whose container sets a zero font size its contents override', () => {
@@ -296,11 +296,11 @@ describe('reading an ordinary message out of the page', () => {
  *
  * The selectors that find it are matched against markup inside the message, and the sender writes some of
  * that markup. So the property asserted is not that a quote is always recognised correctly, but that
- * recognising one wrongly can cost wording at most — never the whole message, and never its links.
+ * recognising one wrongly can cost wording at most: never the whole message, and never its links.
  */
 describe('quoted content', () => {
   /**
-   * Gmail prefixes a sender's classes, so `pull-quote` arrives as `m_42pull-quote` — which a substring
+   * Gmail prefixes a sender's classes, so `pull-quote` arrives as `m_42pull-quote`, which a substring
    * match on "quote" still found. Wrapping a whole message in one emptied its body, the observer read the
    * empty message as one still loading, and it was never assessed at all: no score and no badge.
    */
@@ -358,7 +358,7 @@ describe('quoted content', () => {
 
 /**
  * "Nothing from an email is ever dereferenced." A copy made in Gmail's own document is a live one, and a
- * browser starts fetching an `<img>`'s source as soon as the element exists, attached or not — so reading a
+ * browser starts fetching an `<img>`'s source as soon as the element exists, attached or not, so reading a
  * message by cloning it would request its tracking pixels from the sender. Copies are made into a document
  * with no browsing context instead, and this asserts that no copy is made any other way.
  */
@@ -386,7 +386,7 @@ describe('copies of message content', () => {
 
 /**
  * The gate that was unsatisfiable. Gmail renders `signed-by` with the domain of a signature it verified
- * and omits the row when there is none, so the row's presence is the verdict — but the named verdicts the
+ * and omits the row when there is none, so the row's presence is the verdict, but the named verdicts the
  * gate used to demand are scraped from a details tooltip that most builds do not carry. Asserted here,
  * through the DOM, because asserting it on a hand-written `auth` block is what hid the bug.
  */
@@ -438,7 +438,7 @@ describe('Gmail’s own warning banner', () => {
   });
 
   /**
-   * The page always holds something with `role="alert"` — Gmail's live regions carry it — which is why
+   * The page always holds something with `role="alert"` (Gmail's live regions carry it), which is why
    * the last candidate in that selector group is safe only because the text is judged afterwards. If a
    * stray live region could become a warning, every message would carry Gmail's own verdict.
    */
@@ -455,7 +455,7 @@ describe('Gmail’s own warning banner', () => {
  * Selection asks for the *last* expanded message the user did not write, and "last" only means anything if
  * the candidates are in the order they appear on screen. The union of a prioritised selector list is not:
  * it lists every match of the first candidate, then every match of the second, so a thread whose messages
- * are marked differently arrives in an order Gmail never rendered — and one message arrives repeatedly, at
+ * are marked differently arrives in an order Gmail never rendered, and one message arrives repeatedly, at
  * each depth a candidate happened to match.
  *
  * Both failures pick the wrong element silently, which is the reason to assert them here: a badge appears
@@ -498,8 +498,8 @@ describe('choosing a message when the markup is inconsistent', () => {
   });
 
   /**
-   * One message, matched at two depths. Choosing the inner element loses everything outside it — here the
-   * header, so the sender and the authentication summary — and the message still looks readable.
+   * One message, matched at two depths. Choosing the inner element loses everything outside it (here the
+   * header, so the sender and the authentication summary), and the message still looks readable.
    */
   it('reads a message matched at two depths from its outermost element', () => {
     draw(`<div data-message-id="msg-3">
@@ -522,13 +522,13 @@ describe('choosing a message when the markup is inconsistent', () => {
   });
 
   /**
-   * The thread history, read from the same rows selection is made from — and it has to be the same rows,
+   * The thread history, read from the same rows selection is made from, and it has to be the same rows,
    * or the assessed message cannot be located among them.
    *
    * Reading them separately, from the first candidate selector that matched anything, put the two at
    * different depths: a `.adn.ads` wrapper enclosing a `[data-message-id]` element is one message twice,
    * and selection keeps the wrapper while the history listed the rows inside. Locating the wrapper among
-   * those rows failed, so the history came back empty — and an empty history is indistinguishable from an
+   * those rows failed, so the history came back empty, and an empty history is indistinguishable from an
    * ordinary one-message thread, which is to say every thread-hijack rule quietly stopped firing.
    */
   describe('the thread history behind the assessed message', () => {

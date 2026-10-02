@@ -33,7 +33,7 @@ Asserted in `test/semantic.test.ts`:
 ## What the model sees
 
 Display name, subject, and body (body capped). **No** sending domain, Reply-To, link destinations, or
-attachment types — those are checked in `analysis/rules/` from the real values. The prompt asks for the
+attachment types; those are checked in `analysis/rules/` from the real values. The prompt asks for the
 requested action before tone; concerning reasons should quote a short excerpt from the mail (any language)
 and explain in English. Each reason is asked to be one sentence of at most 15 words, so it reads as one
 line on the card; the parser allows up to 20 and cuts anything longer on a sentence or word boundary,
@@ -84,11 +84,11 @@ while the prompt would be unchanged; cancelled or failed attempts are not cached
 ## Your own model server
 
 Settings → AI mode **Model server**. OpenAI-compatible `POST …/chat/completions`. Same 15-point cap and
-corroboration rules — a larger model buys better reasons, not more weight.
+corroboration rules: a larger model buys better reasons, not more weight.
 
 - Base URL from settings; `http:` only for loopback; otherwise `https:`.
 - Optional host permission requested per origin on a click from the options page, and checked by the
-  worker before every request — Chrome alone would still send an ungranted one.
+  worker before every request, since Chrome alone would still send an ungranted one.
 - Endpoint and system prompt never arrive in a runtime message
   ([adr/0009](adr/0009-model-server-and-inert-cloud.md)); a Gmail tab can change only the trust list.
 

@@ -13,7 +13,7 @@
  *
  * No wrapping, no splitting text nodes, no re-parenting, no attribute rewriting, no listener changes.
  * For text evidence, the *smallest existing element* containing the text is highlighted rather than
- * the exact character range — a slightly coarser highlight in exchange for not restructuring Gmail's
+ * the exact character range: a slightly coarser highlight in exchange for not restructuring Gmail's
  * DOM.
  */
 import { BLOCK_BOUNDARY } from '../gmail/block-text.js';

@@ -2,7 +2,7 @@
  * What the welcome page says about Chrome's on-device model, for each state Chrome can report.
  *
  * Pure, so the wording is tested in Node like the popup's. The page cannot tell "On-device AI is
- * switched off" from "this device does not qualify" — Chrome reports both as `unavailable` — so that
+ * switched off" from "this device does not qualify" (Chrome reports both as `unavailable`), so that
  * state gives the steps for the first and says plainly what the second would look like.
  */
 import type { OnDeviceModelState } from '../analysis/llm/on-device.js';

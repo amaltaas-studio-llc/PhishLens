@@ -28,6 +28,6 @@ dev server ([0001](0001-esbuild-not-vite.md)). List-mark density is not assertab
 
 ## Rejected alternatives
 
-- **Hardcoded dist file lists** — drift when the manifest grows.
-- **Dev-server preview of the badge** — meaningless outside Gmail; the harness replaces it.
-- **Committing `dist/`** — stale binaries and review noise.
+- **Hardcoded dist file lists**: drift when the manifest grows.
+- **Dev-server preview of the badge**: meaningless outside Gmail; the harness replaces it.
+- **Committing `dist/`**: stale binaries and review noise.

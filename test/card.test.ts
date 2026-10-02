@@ -162,7 +162,7 @@ describe('the rendered card', () => {
 });
 
 /**
- * The card is repainted in place — the model's reading arriving, a trust click, the ask button — and a
+ * The card is repainted in place (the model's reading arriving, a trust click, the ask button), and a
  * repaint replaces every node in it. Each of those used to drop keyboard focus to the page and take the
  * live region with it, so a screen-reader user heard nothing when the reading landed and then had to find
  * their way back into the card from the top of Gmail.

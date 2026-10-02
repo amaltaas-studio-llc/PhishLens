@@ -1,6 +1,6 @@
 {
   "name": "legitimate-brand-country-domain",
-  "description": "False-positive resistance for a brand's own name under a country suffix the brand table does not list. A multinational runs one name across every market it sells in, and the table lists a handful of those domains per brand, so `paypal.it` was a domain PayPal does not own — which the lookalike rule reported as a `critical` imitation of `paypal.com` at 45 points and a severity floor, making authentic mail High Risk. Thirty-odd brands against two hundred country suffixes is not a list anyone can finish. The fixture asserts the honest replacement: the uncertainty is reported once, at a severity that sets no floor, and says what the reader can check.",
+  "description": "False-positive resistance for a brand's own name under a country suffix the brand table does not list. A multinational runs one name across every market it sells in, and the table lists a handful of those domains per brand, so `paypal.it` was a domain PayPal does not own, which the lookalike rule reported as a `critical` imitation of `paypal.com` at 45 points and a severity floor, making authentic mail High Risk. Thirty-odd brands against two hundred country suffixes is not a list anyone can finish. The fixture asserts the honest replacement: the uncertainty is reported once, at a severity that sets no floor, and says what the reader can check.",
   "email": {
     "senderName": "PayPal",
     "senderEmail": "service@paypal.it",

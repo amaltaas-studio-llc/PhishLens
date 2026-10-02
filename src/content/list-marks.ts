@@ -2,7 +2,7 @@
  * Markers on inbox rows, for the decision made before a message is opened.
  *
  * What a row can support is set out in `analysis/triage.ts`: a warning about the sender, or nothing.
- * This file is the DOM half — finding rows, reading the sender line, and putting a mark beside it — and
+ * This file is the DOM half (finding rows, reading the sender line, and putting a mark beside it), and
  * it is written around the two things that make a list different from a conversation view.
  *
  * **Gmail recycles rows.** Scrolling and refreshing reuse the same `tr` elements with different mail in
@@ -33,7 +33,7 @@ const MARKED_FOR = 'data-phishlens-row';
  *
  * Recorded because the sender key alone cannot tell a row that has nothing to say from one whose mark has
  * been thrown away. Gmail keeps the `tr` and rewrites the cells inside it when a message becomes read, so
- * opening a marked message and coming back left the row's key intact with its mark gone — skipped on every
+ * opening a marked message and coming back left the row's key intact with its mark gone: skipped on every
  * later pass, and a warning silently absent from exactly the row a reader had just been told to distrust.
  */
 const MARK_STATE = 'data-phishlens-mark';
@@ -79,7 +79,7 @@ export class ListMarks {
    * Gmail replaces its main region wholesale on a view change, and a `MutationObserver` holds the node it
    * was given. Started with an element, the marker stayed attached to a region that was no longer in the
    * document: rows kept arriving, none of them was ever looked at, and the absence of a mark is
-   * indistinguishable from mail with nothing to say about it. Nothing else restarts it either — the message
+   * indistinguishable from mail with nothing to say about it. Nothing else restarts it either; the message
    * observer's own reattachment is about the conversation pane and says nothing to this.
    */
   #resolveRoot: (() => Element) | null = null;
@@ -88,7 +88,7 @@ export class ListMarks {
    *
    * A callback rather than a string because marking starts at `document_idle`, when Gmail has often not
    * rendered its account chrome yet. Reading it once at that moment gives an empty address for the life of
-   * the tab, silently losing the most valuable verdict a row can carry — a domain imitating the reader's
+   * the tab, silently losing the most valuable verdict a row can carry: a domain imitating the reader's
    * own employer.
    */
   #readAccount: () => string = () => '';
@@ -191,8 +191,8 @@ export class ListMarks {
        * The display name, because the same address under a different name is a different claim and the
        * impersonation rules are largely about the name. And the recipient, because it arrives *late*: the
        * first passes run at `document_idle` with no account address, and `identity.lookalike_of_recipient_
-       * domain` — a `high` mark on a domain imitating the reader's own employer, which is the most valuable
-       * thing a row can say — cannot fire without it. Keyed on the sender alone, every row already on
+       * domain` (a `high` mark on a domain imitating the reader's own employer, which is the most valuable
+       * thing a row can say) cannot fire without it. Keyed on the sender alone, every row already on
        * screen when the address resolved kept its "nothing to say here" and was skipped for the life of
        * the tab, so the check only ever ran on mail that arrived later.
        */
@@ -214,7 +214,7 @@ export class ListMarks {
     /*
      * All three counts, every pass, and not just the marks.
      *
-     * An unmarked inbox is the expected result — the floor is `high`, so ordinary mail earns nothing — and
+     * An unmarked inbox is the expected result (the floor is `high`, so ordinary mail earns nothing), and
      * a stale row selector produces exactly the same silence. Logging only the marks made the two
      * indistinguishable from outside, which is the question anyone debugging this actually has: rows at
      * zero means the selectors no longer match Gmail's markup, and rows with addresses but no marks means
@@ -256,7 +256,7 @@ function rowsIn(root: Element): Element[] {
  *
  * `[email]` is what makes triage possible from a list at all: Gmail puts the real address in that
  * attribute even though the row displays only a name. Without it there is no address, so there is no
- * verdict — which is the honest outcome rather than a guess from a display name.
+ * verdict, which is the honest outcome rather than a guess from a display name.
  */
 function readSender(row: Element): { senderName: string; senderEmail: string } {
   const element = queryFirst(row, SELECTORS.listSender);
@@ -298,7 +298,7 @@ function addMark(row: Element, verdict: TriageVerdict): boolean {
     text: GLYPHS[verdict.severity],
     attrs: {
       // The finding's own wording, as the tooltip. It comes from a message, so it arrives as text and is
-      // set as an attribute value — never parsed.
+      // set as an attribute value, never parsed.
       title: `PhishLens: ${verdict.title}. This message has not been opened or fully checked.`,
       'aria-label': `PhishLens warning: ${verdict.title}`,
       'data-phishlens-severity': verdict.severity,

@@ -2,7 +2,7 @@
  * The popup's wording.
  *
  * Worth asserting rather than eyeballing because the popup is consulted when something looks wrong, and
- * the two sentences it must never confuse — "nothing was found" and "nothing was checked" — are one
+ * the two sentences it must never confuse, "nothing was found" and "nothing was checked", are one
  * careless edit apart.
  */
 import { describe, expect, it } from 'vitest';
@@ -226,7 +226,7 @@ describe('healthRow', () => {
 
   /**
    * The only row that speaks up while every check is still working, so it is worded as the warning it
-   * is. It must not read as a present failure — someone who concludes their scores are already wrong
+   * is. It must not read as a present failure: someone who concludes their scores are already wrong
    * will stop trusting the ones that are fine.
    */
   it('warns about a selector list running on a fallback before it breaks', () => {
@@ -250,7 +250,7 @@ describe('healthRow', () => {
 
 /**
  * The copy affordance is deliberately independent of `healthRow` above. That row stays silent while
- * extraction is healthy, and a score someone disagrees with is a bug report about a healthy session —
+ * extraction is healthy, and a score someone disagrees with is a bug report about a healthy session,
  * so attaching the only copy button to the row made the report unreachable in the case it is most
  * wanted for.
  */

@@ -112,15 +112,15 @@ export class GmailDomAdapter implements MailAdapter {
          * selector that matched it, so a thread arrives as an interleaving of wrappers ordered by
          * selector rather than by position on screen, and "the last" is then whichever message the
          * least specific selector happened to reach last. Collapsing to the outermost before testing
-         * for expansion is deliberate too — a collapsed row can contain a body, and asking the wrapper
+         * for expansion is deliberate too: a collapsed row can contain a body, and asking the wrapper
          * is how the row's own state gets to decide.
          */
         const rows = outermost(queryAllUnion(root, SELECTORS.messageContainer));
 
         /*
          * History and selection come from that one population, which is the only way the two can be
-         * compared. Reading the rows separately — from the first candidate selector that matched
-         * anything — gave the history a different set of elements at a different depth, and where the
+         * compared. Reading the rows separately (from the first candidate selector that matched
+         * anything) gave the history a different set of elements at a different depth, and where the
          * wrapper selected here *contained* the rows rather than the other way round, locating the
          * assessed message among them failed and the history came back empty. Empty history is the
          * failure with no symptom: it looks exactly like an ordinary thread, and the thread-hijack rules
@@ -261,7 +261,7 @@ export interface MessageIdentity {
   /** Lowercased sender address, or `''` when the header did not yield one. */
   sender: string;
   /**
-   * Lowercased addresses the header names outside the sender element — in practice the recipient row —
+   * Lowercased addresses the header names outside the sender element (in practice the recipient row),
    * or `null` when it named none.
    *
    * `null` means **unknown**, not "nobody". Gmail may not have rendered the recipient row yet, and the
@@ -349,19 +349,19 @@ export function accountAddressFromTitle(title: string): string | undefined {
  * date is a string in the reader's locale that a message can also simply lie about.
  *
  * Rows after the assessed message are excluded rather than merely ignored. What the rules ask is
- * whether the sender was *established* in the conversation, and a party who only appears further down —
- * where Gmail puts the reader's own later reply, or a message opened out of order — was not.
+ * whether the sender was *established* in the conversation, and a party who only appears further down
+ * (where Gmail puts the reader's own later reply, or a message opened out of order) was not.
  */
 function readPriorSenders(rows: readonly Element[], current: Element): ThreadParticipant[] {
   // Identity, because the assessed message is one of these rows: caller and history read the same
   // population, one element per message. Containment was the test while they were read separately, and
-  // it only ever worked in one direction — a row containing the assessed element. Where the element was
+  // it only ever worked in one direction: a row containing the assessed element. Where the element was
   // the outer wrapper and the rows were the `[data-message-id]` elements inside it, the containment ran
   // the other way, nothing matched, and the history was silently empty.
   const boundary = rows.indexOf(current);
 
   // An unlocatable boundary yields no history, rather than treating every row as preceding. Rows below
-  // the assessed message would then be compared against it, and a wrong history can invent a finding —
+  // the assessed message would then be compared against it, and a wrong history can invent a finding,
   // which costs more than the missed one that silence costs.
   const preceding = boundary === -1 ? [] : rows.slice(0, boundary);
 
@@ -648,7 +648,7 @@ function extractBody(
   /*
    * Quoted blocks are the whole body: a forwarded message with nothing added, or a sender who wrapped
    * everything in a class the quote selectors match. Read them rather than return nothing. An empty body
-   * here was the worst outcome available — not "not checked" but no assessment at all, because the
+   * here was the worst outcome available: not "not checked" but no assessment at all, because the
    * observer reads a message with no words, links or attachments as one still loading and waits for it
    * forever, so the message was left with no badge, exactly like a clean one on a quiet install. The
    * quote rule exists to keep a reply's history from being scored against the person replying, and
@@ -674,13 +674,13 @@ function extractBody(
     ...(chars > 0 ? { hidden: { chars, techniques: [...techniques] } } : {}),
     /*
      * Removals are reported when they account for the *whole* body, because reading an inline style cannot
-     * be exact — a declaration's effect depends on the subtree under it and on stylesheets this cannot see —
+     * be exact (a declaration's effect depends on the subtree under it and on stylesheets this cannot see),
      * and the two ways of being wrong cost wildly different amounts. Over-report and some hidden filler
      * joins the body. Strip everything and the body is empty, which is worse than it sounds: a body that is
      * present but yields nothing was not treated as a missing part, so the message was scored on its subject
      * and sender alone, every content and link check reading an empty string, with nothing on the card to
-     * say so. A wrapper of `font-size:0` around a whole newsletter — which collapses the whitespace between
-     * its tags and hides none of its text — did exactly that.
+     * say so. A wrapper of `font-size:0` around a whole newsletter (which collapses the whitespace between
+     * its tags and hides none of its text) did exactly that.
      *
      * Substituting the unpruned text instead was the first attempt and is worse. Gmail renders a body
      * hidden while it is still building the view, so a message mid-render would be analysed as one
@@ -715,7 +715,7 @@ function pruneHidden(container: Element): { chars: number; techniques: string[] 
  *
  * The other silent extraction failure, and a worse one than an empty thread history: `missingParts` only
  * calls the body missing when the *element* is absent, so a body that is present and yields nothing is
- * scored — on the subject and the sender alone, with every content and link check reading an empty string,
+ * scored, on the subject and the sender alone, with every content and link check reading an empty string,
  * and nothing on the card to say so. From the outside that is indistinguishable from a message whose
  * wording is simply unremarkable.
  *
@@ -725,7 +725,7 @@ function pruneHidden(container: Element): { chars: number; techniques: string[] 
  * because its payload is a picture (`images` above zero), and a body candidate that matched the wrong
  * element (everything zero). The techniques are this project's own vocabulary, not the message's: naming
  * them is what turned "the hidden scan removed all of it" into "which declaration did". Counts and tag
- * names only — nothing from the message itself.
+ * names only, nothing from the message itself.
  */
 function logEmptyBody(bodyElement: Element, hiddenChars: number, techniques: string[]): void {
   logger.debug('body read as empty', {
@@ -760,7 +760,7 @@ function normalizeBodyWhitespace(text: string): string {
  * Quoted blocks are *not* skipped here, unlike in `extractBody`, and the asymmetry is deliberate. Which
  * block counts as quoted is decided by markup inside the message, and some of that markup is the sender's
  * to write: `.gmail_quote` is a class anyone can put on a `<div>`. Skipping quoted anchors made that class
- * a way to take every link out of the analysis while the reader still sees and can click each one — and a
+ * a way to take every link out of the analysis while the reader still sees and can click each one, and a
  * link is the thing a phish exists to deliver. Dropping a quoted sentence costs a little wording; dropping
  * a quoted link costs the finding that mattered.
  *
@@ -803,7 +803,7 @@ function extractLinks(bodyElement: Element | null): EmailLink[] {
 /**
  * Attachment metadata from the chips Gmail renders in the message footer.
  *
- * Filenames only. Nothing is downloaded, opened, hashed, or requested — not even a HEAD. Gmail's
+ * Filenames only. Nothing is downloaded, opened, hashed, or requested, not even a HEAD. Gmail's
  * `download_url` attribute (`<mime>:<filename>:<url>`) is read for the filename and never fetched.
  */
 function extractAttachments(root: Element): EmailAttachment[] {
@@ -909,8 +909,8 @@ function extractAuth(
  *    our spam filters." Every message in the spam folder carries one, including messages the user filed
  *    there by hand.
  *
- * Treating the second as the first made the score depend on which folder was open — the same message
- * scored differently in Spam than in the Inbox — and let a manual "mark as spam" come back as a security
+ * Treating the second as the first made the score depend on which folder was open (the same message
+ * scored differently in Spam than in the Inbox) and let a manual "mark as spam" come back as a security
  * finding. So a banner framed as placement is discarded **in full**, including any security wording
  * inside it, because in that frame the wording is Gmail's filing rationale rather than a warning to the
  * reader.
@@ -939,7 +939,7 @@ const SECURITY_VERDICT =
  * sender chooses, so a message from `"Acme via acme.example" <x@evil.example>` could otherwise nominate
  * its own `via` value and, by matching its own domain, suppress the finding this exists to produce.
  *
- * Message bodies are excluded for the same reason, and more urgently — `queryFirst` on a header selector
+ * Message bodies are excluded for the same reason, and more urgently: `queryFirst` on a header selector
  * can land inside quoted content in a threaded view.
  */
 function readVia(

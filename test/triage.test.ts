@@ -1,7 +1,7 @@
 /**
  * Inbox-list triage.
  *
- * A marker on a list row is the extension's least-evidenced statement — a sender line and nothing else —
+ * A marker on a list row is the extension's least-evidenced statement (a sender line and nothing else),
  * so the tests here are mostly about what it must *not* say. Two properties matter more than any
  * detection: it never marks a row as safe, and it never fires on ordinary mail, because a marker a user
  * learns to ignore is worse than no marker and one they trust as an all-clear is worse still.

@@ -98,8 +98,8 @@ function asSession(value: unknown): Session | null {
 /**
  * A session branched from `template`, or `null` when this build cannot branch one.
  *
- * `clone()` exists in the Prompt API for exactly this: it copies the session's state — including the
- * system prompt, which is the part that must not be lost — without re-loading the model, so per-message
+ * `clone()` exists in the Prompt API for exactly this: it copies the session's state (including the
+ * system prompt, which is the part that must not be lost) without re-loading the model, so per-message
  * isolation costs almost nothing where it is supported.
  */
 async function branch(template: Session): Promise<Session | null> {
@@ -128,8 +128,8 @@ export class ChromePromptAnalyzer implements SemanticAnalyzer {
    * Whether the cached session was created with the system prompt attached.
    *
    * False only on the last-resort bare `create({})`. Every instruction that makes the output usable
-   * lives in `SYSTEM_PROMPT` — the JSON contract, the calibration against over-flagging, and the
-   * framing of message text as data rather than instructions — so a session without it must be given
+   * lives in `SYSTEM_PROMPT` (the JSON contract, the calibration against over-flagging, and the
+   * framing of message text as data rather than instructions), so a session without it must be given
    * the same text inline instead. Running without it at all would quietly produce an uncalibrated,
    * injection-exposed verdict that looks exactly like a normal one.
    */
@@ -145,7 +145,7 @@ export class ChromePromptAnalyzer implements SemanticAnalyzer {
    *
    * A session accepts one prompt at a time and rejects a second while the first is outstanding. Since a
    * rejected inference is treated as a poisoned session and destroys it, concurrent calls do not merely
-   * queue badly — they lose each other's results. Gmail renders a thread in stages and each stage looks
+   * queue badly; they lose each other's results. Gmail renders a thread in stages and each stage looks
    * like a new message to the observer, so concurrency here is the normal case, not an edge one.
    */
   #chain: Promise<unknown> = Promise.resolve();
@@ -219,7 +219,7 @@ export class ChromePromptAnalyzer implements SemanticAnalyzer {
      * one*, which is wrong in three ways of increasing seriousness. The context fills up with mail the
      * reader has finished with, until an inference fails for length on a busy morning and the failure
      * looks like an unavailable model. A verdict anchors on its predecessor, so the same message scores
-     * differently depending on what was read before it — the opposite of a check you can reproduce. And
+     * differently depending on what was read before it, the opposite of a check you can reproduce. And
      * the wording of one message reaches the judgement of the next, which hands any message in the
      * mailbox a channel for steering the assessment of every message after it.
      */
@@ -290,7 +290,7 @@ export class ChromePromptAnalyzer implements SemanticAnalyzer {
    * Creates a session, reusing the cached one when present.
    *
    * Tries the modern `initialPrompts` system-role shape first, then the older `systemPrompt` option,
-   * then a bare create — each historically valid, none guaranteed.
+   * then a bare create: each historically valid, none guaranteed.
    */
   async #ensureSession(): Promise<Session | null> {
     // A queued rebuild can outlive teardown, and a session created after it would never be released.
@@ -353,8 +353,8 @@ export class ChromePromptAnalyzer implements SemanticAnalyzer {
    * it and retrying unconstrained when it does not.
    *
    * The retry loop is why abort needs explicit handling. Its `catch` exists to swallow "this Chrome
-   * version rejected that option shape" and try the next one, and an abort arrives as a rejection too
-   * — so without the check below, cancelling would silently run all three attempts instead of none.
+   * version rejected that option shape" and try the next one, and an abort arrives as a rejection too,
+   * so without the check below, cancelling would silently run all three attempts instead of none.
    */
   async #promptWithTimeout(
     session: Session,
@@ -389,7 +389,7 @@ export class ChromePromptAnalyzer implements SemanticAnalyzer {
   /**
    * The shapes to try, the one that last worked first.
    *
-   * The browser does not change under a tab, so a shape it rejected once it will reject every time — and
+   * The browser does not change under a tab, so a shape it rejected once it will reject every time, and
    * a rejection is not free: an unsupported option can be refused only after the input has been read.
    * The rest of the ladder is kept behind it rather than dropped, because the remembered shape can also
    * fail for a reason that is about the message, and a fallback that has stopped existing cannot help.

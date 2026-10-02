@@ -144,7 +144,7 @@ describe('isSenderProven', () => {
 
   it('rejects SPF alone', () => {
     // SPF authenticates the envelope, not the From header, so it passes for mail that merely claims the
-    // address — the exact case this gate exists to exclude.
+    // address: the exact case this gate exists to exclude.
     expect(isSenderProven({ spf: 'pass' }, 'ledgerworks-billing.com')).toBe(false);
   });
 
@@ -445,7 +445,7 @@ describe('a consumer mailbox at a brand-owned domain', () => {
  * is the request no real organisation makes.
  *
  * Asserted through the score and through `dampened`, in both directions, because the useful half is that
- * genuine brand mail still gets the benefit — a gate this easy to over-tighten would quietly make the
+ * genuine brand mail still gets the benefit: a gate this easy to over-tighten would quietly make the
  * feature unreachable, which is how the trust gate broke once already.
  */
 describe('brand dampening and proof of origin', () => {
@@ -502,7 +502,7 @@ describe('brand dampening and proof of origin', () => {
 
   it('never softens a high finding, however well the brand is proven', () => {
     // Asking for the code is the request no real organisation makes, and a genuine signature is what a
-    // compromised brand mailbox produces — the reason trust keeps `high` at full weight applies here too.
+    // compromised brand mailbox produces, so the reason trust keeps `high` at full weight applies here too.
     const result = analyzeDeterministic({ ...impersonation, auth: PROVEN_BRAND }, { now: FIXED_NOW });
     const mfa = signalFor(result, 'content.mfa_request');
 
@@ -557,7 +557,7 @@ describe('normalizeTrustList', () => {
 
   /**
    * The count and the per-entry length were each chosen against the 8 KB `storage.sync` item cap, but
-   * together they permit about 13 KB — a write that fails and takes every other setting in the same item
+   * together they permit about 13 KB, a write that fails and takes every other setting in the same item
    * with it. Absurd input, real consequence, and a quota error is the worst way to find out.
    */
   it('bounds the serialised size, not only the number of entries', () => {

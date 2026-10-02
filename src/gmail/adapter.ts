@@ -32,7 +32,7 @@ export interface MessageHandle {
  * An extracted message, plus which of its parts the adapter could not find.
  *
  * The two are returned together and kept separate. `EmailMessage` describes the mail, and how well the
- * adapter could read the page is not a property of the mail — putting it inside would also let
+ * adapter could read the page is not a property of the mail; putting it inside would also let
  * `analysis/` branch on extraction quality, which is the browser layer's business and would make the
  * detection rules untestable without a notion of a broken DOM.
  */
@@ -47,7 +47,7 @@ export interface Extraction {
  *
  * The sender is the whole reason this concept exists. Identity, authentication, thread and correlation
  * checks all key off the sending domain, so a message with no readable sender produces almost no
- * findings, which the aggregation faithfully turns into a score near zero — a confident "Low Risk" on
+ * findings, which the aggregation faithfully turns into a score near zero: a confident "Low Risk" on
  * a message nobody actually checked. That is the one failure direction this project cannot accept, so
  * an unscorable extraction is reported to the reader instead of being scored.
  *

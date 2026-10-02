@@ -2,8 +2,8 @@
  * Just enough RFC 5322 and MIME to turn a stored message into the parts Gmail would render.
  *
  * Not a general parser, and deliberately so: it exists to feed the engine what the content script would
- * read, so anything Gmail does not show — every header but a handful, alternative parts it does not
- * pick, attachment bytes — is dropped as early as possible. Every loop is bounded, because a corpus of
+ * read, so anything Gmail does not show (every header but a handful, alternative parts it does not
+ * pick, attachment bytes) is dropped as early as possible. Every loop is bounded, because a corpus of
  * phishing mail is exactly where a message with ten thousand nested parts turns up.
  */
 

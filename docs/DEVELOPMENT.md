@@ -31,7 +31,7 @@ npm test             # vitest run
 npm run test:watch
 npm run test:coverage
 
-npm run verify       # lint, typecheck, test, build, dist check — the gate before committing
+npm run verify       # lint, typecheck, test, build, dist check: the gate before committing
 ```
 
 The icons are drawn by code: every build reruns `scripts/gen-icons.mjs` into `assets/icons/` and copies
@@ -101,10 +101,10 @@ each state is a link:
 ```text
 ?fixture=microsoft-phish   any file in test/fixtures/
 ?semantic=ready            ready | pending | skipped | unavailable | no-output | error | cancelled | off
-?ai=local                  local | server | cloud | off — which analyzer the card names
-?missing=none              none | sender | subject — a part the adapter could not read. `sender`
+?ai=local                  local | server | cloud | off: which analyzer the card names
+?missing=none              none | sender | subject: a part the adapter could not read. `sender`
                            withholds the score and shows the "Not checked" card; `subject` must not
-?trust=none                none | offer | trusted | unproven — the sender's trust state in the card
+?trust=none                none | offer | trusted | unproven: the sender's trust state in the card
 ?view=full                 full (mock message) | card (card alone) | badges (one row per risk band)
                            | list (the whole corpus as an inbox, with the real row scanner over it)
 ?card=1                    open the explanation card
@@ -115,7 +115,7 @@ each state is a link:
 ```
 
 `view=list` is worth singling out. The row markers' failure mode is not a wrong verdict but too many of
-them, and no test can answer "would you leave this switched on" — so the list renders every fixture as one
+them, and no test can answer "would you leave this switched on", so the list renders every fixture as one
 inbox, using markup that mirrors `SELECTORS.listRow` and its neighbours. A stale selector candidate shows
 up here as a missing mark rather than as a passing test.
 
@@ -129,14 +129,14 @@ npm run harness      # in one terminal
 npm run screenshots  # in another
 ```
 
-`scripts/screenshots.mjs` drives headless Chrome — no Puppeteer or Playwright, since a browser automation
-stack is a large amount of supply chain to own for eight PNGs — and overwrites `docs/assets/`. Set
+`scripts/screenshots.mjs` drives headless Chrome (no Puppeteer or Playwright, since a browser automation
+stack is a large amount of supply chain to own for eight PNGs) and overwrites `docs/assets/`. Set
 `CHROME_PATH` if Chrome is somewhere unusual. Because the images are renders of the shipping components, a
 UI change is one command away from being reflected in the README instead of silently outdating it.
 
 ## Testing
 
-Tests run in plain Node — no Chrome, no Gmail, no network. A handful of files ask for a DOM and get it from
+Tests run in plain Node: no Chrome, no Gmail, no network. A handful of files ask for a DOM and get it from
 `jsdom`, which is why that is the only dev dependency here that is not build, lint or test tooling; see the
 note below the table. `npm run test:coverage` uses `@vitest/coverage-v8`, which must stay on the same
 version as `vitest`.
@@ -144,39 +144,39 @@ version as `vitest`.
 | File | Covers |
 | --- | --- |
 | `test/aggregate.test.ts` | The scoring functions in isolation: per-severity ceilings, category caps, `[0, 100]` clamping, and zero contribution from an empty category, which is the "no local model" path. |
-| `test/detection.test.ts` | The full pipeline against the fixture corpus (including multilingual `northwind-*` lures, code deliveries and newsletters), invariants across all of them, and which message in a thread gets picked — including the forged-from-yourself cases that must *not* be skipped. |
+| `test/detection.test.ts` | The full pipeline against the fixture corpus (including multilingual `northwind-*` lures, code deliveries and newsletters), invariants across all of them, and which message in a thread gets picked, including the forged-from-yourself cases that must *not* be skipped. |
 | `test/languages.test.ts` | Language-pack structure: every theme id exists, patterns use Unicode boundaries and bounded gaps, diacritic folding keeps indices, gating stays off ordinary English, and after-verb negation reverses a solicitation. |
-| `test/semantic.test.ts` | The containment guarantees, the calibration limits, and the unavailable / throwing / hanging / cancelled analyzer paths — including which status each reports. |
+| `test/semantic.test.ts` | The containment guarantees, the calibration limits, and the unavailable / throwing / hanging / cancelled analyzer paths, including which status each reports. |
 | `test/chrome-prompt.test.ts` | The on-device adapter against fakes for every API shape Chrome has shipped and every malformed shape it might, plus concurrency: a session fake that rejects overlapping prompts the way the real one does. Also the welcome page's state probe, its click-started download, and the input/output language declarations. |
 | `test/url.test.ts` | Obfuscated IP forms, forged suffix boundaries, redirect chains, hostnames `new URL()` accepts but that cannot exist. |
 | `test/unicode.test.ts` | Punycode decoding, script mixing, bidi tricks, confusable folding, bounded edit distance. |
-| `test/privacy.test.ts` | Settings validation, the model-server URL policy from both directions (loopback `http:` yes, anything else no), and what `buildCloudPayload` **drops** as well as what it keeps — then the same contract again against payloads the builder could not have produced, because the worker is what actually sends. |
+| `test/privacy.test.ts` | Settings validation, the model-server URL policy from both directions (loopback `http:` yes, anything else no), and what `buildCloudPayload` **drops** as well as what it keeps, then the same contract again against payloads the builder could not have produced, because the worker is what actually sends. |
 | `test/observer.test.ts` | The SPA observer's emit and suppress decisions in both directions, since every negative decision it makes is silent by design. |
-| `test/hidden-text.test.ts` | Which inline styles count as hiding, and — mostly — which do not: this is the one scan whose output is *removed* from the body before scoring, so an over-eager rule deletes the evidence rather than finding it. Includes the escape rule: only a descendant with an absolute size or its own `visibility: visible` is freed, never the container's own text. |
+| `test/hidden-text.test.ts` | Which inline styles count as hiding, and (mostly) which do not: this is the one scan whose output is *removed* from the body before scoring, so an over-eager rule deletes the evidence rather than finding it. Includes the escape rule: only a descendant with an absolute size or its own `visibility: visible` is freed, never the container's own text. |
 | `test/highlight.test.ts` | Locating a finding's excerpt in the rendered body: one bounded pass over text nodes, quoted blocks searched only when nothing outside them matches, links matched through the shared selector. Needs a DOM. |
-| `test/extraction.test.ts` | The extraction-gap rule, starting by demonstrating the danger: a thread hijack scored with its sender removed comes back **Low Risk**, because a reply-chain attack is detectable only from identity. Also that the card's wording never reassures, and that neither diagnostic — the single-message one or the session tally — carries anything from a message, including the section that accounts for the score, where every free-text field of a message is asserted absent at once. |
+| `test/extraction.test.ts` | The extraction-gap rule, starting by demonstrating the danger: a thread hijack scored with its sender removed comes back **Low Risk**, because a reply-chain attack is detectable only from identity. Also that the card's wording never reassures, and that neither diagnostic (the single-message one or the session tally) carries anything from a message, including the section that accounts for the score, where every free-text field of a message is asserted absent at once. |
 | `test/background.test.ts` | The service worker's handlers against a stub of `chrome`: no request to an origin the user has not granted, the worker's own system prompt in place of the caller's, a Gmail tab limited to changing the trust list, and a toolbar badge painted only on the tab that asked and only when every field is well-formed. Overlapping settings patches retain both changes, and overlapping toolbar paints finish in order. |
 | `test/model-protocol.test.ts` | The OpenAI-compatible request and response shapes, and the URL policy the worker enforces before any of it is sent. |
 | `test/trust.test.ts` | Each of the four limits on trusted senders, from both sides: that trust dampens what it should, and that it does nothing at all when authentication did not prove the sender, against an identity finding, or against a `high` finding. |
 | `test/triage.test.ts` | The sender-only verdicts, that none of them can read as an all-clear, that no low-scoring fixture is marked, and the allowlist guard that fails when a new identity rule is classified as neither safe nor unsafe for a list row. |
-| `test/popup.test.ts` | The popup's wording for every state — in particular that "nothing was found" and "nothing was checked" never share a phrasing — and the health line for each shape of extraction failure. |
+| `test/popup.test.ts` | The popup's wording for every state (in particular that "nothing was found" and "nothing was checked" never share a phrasing) and the health line for each shape of extraction failure. |
 | `test/toolbar-badge.test.ts` | Toolbar icon badge text and colours for each tab status, including `showBadgeWhenLow` and the unreadable `?`. |
 | `test/welcome.test.ts` | The welcome page's guidance for each on-device model state: the `chrome://settings/system` steps when the model is unavailable, an update when Chrome has no Prompt API, a download only from a button, and that every state says the checks work without the model. |
 | `test/gmail-dom.test.ts` | The adapter against Gmail-shaped markup: sender, subject, body, links and attachment chips read out of a rendered page, authentication read from the details table, a warning banner distinguished from an unrelated live region, an unreadable sender reported as unread rather than empty, and which message is chosen when the candidate selectors disagree about which element is a message. Needs a DOM. |
 | `test/observer-dom.test.ts` | The observer and adapter over a real `MutationObserver`: in-place collapse and evidence changes, visibility before the first readable extraction, nested message IDs, heading-only navigation, and debounce-first reconciliation. Needs a DOM. |
-| `test/list-marks.test.ts` | The list marker against inbox-shaped rows: that ordinary mail is left alone, that a recycled row is re-evaluated rather than trusted, that rows already on screen are re-triaged once Gmail exposes the signed-in address — which arrives after they do, and without which the check for a domain imitating the reader's own cannot run — that a mark Gmail discards when it redraws a row as read comes back, and that marking survives Gmail replacing the region being watched. Needs a DOM. |
-| `test/settings.test.ts` | What each setting asks of a view already on screen, with a guard that fails until a newly added setting is classified — "changes nothing" being the one answer that cannot be right for something offered as a choice. |
+| `test/list-marks.test.ts` | The list marker against inbox-shaped rows: that ordinary mail is left alone, that a recycled row is re-evaluated rather than trusted, that rows already on screen are re-triaged once Gmail exposes the signed-in address (which arrives after they do, and without which the check for a domain imitating the reader's own cannot run), that a mark Gmail discards when it redraws a row as read comes back, and that marking survives Gmail replacing the region being watched. Needs a DOM. |
+| `test/settings.test.ts` | What each setting asks of a view already on screen, with a guard that fails until a newly added setting is classified, "changes nothing" being the one answer that cannot be right for something offered as a choice. |
 | `test/readings.test.ts` | Availability waits and late answers cannot survive cancellation or a model change into the reading cache. |
 | `test/controller.test.ts` | The orchestration's timing, with the model's answer held as a promise this file resolves by hand: that a settings change abandons the inference it supersedes, that the superseded answer reaches neither the screen nor the cache, that a presentation-only change leaves the inference running, and that a header Gmail redraws gets its badge back without another inference. Also that a redraw joins or reuses a reading rather than asking twice, that clean mail is not sent to the model by default while flagged mail is, and that a reading asked for from the card is kept. Out-of-order settings reads cannot repaint an older preference. Needs a DOM. |
-| `test/card.test.ts` | The rendered card: message text set as text even when it looks like markup, findings and the model's reading in separate sections, every ring segment named by a row beside it, the floor shown when a severe finding raised the score, and a skipped reading never worded as an all-clear. Also the card's wording helpers — durations, timing lines, quoted excerpts, score summaries. Needs a DOM. |
+| `test/card.test.ts` | The rendered card: message text set as text even when it looks like markup, findings and the model's reading in separate sections, every ring segment named by a row beside it, the floor shown when a severe finding raised the score, and a skipped reading never worded as an all-clear. Also the card's wording helpers: durations, timing lines, quoted excerpts, score summaries. Needs a DOM. |
 
-**What the DOM tests prove, and what they cannot.** They prove the adapter's logic — that a details table
+**What the DOM tests prove, and what they cannot.** They prove the adapter's logic: that a details table
 becomes an `EmailAuthInfo`, that an unread part is reported rather than dropped. They do not prove the
 selectors still match Gmail, because the markup is written from the same table the code reads. Nothing in a
 repository can prove that; it needs the live product, which is what the session health tally and the
 copied diagnostic in the popup exist for. The value is that a refactor can no longer quietly break
 extraction, and that a gate like `isSenderProven` is now asserted against what the adapter can actually
-read rather than against a hand-written `auth` block — which is precisely how it came to be unsatisfiable
+read rather than against a hand-written `auth` block, which is precisely how it came to be unsatisfiable
 in production while passing in CI.
 
 Fixture philosophy and the both-directions assertion are described in
@@ -197,8 +197,8 @@ npm run eval -- ~/corpora/dataset.csv                    # pre-extracted rows (c
 
 A legitimate corpus measures false positives and a phishing corpus misses, and neither number means much
 alone: a change is judged by running both before and after. The conversion in `scripts/eval/message.ts`
-follows what Gmail renders — the HTML part over the plain one, hidden subtrees removed by the adapter's own
-scan — and the places it cannot, such as Gmail's warning banner, are listed there. A corpus result can
+follows what Gmail renders (the HTML part over the plain one, hidden subtrees removed by the adapter's own
+scan), and the places it cannot, such as Gmail's warning banner, are listed there. A corpus result can
 differ from what a user sees exactly there.
 
 The report holds rule ids and counts only. `--rows <dir>` adds each flagged message's sender, subject, link
@@ -208,8 +208,8 @@ under an invented `northwind-*` name, never as the message (see [AGENTS.md](../A
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs `lint`, `typecheck` and `test` on Node 22.13.0 — the `engines` floor,
-because an untested promise is a guess — as well as the current LTS. It then builds and uploads the
+`.github/workflows/ci.yml` runs `lint`, `typecheck` and `test` on Node 22.13.0 (the `engines` floor,
+because an untested promise is a guess) as well as the current LTS. It then builds and uploads the
 extension as an artifact, so every commit has an installable package attached. Before uploading, it runs
 `npm run check:dist` (`scripts/check-dist.mjs`), which catches what a broken build would otherwise ship
 silently: a file the manifest names but the build did not produce, a `<script>` in `options.html` pointing
@@ -253,7 +253,7 @@ and a tag that no longer describes what they have is a worse outcome than a skip
 
 ## Branch and tag protection
 
-Configured as repository rulesets, which live on GitHub rather than in this repository — hence recorded here.
+Configured as repository rulesets, which live on GitHub rather than in this repository, hence recorded here.
 Both apply to every account including the owner, since a rule that the person most likely to be typing at
 2am can bypass is documentation, not protection.
 
@@ -263,7 +263,7 @@ Both apply to every account including the owner, since a rule that the person mo
 | `refs/tags/v*`        | No deletion, no moving          | A release asset is public and permanent, so its tag has to be too.                   |
 
 Status checks are deliberately **not** required. A commit cannot have passing checks before it is pushed, so
-requiring them would block direct pushes to `main` and force every change through a pull request — friction
+requiring them would block direct pushes to `main` and force every change through a pull request: friction
 that buys little on a single-maintainer repository, given `npm run verify` runs before every commit anyway.
 
 If that changes, do not require the matrix jobs by name: they are called `Verify (Node 22.13.0)` and

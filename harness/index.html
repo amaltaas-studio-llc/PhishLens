@@ -8,7 +8,7 @@
       A stand-in mail reader for developing and screenshotting the badge and card.
 
       Deliberately not an imitation of Gmail: it reproduces the one structural thing the components
-      depend on — a header row with a right-hand cluster the badge is appended into — and otherwise
+      depend on (a header row with a right-hand cluster the badge is appended into) and otherwise
       stays neutral. The components themselves live in shadow roots, so nothing here can style them,
       which is the same guarantee they get inside Gmail.
     -->
@@ -170,7 +170,7 @@
       }
 
       /*
-        ?view=card — the card alone, for a close-up image.
+        ?view=card: the card alone, for a close-up image.
 
         The card is laid out in normal flow here (see flattenForStillImage), so the frame only supplies
         room for its drop shadow. 16px, matching the inset it keeps from the window edge in Gmail.
@@ -185,7 +185,7 @@
         background: transparent;
       }
 
-      /* ?view=badges — one header row per classification, for a single explanatory image. */
+      /* ?view=badges: one header row per classification, for a single explanatory image. */
       .rows {
         display: flex;
         flex-direction: column;

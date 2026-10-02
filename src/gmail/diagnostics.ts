@@ -1,8 +1,8 @@
 /**
  * A report a user can paste into a bug report when extraction has failed.
  *
- * This is the project's substitute for telemetry. Nothing here phones home — the extension makes no
- * network call of its own volition (docs/PRIVACY.md) — so the only way a broken selector becomes known
+ * This is the project's substitute for telemetry. Nothing here phones home (the extension makes no
+ * network call of its own volition, see docs/PRIVACY.md), so the only way a broken selector becomes known
  * is that the person in front of it can say something useful about it. "PhishLens stopped working" is
  * not actionable; a list naming which selector groups matched is, because it points at the exact
  * candidate list in `selectors.ts` that needs a new entry.
@@ -68,7 +68,7 @@ export function probeSelectors(handle: MessageHandle): SelectorProbe[] {
  * code reads that group from.
  *
  * Both halves are load-bearing, and each was learned by getting it wrong. A group that matched *nothing*
- * is not drift, because most of the table is expected to miss on an ordinary message — no attachments, no
+ * is not drift, because most of the table is expected to miss on an ordinary message: no attachments, no
  * quoted reply, nothing collapsed, and no unverified-sender avatar precisely when the sender
  * authenticated. And a group found on the page after missing inside the message is not drift either: it
  * was located somewhere the adapter never looks, which says nothing about the selector's health.
@@ -108,7 +108,7 @@ export interface DiagnosticInput {
  */
 export function formatDiagnostic(input: DiagnosticInput): string {
   const lines = [
-    `PhishLens ${input.version} — extraction diagnostic`,
+    `PhishLens ${input.version}: extraction diagnostic`,
     `adapter:  ${input.adapter}`,
     `browser:  ${input.browser}`,
     `missing:  ${input.missing.length > 0 ? input.missing.join(', ') : 'nothing'}`,
@@ -146,13 +146,13 @@ export interface CheckSummary {
  * This is the half of a bug report the selector probes cannot give. A selector that stopped matching is
  * visible in the probe list; a check that fired when it should not have is visible only in the card,
  * whose every sentence is built around a value from the reader's mail and therefore cannot be pasted
- * into a public issue. Without this, disagreeing with a score meant installing a development build — a
+ * into a public issue. Without this, disagreeing with a score meant installing a development build, a
  * toolchain, for a bug the person reporting it can see and we cannot.
  *
  * What it holds: rule ids, severities, scores, and counts. What it must never hold: `title`,
  * `description` or `evidence`, each of which is a sentence assembled around a domain, a filename or an
  * excerpt. `summarizeScoring` is the only way to build one, because `SecuritySignal` is assignable to
- * `CheckSummary` — a spread would satisfy the compiler and carry the wording along with the id.
+ * `CheckSummary`: a spread would satisfy the compiler and carry the wording along with the id.
  *
  * The counts are a deliberate exception to the rule the selector report follows, which excludes body
  * length as weak leakage that would not help anyway. Here the second half of that reasoning fails: a
@@ -267,7 +267,7 @@ export function formatHealth(input: HealthInput): string {
       : 'none';
 
   const lines = [
-    `PhishLens ${input.version} — session diagnostic`,
+    `PhishLens ${input.version}: session diagnostic`,
     `adapter:     ${input.adapter}`,
     `browser:     ${input.browser}`,
     `messages:    ${String(health.seen)}`,

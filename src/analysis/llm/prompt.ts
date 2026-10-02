@@ -7,7 +7,7 @@
  *     defence in depth: the real control is that a successful injection can only alter the `llm`
  *     category's 15 points and can never touch a deterministic finding.
  *  2. **Minimisation.** Only what semantic judgement needs: display name, subject, body. Domains, link
- *     destinations and file types are deliberately withheld — see below. Where the body is cut to fit,
+ *     destinations and file types are deliberately withheld; see below. Where the body is cut to fit,
  *     a notice *outside* the delimited block says so: a model that cannot tell an excerpt from a whole
  *     message draws conclusions about text it was never shown, and the notice has to sit where the
  *     message cannot forge it.
@@ -17,11 +17,11 @@
  *     warranted, and its false positives land on the ordinary mail that makes up most of what a reader
  *     opens. Two things carry most of the correction. The prompt asks what the reader is being *asked to
  *     do* before how the message sounds, and closes with the default that a concern no sentence can be
- *     quoted for is not a concern — one mechanism, not two, since a request can be quoted where a tone
+ *     quoted for is not a concern: one mechanism, not two, since a request can be quoted where a tone
  *     cannot, and vocabulary alone is what a small model over-reads. And the model is not *given* domains,
  *     links or file types, rather than merely told not to reason about them: instructed not to and shown
  *     them anyway, it rated a genuine bank notification 85/100 on the grounds that one of its links was
- *     not specific enough to the bank's own site — a guess it had no means to check, about the one thing
+ *     not specific enough to the bank's own site, a guess it had no means to check, about the one thing
  *     deterministic code checks properly. Withholding the data removes the failure instead of
  *     forbidding it. What bias survives is contained in `semantic-signals.ts`.
  */
@@ -44,7 +44,7 @@ export const MAX_PROMPT_CHARS = 16_000;
 /**
  * Header fields are bounded separately from the body. A display name or subject is attacker-controlled
  * and has no natural length limit, so without this a 100 kB subject line would push the body out of
- * the model's context — a cheap way to blind the semantic layer while keeping the prompt "valid".
+ * the model's context: a cheap way to blind the semantic layer while keeping the prompt "valid".
  */
 const MAX_PROMPT_HEADER_CHARS = 300;
 
@@ -102,7 +102,7 @@ export const RESPONSE_SCHEMA = {
       maxItems: 3,
       /*
        * maxLength is a runaway guard, not the length the card wants. Chrome's response constraint
-       * enforces it by ending the string at that character — mid-word, with the JSON still valid — so
+       * enforces it by ending the string at that character (mid-word, with the JSON still valid), so
        * at the card's own length it produced reasons stopping at "'n". Set well above that, it only
        * stops a model that never closes the string, which would otherwise run to the inference
        * timeout and lose the whole answer. The card's length is enforced in parse.ts, which cuts on a

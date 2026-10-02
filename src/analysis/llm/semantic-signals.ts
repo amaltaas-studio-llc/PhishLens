@@ -8,7 +8,7 @@
  *    at 25, the model cannot reach even that on its own.
  *  - The conversion is **additive only**: no verdict can remove or reduce a deterministic signal, so a
  *    model injected into declaring the message safe changes nothing but its own contribution.
- *  - Sub-threshold, unsupported, and low-confidence verdicts are reported as `info` at score 0 — shown
+ *  - Sub-threshold, unsupported, and low-confidence verdicts are reported as `info` at score 0: shown
  *    in the panel, worth nothing. `SEMANTIC_SCORING` explains why the calibration is a threshold rather
  *    than a proportional discount.
  *  - Wording is always assessment ("wording resembles…"), never observation, so the panel can separate
@@ -23,7 +23,7 @@ import { signal } from '../rules/types.js';
  * Introduces the model's own reasons at the end of the description.
  *
  * Exported so the card can end the explanation where the reasons begin and list them from
- * `SemanticAnalysis.reasons` instead — the description stays one self-contained string for every
+ * `SemanticAnalysis.reasons` instead; the description stays one self-contained string for every
  * surface that shows it whole.
  */
 export const REASONING_PREFIX = "Model's reasoning:";
@@ -44,7 +44,7 @@ const CATEGORY_LABELS: Readonly<Record<SemanticCategory, string>> = {
  * Whether the verdict actually names a concern.
  *
  * `categories` survives parsing even when the model returned none we recognise, and a rating with no
- * category has identified nothing — the panel already says so, and the score has to agree.
+ * category has identified nothing: the panel already says so, and the score has to agree.
  */
 function namesAConcern(analysis: SemanticAnalysis): boolean {
   return analysis.categories.some((c) => c !== 'benign');
@@ -67,7 +67,7 @@ function severityForRisk(analysis: SemanticAnalysis, corroborated: boolean): Sev
  *
  * Multiplying by confidence means a hedged verdict contributes proportionally less, which is the
  * behaviour we want from a component that is explicitly not authoritative. Subtracting the dead zone
- * first is what stops an uncalibrated model from putting a few points on every clean message — see
+ * first is what stops an uncalibrated model from putting a few points on every clean message; see
  * `SEMANTIC_SCORING` for why that mattered enough to change the shape of the function.
  */
 function rawScore(analysis: SemanticAnalysis, corroborated: boolean): number {
@@ -121,7 +121,7 @@ export function semanticToSignals(
    * The title is the one line most users read, so it tracks how strong the model's *claim* is, not how
    * much that claim scored. A hedged reading is softened, because "Wording resembles credential
    * phishing" on a legitimate newsletter is alarming regardless of the number beside it. A confident
-   * reading that scored zero for want of corroboration keeps its strong wording — the model did say it,
+   * reading that scored zero for want of corroboration keeps its strong wording: the model did say it,
    * and the description explains why it did not move the score.
    *
    * A rating in the routine band outranks the category entirely: see `routineRiskCeiling`. Reporting the
@@ -130,7 +130,7 @@ export function semanticToSignals(
    *
    * "Found nothing of concern" is an all-clear, so it is reserved for mail the checks found nothing on
    * either. Beside a standing technical finding it reads as the model vouching for the message under a
-   * Suspicious verdict — and a model that missed a phish is the common case, not the exotic one: a small
+   * Suspicious verdict, and a model that missed a phish is the common case, not the exotic one: a small
    * model can rate an account-blocking threat with a sign-in link at 16/100. What is true in that case is
    * narrower, and it is what the headline says instead.
    */
@@ -218,7 +218,7 @@ export function semanticToSignals(
  * Names the model that produced the reading, mid-sentence.
  *
  * A self-hosted model is named where it is known, because "your model server (qwen2.5:7b)" is checkable
- * — the reader can go and ask that model the same question — where "the model" is not. The name comes
+ * (the reader can go and ask that model the same question) where "the model" is not. The name comes
  * from settings rather than from the response, so a model cannot choose what it is called here, and it is
  * truncated because the field tolerates 200 characters and a sentence does not.
  */

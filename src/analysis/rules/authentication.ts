@@ -3,9 +3,9 @@
  *
  * Important caveat, and the reason the `authentication` weight is 15 rather than the 30 the brief
  * suggested: a content script sees the DOM, not RFC 5322 headers. There is no way to read
- * `Authentication-Results` directly. Everything here is inferred from Gmail's own surfaces — the
+ * `Authentication-Results` directly. Everything here is inferred from Gmail's own surfaces (the
  * "mailed-by"/"signed-by" details table, the `via` annotation, the unauthenticated-sender indicator,
- * and Gmail's red warning banner — all of which are frequently absent.
+ * and Gmail's red warning banner), all of which are frequently absent.
  *
  * So these detectors are written to be **silent when uncertain**. An absent SPF result produces no
  * signal, because "Gmail did not render a details table" is not evidence of anything.
@@ -76,7 +76,7 @@ function authenticationFailure(context: AnalysisContext): SecuritySignal[] {
 /**
  * The DKIM signing domain is unrelated to the From domain.
  *
- * Not automatically bad — plenty of legitimate senders sign as their ESP — but when the message also
+ * Not automatically bad (plenty of legitimate senders sign as their ESP), but when the message also
  * claims a major brand, a signature from an unrelated domain is meaningful.
  */
 function signingDomainMismatch(context: AnalysisContext): SecuritySignal[] {
@@ -115,7 +115,7 @@ function signingDomainMismatch(context: AnalysisContext): SecuritySignal[] {
  *
  * **Scores nothing on its own, and that is the finding's whole design.** Gmail prints `via` whenever the
  * authenticated sending domain differs from the From domain, which is the ordinary consequence of using
- * any third-party sending service — a transactional mail vendor, a helpdesk, a mailing list, a payroll
+ * any third-party sending service: a transactional mail vendor, a helpdesk, a mailing list, a payroll
  * system. A large share of legitimate commercial mail carries one. Charging even a few points for it
  * raises the score of most real mail in an inbox, and a signal present on both the honest and the
  * dishonest population is not evidence, however suspicious the host looks to a reader.
@@ -124,8 +124,8 @@ function signingDomainMismatch(context: AnalysisContext): SecuritySignal[] {
  * project does not have and will not fetch. So the plain case is reported at `info`: the panel can tell a
  * curious reader where the message actually came from, and the number does not move.
  *
- * It scores in exactly one configuration — the message claims to be a brand, and the relay is not one of
- * that brand's own domains — because there the relay contradicts a specific claim rather than merely
+ * It scores in exactly one configuration (the message claims to be a brand, and the relay is not one of
+ * that brand's own domains), because there the relay contradicts a specific claim rather than merely
  * existing. Recognised bulk-mail platforms are dropped entirely in the non-claim case; naming the ESP of
  * every newsletter is noise even at zero.
  *
@@ -156,7 +156,7 @@ function sentViaUnrelatedHost(context: AnalysisContext): SecuritySignal[] {
         : 'Message was relayed through another service',
       description: brandClaimedButSentElsewhere
         ? `Gmail shows this message as sent via ${viaRegistrable} rather than directly from ${context.senderRegistrable}. The message presents itself as ${claim.brand.label}, which does not send mail through ${viaRegistrable}.`
-        : `Gmail shows this message as sent via ${viaRegistrable} rather than directly from ${context.senderRegistrable}. This is how mail sent through a third-party service normally appears — a notification platform, a helpdesk, a mailing list — so it is shown for context and does not affect the score.`,
+        : `Gmail shows this message as sent via ${viaRegistrable} rather than directly from ${context.senderRegistrable}. This is how mail sent through a third-party service normally appears (a notification platform, a helpdesk, a mailing list), so it is shown for context and does not affect the score.`,
       evidence: { value: viaRegistrable },
     }),
   ];
@@ -175,7 +175,7 @@ function gmailOwnWarning(context: AnalysisContext): SecuritySignal[] {
       score: 30,
       title: 'Gmail displayed its own warning banner for this message',
       description:
-        'Gmail flagged this message in its own interface. Gmail applies checks this extension cannot — including reputation data and account history — so its warning is independent corroboration.',
+        'Gmail flagged this message in its own interface. Gmail applies checks this extension cannot, including reputation data and account history, so its warning is independent corroboration.',
       evidence: { text: warning },
     }),
   ];
@@ -201,7 +201,7 @@ function unauthenticatedSender(context: AnalysisContext): SecuritySignal[] {
 
 /**
  * Everything passed. Emitted as an `info` signal worth zero points so the panel can say so
- * explicitly — a security tool that only ever lists problems teaches users to distrust its silence.
+ * explicitly: a security tool that only ever lists problems teaches users to distrust its silence.
  */
 function authenticationPassed(context: AnalysisContext): SecuritySignal[] {
   const auth = context.email.auth;
@@ -224,7 +224,7 @@ function authenticationPassed(context: AnalysisContext): SecuritySignal[] {
       severity: 'info',
       score: 0,
       title: `Sender authentication passed (${passed.join(', ')})`,
-      description: `${passed.join(', ')} verified for ${context.senderDomain === '' ? 'the sending domain' : context.senderDomain}. This confirms the message really was sent by that domain — it does not confirm that the domain belongs to who it claims to be.`,
+      description: `${passed.join(', ')} verified for ${context.senderDomain === '' ? 'the sending domain' : context.senderDomain}. This confirms the message really was sent by that domain; it does not confirm that the domain belongs to who it claims to be.`,
       evidence: { value: passed.join(', ') },
     }),
   ];

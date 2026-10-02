@@ -108,7 +108,7 @@ export const fr: LanguagePack = {
     ],
   },
   negation: {
-    // "ne vous demandera jamais de nous envoyer le code" — the ask-verb must reach the solicitation.
+    // "ne vous demandera jamais de nous envoyer le code": the ask-verb must reach the solicitation.
     before: compile(
       String.raw`\b(ne|n'|jamais|nullement)\b(?:[^.!?,;]{0,50}\b(?:demander\w*|exiger\w*)\b[^.!?,;]{0,40}\b(?:de|que))?\s{1,3}$`,
     ),

@@ -3,7 +3,7 @@
  *
  * **What this is for.** `isMalformedHost` in `url.ts` checks that a TLD is *shaped* like one; this
  * checks that it *is* one. A sending domain under a TLD that does not exist cannot resolve, cannot
- * accept a reply, and cannot have been registered by anyone — so the From address is fabricated, which
+ * accept a reply, and cannot have been registered by anyone, so the From address is fabricated, which
  * is worth stating plainly rather than inferring from softer signals.
  *
  * **Why a snapshot and not a lookup.** Nothing in this extension performs DNS or any other network
@@ -15,7 +15,7 @@
  * `high`, never `critical`, so a stale entry can raise a legitimate message to "suspicious" but can
  * never on its own produce "high risk". Refresh with `node scripts/gen-tlds.mjs`.
  *
- * Generated file — do not edit by hand.
+ * Generated file. Do not edit by hand.
  * Source: https://data.iana.org/TLD/tlds-alpha-by-domain.txt
  * Version 2026090600, Last Updated Sun Sep  6 07:07:01 2026 UTC
  * 1438 entries, of which 151 are internationalised (`xn--`).

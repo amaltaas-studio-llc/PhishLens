@@ -49,7 +49,7 @@ export const SELECTORS = {
   senderTextual: ['.gD', '.go', '.qu .gD'],
 
   /**
-   * The header block holding the sender line — display name, address, and the annotations Gmail adds
+   * The header block holding the sender line: display name, address, and the annotations Gmail adds
    * beside them, of which `via <host>` is the one detection reads.
    *
    * Needed as its own selector because those annotations are *siblings* of the sender element, not
@@ -60,7 +60,7 @@ export const SELECTORS = {
   senderHeaderBlock: ['.gE.iv.gt', 'table.cf.gJ', '.gE', '.iw', '.hb'],
 
   /**
-   * Anything in a message header that names a party by address — sender and recipient chips alike.
+   * Anything in a message header that names a party by address, sender and recipient chips alike.
    *
    * Attribute-based on purpose. Which classes Gmail uses for the recipient row has changed repeatedly,
    * but both attributes below are part of how Gmail itself finds a person (they drive the hover card),
@@ -91,7 +91,7 @@ export const SELECTORS = {
    * (`pull-quote` arrives as `m_42pull-quote`), and a prefix still contains every substring it did before:
    * `[class*="quote"]` matched any sender who chose a class with "quote" in it, which made wrapping the
    * whole message in one a way to have none of it read. What remains here can still be written by a sender
-   * — `.gmail_quote` is only a class — so the consumers are built so that matching it costs wording at
+   * (`.gmail_quote` is only a class), so the consumers are built so that matching it costs wording at
    * worst: links are read regardless, and a body with nothing outside its quotes is read from the quotes.
    */
   quotedContent: ['.gmail_quote', '.im', 'blockquote.gmail_quote', '.ajR'],
@@ -137,8 +137,8 @@ export const SELECTORS = {
   ],
 
   /**
-   * The right-hand cluster of the message header — the cell holding the timestamp, star and reply
-   * controls — which is where the badge is attached.
+   * The right-hand cluster of the message header (the cell holding the timestamp, star and reply
+   * controls), which is where the badge is attached.
    *
    * Chosen over the header container itself because appending to the container makes the badge the
    * last block in it, which renders on a line of its own *below* the recipient row. Inside this cell
@@ -156,7 +156,7 @@ export const SELECTORS = {
    * A group of its own despite overlapping `senderHeaderBlock`, because the two lists are consumed
    * differently: that one is read as text and may legitimately name a `<table>`, and appending an element
    * inside a table is a layout accident rather than a worse position. Kept here rather than inline in
-   * `dom-adapter.ts` for the reason the whole file exists — when Gmail moves its markup, one file should
+   * `dom-adapter.ts` for the reason the whole file exists: when Gmail moves its markup, one file should
    * need editing, and a list that lives beside the code that uses it is the one nobody remembers to change.
    *
    * Every candidate is a placement, not a requirement. A badge on the wrong line is an acceptable
@@ -165,7 +165,7 @@ export const SELECTORS = {
   headerFallbackBlock: ['.gE.iv.gt', '.gE', '.iw', '.gK', '.go', '.hb'],
 
   /**
-   * A row in a message list — inbox, search results, a label.
+   * A row in a message list: inbox, search results, a label.
    *
    * `tr.zA` is the long-standing one and `[role="row"]` is the semantic fallback, which also matches
    * rows in Gmail's newer list layouts. Both are scoped to the list container, never the whole page:
@@ -187,7 +187,7 @@ export const SELECTORS = {
    *
    * Ordered innermost first, and that order is the whole point: `.y6` and the subject's link wrapper hold
    * inline spans, so a glyph prepended there sits on the subject's own line. The `td` is a last resort
-   * because its children are blocks — a mark there lands on a line of its own and makes marked rows
+   * because its children are blocks: a mark there lands on a line of its own and makes marked rows
    * taller than their neighbours, which is worse than no mark.
    */
   listSubjectCell: ['.y6', 'td.xY div[role="link"]', 'td.xY.a4W'],
@@ -227,7 +227,7 @@ export const PAGE_SCOPED: ReadonlySet<string> = new Set([
  * rewrites `style`, `jsaction`, `tabindex` and `aria-hidden` constantly and none of them changes what a
  * message says, while `class` decides whether a message is collapsed and `data-message-id` decides which
  * message it is. A hand-written list would answer that today and be wrong the first time a selector gains
- * an attribute, silently — the observer would stop noticing the state change and nothing would fail. So the
+ * an attribute, silently: the observer would stop noticing the state change and nothing would fail. So the
  * list is read off the selectors, and adding a candidate here is enough.
  *
  * Coarse on purpose. A selector mentioning any class contributes `class` rather than the class named,
@@ -293,8 +293,8 @@ export function queryAllUnion(root: ParentNode, candidates: readonly string[]): 
 /**
  * Elements sorted by position on screen.
  *
- * A union arrives grouped by selector — every match of the first candidate, then every match of the
- * second — and that is not the order on screen as soon as the candidates disagree about which element
+ * A union arrives grouped by selector (every match of the first candidate, then every match of the
+ * second), and that is not the order on screen as soon as the candidates disagree about which element
  * marks a message. Callers asking for "the last one" or "what came before this" mean the page, not this
  * file's ordering of its own guesses, and the answer they get from selector order is a different message
  * rather than a missing one.
@@ -319,7 +319,7 @@ export function inDocumentOrder(elements: readonly Element[]): Element[] {
  *
  * Several candidate selectors routinely match one message at different depths, which hands a caller the
  * same message several times over. The outermost is the one kept because it is the only one guaranteed to
- * contain the whole of the message — header, body and attachment row — and every field is then looked up
+ * contain the whole of the message (header, body and attachment row), and every field is then looked up
  * within it. This relies on the candidate lists naming per-message elements: a selector matching a wrapper
  * around *several* messages would collapse them into one, which is why nothing in `messageContainer`
  * matches the conversation itself.

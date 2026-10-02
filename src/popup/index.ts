@@ -3,7 +3,7 @@
  *
  * Exists because clicking the extension's icon used to do nothing, which is the moment a user decides an
  * extension is half-finished. It answers the three questions asked at that moment: is PhishLens running
- * on this tab, what did it make of the message, and — the one that used to require a DevTools console —
+ * on this tab, what did it make of the message, and (the one that used to require a DevTools console)
  * is the AI layer actually working.
  *
  * It holds no state and starts no work. Everything shown is read from the tab that already did the
@@ -34,7 +34,7 @@ const GMAIL_ORIGIN = 'https://mail.google.com/';
  * The active tab's id, if it is a Gmail tab.
  *
  * `tab.url` is only populated for tabs the extension has host access to, which is exactly the check
- * wanted here — and the reason this needs no `tabs` permission. A tab whose URL is hidden from us is a
+ * wanted here, and the reason this needs no `tabs` permission. A tab whose URL is hidden from us is a
  * tab we have nothing to say about.
  */
 async function gmailTabId(): Promise<number | null> {
@@ -180,7 +180,7 @@ class Popup {
   /**
    * Copies the session report, and shows it either way.
    *
-   * `navigator.clipboard` can refuse — an unfocused document is enough — so the failure path puts the
+   * `navigator.clipboard` can refuse (an unfocused document is enough), so the failure path puts the
    * text on screen to be selected by hand. Same reasoning as the unreadable card: a user who cannot see
    * what they are about to paste into a public issue has no way to check it holds none of their mail.
    */
@@ -215,13 +215,13 @@ class Popup {
 
     this.#findings.replaceChildren(
       // Titles are the extension's own wording, but they are built from message content, so they arrive
-      // here as text and leave as text nodes — `el` has no way to do otherwise.
+      // here as text and leave as text nodes; `el` has no way to do otherwise.
       ...state.headlines.map((title) => el('li', { text: title })),
     );
 
     const hidden = state.findings - state.headlines.length;
     this.#more.textContent =
-      hidden > 0 ? `and ${String(hidden)} more — ${findings} in total` : findings;
+      hidden > 0 ? `and ${String(hidden)} more, ${findings} in total` : findings;
     this.#more.hidden = false;
   }
 
@@ -251,7 +251,7 @@ class Popup {
     this.#testResult.textContent =
       response.models.length === 0
         ? 'Reached the server, but it reports no models loaded.'
-        : `Reached the server — ${String(response.models.length)} model(s) loaded.`;
+        : `Reached the server: ${String(response.models.length)} model(s) loaded.`;
   }
 
   async #save(patch: Partial<Settings>): Promise<void> {

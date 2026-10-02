@@ -107,13 +107,13 @@ export function tldOf(hostname: string): string {
 }
 
 /**
- * True when the hostname's TLD is not one IANA has delegated — i.e. the name cannot exist.
+ * True when the hostname's TLD is not one IANA has delegated, i.e. the name cannot exist.
  *
  * Distinct from `isMalformedHost`, which asks whether a TLD is *shaped* like one. `.ldk` passes that
  * test and is still not a place mail can come from.
  *
- * Returns `false` for anything where the question does not apply — an empty host, an IP literal, a
- * single-label name, a name that cannot be reduced to the ASCII form the list is written in — so a caller
+ * Returns `false` for anything where the question does not apply (an empty host, an IP literal, a
+ * single-label name, a name that cannot be reduced to the ASCII form the list is written in), so a caller
  * gets "this TLD does not exist" and not "there was no TLD to check". Both are absences; only one is
  * evidence.
  */
@@ -132,7 +132,7 @@ export function hasUnknownTld(hostname: string): boolean {
  *
  * `.рф` is delegated; `xn--p1ai` is how it is written down. Comparing the Unicode spelling against the
  * list would report every internationalised domain in the world as nonexistent, so the conversion is
- * mandatory rather than defensive — and a host that will not convert must be nobody's finding, since the
+ * mandatory rather than defensive, and a host that will not convert must be nobody's finding, since the
  * alternative is a fabricated-sender verdict drawn from our own inability to parse a name.
  *
  * Deliberately not folded into `normalizeDomain`: that value is compared against brands and shown as
@@ -163,7 +163,7 @@ export function domainCore(hostname: string): string {
 }
 
 /**
- * True for any host that is an IP literal rather than a name — including the obfuscated forms
+ * True for any host that is an IP literal rather than a name, including the obfuscated forms
  * (`http://3232235777/`, `http://0xc0a80001/`, `http://0300.0250.0.1/`) that the WHATWG parser
  * accepts and silently canonicalises. We check the *parsed* result where possible, and fall back to
  * pattern checks for the raw string.
@@ -302,7 +302,7 @@ export interface UnwrapResult {
   /** The URLs behind `chain`, outermost first: the input, then each target peeled from it. */
   urls: URL[];
   /**
-   * True when a redirect parameter was present but its value was not a parseable absolute URL —
+   * True when a redirect parameter was present but its value was not a parseable absolute URL,
    * i.e. the link looks like an open redirector but we cannot see the destination.
    */
   opaqueRedirect: boolean;
@@ -312,7 +312,7 @@ export interface UnwrapResult {
  * Peels redirect wrappers so comparisons are made against real destinations.
  *
  * Gmail rewrites body links to `https://www.google.com/url?q=<real>`, and attackers chain open
- * redirectors. Bounded to 3 hops — an attacker controls the input and we will not loop on it.
+ * redirectors. Bounded to 3 hops: an attacker controls the input and we will not loop on it.
  */
 export function unwrapRedirects(input: URL, maxHops = 3): UnwrapResult {
   let current = input;
@@ -360,7 +360,7 @@ function extractRedirectTarget(url: URL): { parsed: URL | null } | null {
   //
   // The separators are matched percent-encoded as well, because that is the form the click trackers of
   // the large sending platforms use: `…/L0/https:%2F%2Fexample.com%2Fpath`. `URL` does not decode `%2F`
-  // in a pathname — correctly, since a decoded slash would change the path's structure — so a pattern
+  // in a pathname (correctly, since a decoded slash would change the path's structure), so a pattern
   // written only for the literal form reads the tracker's own host as the destination. Every rule that
   // asks where a link goes then answers with the tracker, which is how a brand's genuine mail came to
   // be reported as sending its readers to a domain the brand does not own.

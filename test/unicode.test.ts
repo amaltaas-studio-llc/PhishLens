@@ -77,7 +77,7 @@ describe('script mixing', () => {
   });
 
   it('flags a label that mixes Latin with a confusable script', () => {
-    // "аpple" with a Cyrillic а — visually identical, a different domain entirely.
+    // "аpple" with a Cyrillic а: visually identical, a different domain entirely.
     expect(hasSuspiciousScriptMixing('аpple')).toBe(true);
     expect(hasSuspiciousScriptMixing('раypal')).toBe(true);
   });

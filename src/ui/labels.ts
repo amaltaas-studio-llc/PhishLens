@@ -2,7 +2,7 @@
  * The names PhishLens gives things on screen.
  *
  * Separate from `format.ts` for one structural reason: this file imports nothing but types, so a surface
- * that needs only the vocabulary — the popup — does not pull in domain parsing and the IANA table behind
+ * that needs only the vocabulary (the popup) does not pull in domain parsing and the IANA table behind
  * it. Wording that is *derived* rather than looked up belongs in `format.ts`.
  *
  * Every table is a `Record` over a union, so adding a classification or severity cannot compile until it

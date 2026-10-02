@@ -7,7 +7,7 @@ export const nl: LanguagePack = {
   id: 'nl',
   label: 'Dutch',
   script: 'latin',
-  // Prefer words that are rare as whole tokens in English — Dutch shares many short particles with
+  // Prefer words that are rare as whole tokens in English. Dutch shares many short particles with
   // English ("is", "in", "de"), and those alone must not qualify the pack on ordinary English mail.
   markers: [
     'het',

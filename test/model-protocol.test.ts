@@ -4,7 +4,7 @@
  * Every case here comes from a runner actually behaving this way, because none of it can be reasoned out
  * from a specification: "OpenAI-compatible" is a family resemblance, and the fields that differ between
  * members are exactly the ones this file pins down. The failure these guard against is the worst kind to
- * receive — HTTP 200, a model plainly loaded and running, and a card saying it returned nothing usable.
+ * receive: HTTP 200, a model plainly loaded and running, and a card saying it returned nothing usable.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -44,7 +44,7 @@ describe('the request ladder', () => {
 
   /**
    * The ladder exists because a server that does not know a field rejects the whole request rather than
-   * ignoring it, so both optional fields have to be droppable — including `reasoning_effort`, which is
+   * ignoring it, so both optional fields have to be droppable, including `reasoning_effort`, which is
    * newer than `response_format` and the more likely of the two to be unknown.
    */
   it('can reach a working request even if reasoning_effort is what was refused', () => {

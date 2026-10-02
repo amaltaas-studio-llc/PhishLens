@@ -2,7 +2,7 @@
  * The verdict available from a message list, where the only thing on screen is a sender line.
  *
  * An inbox row has no body, no links, no attachments and no authentication table, so it cannot be
- * scored — and the temptation this module exists to refuse is scoring it anyway. A number derived from
+ * scored, and the temptation this module exists to refuse is scoring it anyway. A number derived from
  * a quarter of the evidence would sit beside a number derived from all of it, look like the same kind of
  * thing, and be wrong in the reassuring direction for every message whose problem is in its body.
  *
@@ -10,7 +10,7 @@
  * means "nothing visible from here", which is what the absence of a marker naturally reads as, and the
  * marker's own wording says the message has not been opened or checked.
  *
- * Only the identity rules run, and only those needing nothing beyond the sender line — see
+ * Only the identity rules run, and only those needing nothing beyond the sender line; see
  * `SENDER_ONLY_RULES`. Pure, like everything else in `analysis/`: the caller supplies the two strings it
  * scraped and gets a verdict, with no notion of a DOM anywhere in here.
  */
@@ -24,7 +24,7 @@ import { isAtLeast, sortSignalsForDisplay } from './scoring/aggregate.js';
  *
  * An allowlist rather than a denylist, so a new rule reading the body cannot join triage by default. The
  * cost is that a new *sender-only* rule has to be added here to appear in a list row, which is the safe
- * direction to fail — and `test/triage.test.ts` asserts that every identity rule the fixture corpus
+ * direction to fail, and `test/triage.test.ts` asserts that every identity rule the fixture corpus
  * produces appears in this set or in `NEEDS_MORE_THAN_SENDER`, so the choice cannot be made by omission.
  */
 const SENDER_ONLY_RULES: ReadonlySet<string> = new Set([
@@ -49,7 +49,7 @@ const SENDER_ONLY_RULES: ReadonlySet<string> = new Set([
    * Sender-only, and silent on a row for as long as it stays `medium`: what keeps it out of the list is
    * `TRIAGE_MIN_SEVERITY`, not this set. Recorded because raising its severity would put "cannot confirm
    * this domain belongs to PayPal" on unopened mail, which is a marker on a message that may be entirely
-   * ordinary — the thing that gets the feature switched off.
+   * ordinary: the thing that gets the feature switched off.
    */
   'identity.unverified_brand_domain',
   // Sender-only too, and silent on a row at `medium` for the same reason.
@@ -92,8 +92,8 @@ export type TriageSeverity = Extract<Severity, 'high' | 'critical'>;
  * the card.
  *
  * `medium` was tried and is wrong here. The generous half of `identity.unsupported_org_claim` fires on
- * `"Accounts Receivable" <ar@a-supplier.example>` — a departmental name that shares no word with its own
- * company's domain — which is a reasonable thing to mention beside a full score and a bad thing to put on
+ * `"Accounts Receivable" <ar@a-supplier.example>` (a departmental name that shares no word with its own
+ * company's domain), which is a reasonable thing to mention beside a full score and a bad thing to put on
  * an inbox row, where it is the *only* thing said about the message. At `high` the marks left are
  * impersonations of a named brand, of the reader's own domain, and outright malformed senders.
  *

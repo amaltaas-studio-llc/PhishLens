@@ -1,7 +1,7 @@
 /**
  * The semantic layer's *containment* properties.
  *
- * These tests are less about "does the model work" — we cannot depend on a model existing in CI — and
+ * These tests are less about "does the model work" (we cannot depend on a model existing in CI) and
  * more about the guarantees that make shipping an optional LLM defensible:
  *
  *  1. A missing, broken, hostile, or prompt-injected model cannot change a deterministic verdict.
@@ -63,7 +63,7 @@ const returnsNothing: SemanticAnalyzer = {
 };
 
 /**
- * An adapter that resolves to nothing because it was cancelled — the shape the on-device adapter takes
+ * An adapter that resolves to nothing because it was cancelled: the shape the on-device adapter takes
  * when the reader navigates away mid-inference.
  */
 const cancelledSilently: SemanticAnalyzer = {
@@ -79,7 +79,7 @@ const cancelledByThrowing: SemanticAnalyzer = {
   analyze: () => Promise.reject(new DOMException('The operation was aborted.', 'AbortError')),
 };
 
-/** Never settles — stands in for a wedged inference. */
+/** Never settles; stands in for a wedged inference. */
 const hangs: SemanticAnalyzer = {
   id: 'hangs',
   isAvailable: () => Promise.resolve(true),
@@ -148,7 +148,7 @@ describe('semantic layer: unavailable', () => {
    * The card renders these four outcomes with four different messages, so the engine has to keep them
    * apart. Before this existed the UI only knew `semanticSource === 'none'`, which is the same value for
    * "this browser has no model" (permanent, worth saying) and "that one attempt failed" (transient, says
-   * nothing about the browser) — and identical again to the result the UI shows *while still waiting*.
+   * nothing about the browser), and identical again to the result the UI shows *while still waiting*.
    */
   describe('reports how the semantic stage ended', () => {
     it.each([
@@ -397,7 +397,7 @@ describe('semantic layer: containment', () => {
    * A softened content finding is the *opposite* of corroboration: softening happens precisely because
    * the sender was proven to be the organisation it claims to be, which is what explains the wording.
    * Counting it would let an alarmist model add points to exactly the mail the dampening rule exists to
-   * protect — a genuine password-reset notice from the brand's own domain.
+   * protect: a genuine password-reset notice from the brand's own domain.
    */
   it('does not treat a softened content finding as corroboration', () => {
     const softened = analyzeDeterministic(loadFixture('legitimate-password-reset').email, {
@@ -492,7 +492,7 @@ describe('semantic layer: containment', () => {
 
     it('still reads as clean when the only findings were softened for a proven sender', () => {
       // A dampened finding is already explained by the sender, so it is no reason to withhold the
-      // all-clear — withholding it would put a caveat on exactly the genuine mail dampening protects.
+      // all-clear; withholding it would put a caveat on exactly the genuine mail dampening protects.
       const softened = analyzeDeterministic(loadFixture('legitimate-password-reset').email, {
         now: 0,
       }).signals;
@@ -806,7 +806,7 @@ describe('prompt construction', () => {
   /**
    * Shown the link domains and told not to reason about them, an on-device model rated a genuine bank
    * notification 85/100 on the grounds that one of its links was not specific enough to the bank's own
-   * site — a claim it had no way to check, about the one thing `analysis/rules/` checks properly.
+   * site, a claim it had no way to check, about the one thing `analysis/rules/` checks properly.
    * Withholding the data is what makes the instruction true rather than merely stated.
    */
   it('withholds the domains, link targets and file types it is told not to judge', () => {
@@ -854,7 +854,7 @@ describe('prompt construction', () => {
 
   it('keeps the required excerpt off the evidence the model was not given', () => {
     // Reasons must quote the message and messages contain URLs, so requiring a quotation reopens the
-    // guessing that withholding link data closed — unless the excerpt itself excludes them.
+    // guessing that withholding link data closed, unless the excerpt itself excludes them.
     expect(SYSTEM_PROMPT).toMatch(/never use a URL, email address, or filename/iu);
   });
 

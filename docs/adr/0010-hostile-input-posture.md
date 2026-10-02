@@ -24,7 +24,7 @@ can be prompt-injected. This is a privacy guarantee, not only a performance choi
 
 ## Rejected alternatives
 
-- **Regex-split URLs** — miss what `URL` accepts and vice versa.
-- **Fetching destinations for “reputation”** — privacy break and oracle.
-- **Partial trust of malformed model JSON** — hostile mail may be why it is malformed.
+- **Regex-split URLs**: miss what `URL` accepts and vice versa.
+- **Fetching destinations for “reputation”**: privacy break and oracle.
+- **Partial trust of malformed model JSON**: hostile mail may be why it is malformed.
 - **Executing any string derived from the message.**

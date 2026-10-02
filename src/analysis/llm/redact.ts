@@ -9,8 +9,8 @@
  *  - the recipient's address (the backend does not need to know who received the mail)
  *  - the sender's local part (`accounts-noreply@` → just the domain)
  *  - message and thread ids (no cross-request correlation of a user's mailbox)
- *  - attachment filenames (extensions only — filenames contain client names, case numbers, staff names)
- *  - full link URLs (registrable domains only — paths and query strings carry tracking identifiers
+ *  - attachment filenames (extensions only: filenames contain client names, case numbers, staff names)
+ *  - full link URLs (registrable domains only: paths and query strings carry tracking identifiers
  *    that tie the message to a specific recipient)
  */
 import { collapseWhitespace, truncate } from '../../shared/text.js';
@@ -61,8 +61,8 @@ export function buildCloudPayload(
  * `buildCloudPayload` runs in the content script, but the service worker is the only part of the
  * extension that can reach the network, and it is handed the built payload rather than the message.
  * Trusting that hand-off means the redaction this file exists to guarantee is enforced nowhere the
- * network can see it: any surface able to call `sendMessage` — including a content script running on a
- * page that has found a way to talk to it — could post a full mailbox to a configured backend, and the
+ * network can see it: any surface able to call `sendMessage` (including a content script running on a
+ * page that has found a way to talk to it) could post a full mailbox to a configured backend, and the
  * tests pinning this contract would still pass, because they test the builder.
  *
  * So the fields, lengths and shapes are checked again here, at the egress point. A field that cannot be
@@ -83,7 +83,7 @@ export function sanitizeCloudPayload(raw: unknown): CloudPayload | null {
     senderDomain,
     // A shape is a hyphenated vocabulary this file controls. Anything else is reported as `unknown`
     // rather than passed through, because a display name is exactly what this field exists not to carry,
-    // and `unknown` is not a value `describeNameShape` can produce — so it also says where it came from.
+    // and `unknown` is not a value `describeNameShape` can produce, so it also says where it came from.
     senderNameShape: /^[a-z-]{1,64}$/u.test(shape) ? shape : 'unknown',
     ...(replyToDomain !== '' && replyToDomain !== senderDomain ? { replyToDomain } : {}),
     linkDomains: registrableList(source['linkDomains'], MAX_LINK_DOMAINS),

@@ -4,7 +4,7 @@
  * The observer against a page, rather than against a fake of one.
  *
  * `observer.test.ts` fakes the adapter and the MutationObserver, which is the right shape for asserting
- * the reconciliation logic — it can move the route and the DOM apart, which no real page will do on
+ * the reconciliation logic: it can move the route and the DOM apart, which no real page will do on
  * command. What it cannot assert is the part that decides whether that logic ever runs: which mutations
  * the browser is asked to report. A fake observer is told `attributes: false` and dutifully calls the
  * callback anyway, so every test in that file passed while the real one sat waiting for a structural
@@ -104,7 +104,7 @@ describe('a message changed in place', () => {
 
   /**
    * Collapsing a message adds a class to the container Gmail already rendered. Nothing is inserted and
-   * nothing is removed, so a structural watch sees no reason to look — and the badge went on asserting a
+   * nothing is removed, so a structural watch sees no reason to look, and the badge went on asserting a
    * verdict about a message the reader could no longer see, which is the case the disappearance grace
    * exists for and was never reachable from.
    */
@@ -132,8 +132,8 @@ describe('a message changed in place', () => {
   });
 
   /**
-   * Revealing text that was hidden changes what the engine is given — hidden text is extracted separately
-   * and removed from the body — and it arrives as an inline style, which no selector mentions. Deriving the
+   * Revealing text that was hidden changes what the engine is given (hidden text is extracted separately
+   * and removed from the body), and it arrives as an inline style, which no selector mentions. Deriving the
    * watched attributes from the selectors alone therefore missed the one attribute extraction reads
    * directly, and a solicitation becoming visible produced no new assessment.
    */
@@ -205,8 +205,8 @@ describe('navigation and partially rendered bodies', () => {
   });
 
   /**
-   * A body hidden in full is waited on briefly, because Gmail draws bodies hidden while building the view
-   * — and then reported as unreadable, because waiting on it for good meant a message that never emitted
+   * A body hidden in full is waited on briefly, because Gmail draws bodies hidden while building the view,
+   * and then reported as unreadable, because waiting on it for good meant a message that never emitted
    * and so never got a badge, which on a quiet install is what a clean message looks like.
    */
   it.each(['style', 'hidden'])('watches %s before the first readable extraction', async (attribute) => {

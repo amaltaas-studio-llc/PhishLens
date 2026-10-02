@@ -56,7 +56,7 @@ export const CATEGORY_WEIGHTS: CategoryWeights = Object.freeze({
  *
  * **Why this exists.** Pure "sum of capped category subtotals" has a structural blind spot: an attack
  * that is malicious in only *one* dimension can never score above that dimension's weight. Business
- * email compromise is the clearest case — a payroll-diversion or gift-card email has no links, no
+ * email compromise is the clearest case: a payroll-diversion or gift-card email has no links, no
  * attachments, no lookalike domain, and often passes authentication, because it is a plain text
  * message from a real mailbox. It is *entirely* a `content` finding, so with `content: 15` it would
  * top out at 15/100 and be reported as low risk. The same applies to a disguised `.pdf.exe`, which is
@@ -68,10 +68,10 @@ export const CATEGORY_WEIGHTS: CategoryWeights = Object.freeze({
  *
  * Constraints that keep this honest, all tested:
  *  - Floors are driven **only by deterministic signals**. `llm` signals are excluded, so the semantic
- *    layer cannot trigger one — the "the model can never produce high risk on its own" guarantee is
+ *    layer cannot trigger one, and the "the model can never produce high risk on its own" guarantee is
  *    unaffected.
  *  - `critical` severity is reserved for findings that are conclusive in isolation. An authentication
- *    failure looks conclusive and is not — forwarding breaks SPF, lists break DKIM — so it is held at
+ *    failure looks conclusive and is not (forwarding breaks SPF, lists break DKIM), so it is held at
  *    `high`, and at `low` when DMARC passed anyway (see `authentication.ts`). No legitimate-mail fixture
  *    produces a `high` or `critical` deterministic signal. That is asserted directly by the test suite, which is what makes
  *    a floor of 50 for `high` safe rather than merely plausible.
@@ -111,7 +111,7 @@ const FLOOR_ELIGIBLE_CATEGORIES: readonly SignalCategory[] = Object.freeze([
  * Gmail's own warning banner is reported and scored, but may not establish a floor.
  *
  * It is an assertion by another system, not an observation of ours: we cannot show the reasoning behind
- * it, and it is *rendered conditionally on the folder being viewed* — Gmail annotates messages in the
+ * it, and it is *rendered conditionally on the folder being viewed*: Gmail annotates messages in the
  * spam folder in ways it does not in the inbox. A floor here made the headline verdict a function of
  * where the user happened to be looking rather than of the message, and would have let a manual "mark
  * as spam" turn into PhishLens confirming the user's own action.
@@ -123,18 +123,18 @@ const FLOOR_EXCLUDED_SIGNAL_IDS: readonly string[] = Object.freeze(['authenticat
  *
  * The single-finding floor closes the one-dimension gap; this closes the one it leaves. A phish that
  * invents no brand and sends from a throwaway domain that passes its own SPF and DKIM leaves identity
- * and authentication — 35 of the 100 points — with nothing to find. Everything it does wrong then lands
+ * and authentication (35 of the 100 points) with nothing to find. Everything it does wrong then lands
  * in links and wording, whose weights sum to 40, so with the model's 15 on top it stops at 55: a page
  * served from a storage bucket, a demand to change payment details and a threat to delete the account,
  * all at `high`, reported as merely Suspicious. The additive sum cannot express that the findings are
- * *independent* — each category is a different way of being wrong, and two at once is what an attack
+ * *independent*: each category is a different way of being wrong, and two at once is what an attack
  * looks like and what ordinary mail does not.
  *
  * It needs a floor rather than a larger weight because any weight large enough to reach 75 from two
  * categories would also inflate ordinary mail with medium findings in both. `high` is the threshold for
  * the same reason the single-finding floor is safe: no legitimate fixture produces a `high` finding in
  * *any* category, so none can produce one in two. Counting categories rather than findings is what
- * stops one fact — three links to the same page — from converging with itself.
+ * stops one fact (three links to the same page) from converging with itself.
  */
 const CONVERGENCE_FLOOR: ScoreFloorConfig['convergence'] = Object.freeze({
   minCategories: 2,
@@ -278,7 +278,7 @@ export const DETECTION_TUNING = Object.freeze({
    *
    * Set by what legitimate senders do, not by what attackers do. Every mail platform hides a preheader
    * line to control the inbox preview, and those run to a couple of hundred characters at most, spacer
-   * padding excluded — so 600 sits far above ordinary practice while remaining far below the thousands of
+   * padding excluded, so 600 sits far above ordinary practice while remaining far below the thousands of
    * characters of filler prose that make the technique worth using.
    */
   minHiddenBodyChars: 600,
@@ -356,7 +356,7 @@ export const DAMPENING: DampeningConfig = Object.freeze({
    * inside the organisation the mail provably came from, there is no fake page, and a genuine
    * password-reset or expired-card notice is what remains. The money-movement combinations are
    * deliberately absent: a gift-card, wire, payee or payroll request is exactly what a compromised account
-   * sends, and the account being genuine makes acting on it no safer — the reason trust never softens
+   * sends, and the account being genuine makes acting on it no safer: the reason trust never softens
    * `high`, applied to brands too.
    */
   refutableCombinations: Object.freeze([
@@ -413,13 +413,13 @@ export const SEMANTIC_SCORING = Object.freeze({
    */
   minRiskForScoring: 45,
   /**
-   * Top of the prompt's routine band — no concerning request the wording supports — and the point below
+   * Top of the prompt's routine band (no concerning request the wording supports) and the point below
    * which a named category is disregarded when wording the finding.
    *
    * Models fill the `categories` slot as a matter of form. One rated an auto-reply 10/100 and explained
    * itself with "standard auto-reply", having tagged it `social_engineering` anyway, which the panel
-   * then headlined as wording that resembled social engineering. The rating is the judgement — it is the
-   * number the prompt defines bands for and the number that is scored — so below this the finding reads
+   * then headlined as wording that resembled social engineering. The rating is the judgement (it is the
+   * number the prompt defines bands for and the number that is scored), so below this the finding reads
    * as clean regardless of the tag.
    */
   routineRiskCeiling: 20,
@@ -429,7 +429,7 @@ export const SEMANTIC_SCORING = Object.freeze({
    *
    * This costs no detection capability, which is what makes it the right call rather than merely a
    * cautious one. The `llm` weight (15) is already below the `caution` threshold (25), so a verdict
-   * with nothing else supporting it could never change the classification even at full weight — the
+   * with nothing else supporting it could never change the classification even at full weight; the
    * message reads "Low Risk" either way. All that scoring it achieved was moving the number off zero
    * on clean mail, destroying the difference between "we found nothing" and "we found something
    * small". The verdict is still shown in full, with the model's reasons, as an informational finding.
@@ -449,7 +449,7 @@ export const SEMANTIC_SCORING = Object.freeze({
   maxReasons: 3,
   /**
    * Words the prompt allows each reason, so a reason reads as one line on the card rather than a
-   * paragraph — the quoted excerpt is what the reader checks, and the explanation only needs to say why
+   * paragraph: the quoted excerpt is what the reader checks, and the explanation only needs to say why
    * it matters.
    */
   reasonWords: 15,

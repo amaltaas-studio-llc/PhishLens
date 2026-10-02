@@ -96,7 +96,7 @@ export function isLoopbackHost(hostname: string): boolean {
 /**
  * Normalises the base URL of a user-run model server to an origin plus optional path prefix.
  *
- * Unlike `normalizeBackendUrl` this accepts `http:` — but only for loopback, where there is no wire to
+ * Unlike `normalizeBackendUrl` this accepts `http:`, but only for loopback, where there is no wire to
  * intercept. Off the machine, TLS is required: the request carries the subject and body of the message
  * being read, and sending that in plaintext across a LAN would be a worse leak than any this extension
  * is meant to warn about. Everything else is rejected exactly as it is for the backend URL, so
@@ -132,7 +132,7 @@ export const MAX_ENTRY_CHARS = 254;
 
 /**
  * And bounded again in total, because the two limits above do not compose: fifty entries at the maximum
- * address length is about 13 KB, which the 8 KB cap they were chosen to respect would reject — a write
+ * address length is about 13 KB, which the 8 KB cap they were chosen to respect would reject: a write
  * that fails, taking every other setting in the same item with it.
  *
  * Reaching this needs deliberately absurd addresses; the realistic fifty-entry list is well under 2 KB.
@@ -150,7 +150,7 @@ const MAX_TRUST_LIST_CHARS = 6000;
  *
  * Here rather than in `trust.ts` with the rest of the trust logic for the same reason as every other
  * `normalize*` in this file: it is what makes a stored value safe to use, and this is the file the storage
- * layer already depends on. It also keeps `trust.ts` — and the public suffix table it reaches — out of the
+ * layer already depends on. It also keeps `trust.ts` (and the public suffix table it reaches) out of the
  * popup bundle, which needs settings and nothing else.
  */
 export function normalizeTrustList(raw: unknown): string[] {
@@ -173,7 +173,7 @@ export function normalizeTrustList(raw: unknown): string[] {
 }
 
 /**
- * An address with one `@`, or a domain — in both cases spelled the way a hostname is spelled.
+ * An address with one `@`, or a domain, in both cases spelled the way a hostname is spelled.
  *
  * Structural, rather than checked against the public suffix list: validation does not need to know which
  * suffixes exist, because an entry naming a suffix nobody registered matches nothing, which is the same
@@ -187,7 +187,7 @@ function isPlausibleEntry(entry: string): boolean {
 
 /**
  * At least two labels, each alphanumeric with interior hyphens, and a final label that starts with two
- * letters — which rules out the bare IP addresses a trust entry could never usefully name. Anchored and
+ * letters, which rules out the bare IP addresses a trust entry could never usefully name. Anchored and
  * bounded per label, so no input can make it expensive.
  */
 const HOSTNAME = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2}[a-z0-9-]{0,61}$/u;
@@ -217,7 +217,7 @@ export function isModelServerConfigured(settings: Settings): boolean {
 
 /**
  * The match pattern for a validated base URL, as narrow as Chrome allows: one scheme, one host, one
- * port. Chrome grants by origin, so the path prefix cannot be part of it — `/engines/v1` is not a
+ * port. Chrome grants by origin, so the path prefix cannot be part of it: `/engines/v1` is not a
  * separate permission from `/`. Shared because the options page requests exactly this pattern and the
  * worker checks exactly this pattern before every request; two derivations could disagree.
  */

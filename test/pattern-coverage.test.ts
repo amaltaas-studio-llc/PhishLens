@@ -97,7 +97,7 @@ const EXAMPLES: readonly string[] = [
   'Send me the codes on the back of the cards.',
   'The cards have a code on the back, photograph the codes.',
   'Get the gift cards today and send them.',
-  // invoice_fraud — fixtures cover it
+  // invoice_fraud: fixtures cover it
   // secrecy
   'Keep this between us for now.',
   'Do not discuss this with anyone.',
@@ -122,7 +122,7 @@ const EXAMPLES: readonly string[] = [
   'Are you busy right now?',
   'I have an urgent task for you.',
   'I have a small favour to ask.',
-  // crypto_demand — fixtures cover it
+  // crypto_demand: fixtures cover it
   // sextortion
   "I've recorded you through your webcam.",
   'I have filmed you without your knowledge.',

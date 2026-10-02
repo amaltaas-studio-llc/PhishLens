@@ -12,7 +12,7 @@ Sender click-trackers look like URL mismatches.
 
 - **Sender alignment:** dampen `content` one severity step only when a claimed brand’s domain is
   *proven* by Gmail’s authentication summary, and never when medium-or-higher identity or link findings
-  are present. Never dampen technical categories, and never a `high` or `critical` finding — apart from
+  are present. Never dampen technical categories, and never a `high` or `critical` finding, apart from
   the fake-sign-in-page combinations listed in `scoring/config.ts`, which describe the brand's own
   notifications. A request to move money keeps its full weight even from a proven brand, since a genuine
   brand service is what an attacker abuses to send one.

@@ -39,7 +39,7 @@ function adaptBias(delta: number, numPoints: number, firstTime: boolean): number
 
 /**
  * Decodes a single punycode label body (i.e. the part after `xn--`).
- * Returns `null` on any malformed input — this parses attacker-controlled data, so it never throws
+ * Returns `null` on any malformed input: this parses attacker-controlled data, so it never throws
  * and never returns a partial guess.
  */
 export function punycodeDecodeLabel(body: string): string | null {
@@ -135,7 +135,7 @@ export function scriptsUsed(text: string): string[] {
 }
 
 /**
- * True when a single label mixes scripts that no real word mixes — the classic homoglyph attack.
+ * True when a single label mixes scripts that no real word mixes: the classic homoglyph attack.
  * CJK+Latin is common and legitimate (product names), so it is excluded.
  */
 export function hasSuspiciousScriptMixing(label: string): boolean {
@@ -180,7 +180,7 @@ export function hasDirectionControl(text: string): boolean {
 }
 
 /**
- * Letters from Unicode's mathematical alphabets — the block that exists so a mathematician can write a
+ * Letters from Unicode's mathematical alphabets: the block that exists so a mathematician can write a
  * bold variable, and that spam uses to write `𝗣aym𝗲nt` in a form no text rule matches.
  *
  * Deliberately *not* folded away and forgotten. `skeleton()` normalises these to plain letters, which is
@@ -190,7 +190,7 @@ export function hasDirectionControl(text: string): boolean {
  *
  * The second alternative covers the holes in the block. Unicode did not duplicate characters it already
  * had, so the script and fraktur alphabets are missing letters that live in Letterlike Symbols
- * (`ℋ`, `ℎ`, `ℝ`) — a spammer spelling a whole word needs them, so a rule that ignored them would miss
+ * (`ℋ`, `ℎ`, `ℝ`); a spammer spelling a whole word needs them, so a rule that ignored them would miss
  * the words most likely to be spelled this way. They are enumerated rather than taken as a range because
  * the same block holds `™`, `№` and `℃`, which appear in ordinary display names.
  *
@@ -271,7 +271,7 @@ const MULTI_CHAR_CONFUSABLES: readonly [RegExp, string][] = [
  *
  * This has to be a separate pass applied *after* everything else, for two reasons. It must run after
  * case folding, because the attack is usually a capital `I` standing in for a lowercase `l`
- * (`northwind-Iogistics.com`) — and folding only the capital would make `MICROSOFT` and `microsoft`
+ * (`northwind-Iogistics.com`), and folding only the capital would make `MICROSOFT` and `microsoft`
  * produce different skeletons, which is worse than the gap it closes. It must also run after the
  * multi-character rules, so that `cl`→`d` cannot fire on a `ci` that this pass created.
  */
@@ -291,7 +291,7 @@ export function skeleton(input: string): string {
     .replace(/\p{Mn}/gu, ''); // drop combining marks left behind by NFKD
 
   // The table is consulted on the character as written, then on its lowercase. Lowercasing first made
-  // every capital entry unreachable and read a Greek `Η` as its lowercase `η`, an n — so `ΗSBC` and
+  // every capital entry unreachable and read a Greek `Η` as its lowercase `η`, an n, so `ΗSBC` and
   // `HSBC` did not compare equal.
   let folded = '';
   for (const ch of normalized) {

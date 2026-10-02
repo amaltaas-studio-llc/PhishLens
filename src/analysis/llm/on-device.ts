@@ -2,8 +2,8 @@
  * Finding Chrome's on-device model and asking what state it is in.
  *
  * Separate from the adapter so the welcome page can ask without bundling the prompt, the parser and the
- * analyzer it never runs. The API surface is unstable — the entry point, the availability method and its
- * values have all differed between Chrome versions — so every shape is probed rather than assumed, and
+ * analyzer it never runs. The API surface is unstable (the entry point, the availability method and its
+ * values have all differed between Chrome versions), so every shape is probed rather than assumed, and
  * anything unexpected resolves to "unavailable" instead of throwing.
  */
 
@@ -50,7 +50,7 @@ export function findFactory(): { host: UnknownRecord; label: string } | null {
   const g = globalThis as unknown as UnknownRecord;
 
   // Current: bare `LanguageModel` global (Chrome 138+ in extensions, 148+ on the web). This is a
-  // class, so it is function-typed — see `isPropertyHost`.
+  // class, so it is function-typed; see `isPropertyHost`.
   const bare = g['LanguageModel'];
   if (isPropertyHost(bare) && fn(bare, 'create') !== null) {
     return { host: bare, label: 'LanguageModel' };
@@ -82,7 +82,7 @@ export function findFactory(): { host: UnknownRecord; label: string } | null {
 /**
  * What Chrome says about its on-device model. `unsupported` means this build offers no Prompt API at
  * all, which a user fixes by updating Chrome; `unavailable` means it offers one but not the model, which
- * they fix — if the device qualifies — in `chrome://settings/system`.
+ * they fix (if the device qualifies) in `chrome://settings/system`.
  */
 export type OnDeviceModelState =
   | 'available'
@@ -135,7 +135,7 @@ export async function onDeviceModelState(): Promise<OnDeviceModelState> {
  * Chrome's message when the On-device AI user toggle (or a policy that looks like it) blocks execution.
  *
  * Calling `create()` while blocked also makes Chrome report a Mojo bad-message on the extension's
- * Errors page — so we must recognise this *before* create, not only after a rejection.
+ * Errors page, so we must recognise this *before* create, not only after a rejection.
  */
 export function isOnDeviceSettingDisabledError(error: unknown): boolean {
   const text =
@@ -163,8 +163,8 @@ export type ModelDownloadOutcome =
  * Gmail.
  *
  * Re-checks availability immediately before `create()`. When On-device AI is off, Chrome's create path
- * logs "The feature flag gating model execution was disabled." on the extension Errors page — even if
- * the promise is caught — so that call must not be made.
+ * logs "The feature flag gating model execution was disabled." on the extension Errors page (even if
+ * the promise is caught), so that call must not be made.
  */
 export async function downloadOnDeviceModel(
   onProgress: (fraction: number) => void,

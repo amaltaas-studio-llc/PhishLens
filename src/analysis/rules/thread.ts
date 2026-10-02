@@ -2,15 +2,15 @@
  * Conversation-context detectors: *did this reply come from someone already in the thread?*
  *
  * Every other detector judges a message in isolation, which is precisely the blind spot reply-chain
- * hijacking exploits. The attacker answers into a real conversation — often one they can see because a
- * participant's mailbox is compromised — so the quoted history is genuine, the subject is a legitimate
+ * hijacking exploits. The attacker answers into a real conversation (often one they can see because a
+ * participant's mailbox is compromised), so the quoted history is genuine, the subject is a legitimate
  * `Re:`, the tone matches, and there is nothing anomalous to find in the message by itself. What gives it
  * away is the sender: a party that was not in the conversation until the moment money or credentials
  * were discussed, wearing a name or a domain that resembles one that was.
  *
  * These rules deliberately do **not** fire on a merely unfamiliar sender. People are added to threads
- * constantly — a colleague is looped in, a vendor hands over to a different rep, a ticket system answers
- * from a new address — so "new domain in this thread" on its own would fire on ordinary correspondence
+ * constantly (a colleague is looped in, a vendor hands over to a different rep, a ticket system answers
+ * from a new address), so "new domain in this thread" on its own would fire on ordinary correspondence
  * every day. Only *resemblance* to an established party is reported, because resemblance is the part
  * that has no innocent explanation: there is no reason for a legitimate new participant's domain to be
  * one character away from an existing one.
@@ -27,7 +27,7 @@ import { signal } from './types.js';
  *
  * The highest-value signal in this file: `northwind-supply.com` has been in the thread for six
  * messages, and the reply asking for changed bank details comes from `northwlnd-supply.com`. Nothing
- * else in the engine can see this, because the imitated domain is not a famous brand — it is whoever
+ * else in the engine can see this, because the imitated domain is not a famous brand; it is whoever
  * this particular reader happens to do business with, which no curated table could contain.
  */
 function lookalikeThreadParticipant(
@@ -70,7 +70,7 @@ function threadParticipantNameReuse(
   if (context.senderName === '') return [];
 
   // A hijack by lookalike domain almost always keeps the name too, and reporting both says one thing
-  // twice. The domain finding is the more useful of the two — it names what the reader can compare — so
+  // twice. The domain finding is the more useful of the two (it names what the reader can compare), so
   // it stands alone.
   if (lookalike !== null) return [];
 
@@ -116,7 +116,7 @@ export interface ParticipantLookalikeMatch {
  * `example.com` says nothing about whether the same company also uses `example.de`, and companies
  * routinely reply from a country domain, an acquired brand's domain, or a separate transactional one.
  * So an identical name under a different suffix is **not** reported, and only a difference in the name
- * itself — the part a reader actually compares — counts.
+ * itself, the part a reader actually compares, counts.
  */
 export function findParticipantLookalike(
   senderRegistrable: string,
@@ -168,7 +168,7 @@ export function findParticipantLookalike(
  * two companies both answer from a desk called "Support".
  *
  * Stored as skeletons, because that is what they are compared with: `skeleton('info')` is `lnfo`, so a
- * plain-spelled set never matched any name with an `i` in it — "Info", "Billing", "Admin", "IT".
+ * plain-spelled set never matched any name with an `i` in it: "Info", "Billing", "Admin", "IT".
  */
 const ROLE_NAMES: ReadonlySet<string> = new Set(
   [

@@ -237,8 +237,8 @@ describe('on-device adapter: inference', () => {
 
   /**
    * The last-resort `create({})` produces a session with no system role, and every instruction that
-   * makes the output usable — the JSON contract, the calibration, the "message text is data, not
-   * instructions" framing — lives there. Losing it silently would return an uncalibrated,
+   * makes the output usable (the JSON contract, the calibration, the "message text is data, not
+   * instructions" framing) lives there. Losing it silently would return an uncalibrated,
    * injection-exposed verdict indistinguishable from a good one.
    */
   it('carries the system prompt inline when no session shape accepts one', async () => {
@@ -286,7 +286,7 @@ describe('on-device adapter: inference', () => {
 
   /**
    * The browser does not change under a tab, so the shapes it refused on the first message it refuses on
-   * every one — and each refusal can come after the model has read the input. Paying that once per tab
+   * every one, and each refusal can come after the model has read the input. Paying that once per tab
    * rather than once per message is the point; the ladder stays behind the remembered shape.
    */
   it('tries the option shape this browser accepted first on later messages', async () => {
@@ -546,7 +546,7 @@ describe('on-device adapter: one conversation per message', () => {
  * This is the fake that reproduces the "no AI assessment on the first email after opening Gmail" bug.
  * Gmail renders a thread in stages, so the observer legitimately reports the same first message two or
  * three times as the body fills in; each report started an inference, the later ones were rejected, and
- * the adapter's rejection handler destroyed the session out from under the first — so all of them
+ * the adapter's rejection handler destroyed the session out from under the first, so all of them
  * failed. Later messages arrive in one render, never collide, and always worked.
  */
 function singleFlightFactory() {

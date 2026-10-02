@@ -1,8 +1,8 @@
 /**
  * Watching a Gmail region that Gmail may replace rather than change.
  *
- * A `MutationObserver` holds the node it was given. Gmail swaps out whole regions — the conversation
- * container on some in-place actions, the main region on a view change — and an observer then sits on an
+ * A `MutationObserver` holds the node it was given. Gmail swaps out whole regions (the conversation
+ * container on some in-place actions, the main region on a view change), and an observer then sits on an
  * element outside the document, reporting nothing again for the lifetime of the tab. Nothing notices,
  * because in both consumers every trigger is downstream of a mutation, so the extension goes quiet on a
  * page that still looks like it is working, with whatever it last drew still on screen.
@@ -14,7 +14,7 @@
  * re-extracting a message.
  *
  * Shared by `observer.ts` and `content/list-marks.ts` because both learned this the same way. The rule is
- * one rule — watch the region, and watch for the region being replaced — and a second copy of it is the
+ * one rule (watch the region, and watch for the region being replaced), and a second copy of it is the
  * copy that is missing the day Gmail changes shape.
  */
 

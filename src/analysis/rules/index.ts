@@ -2,7 +2,7 @@
  * Rule engine entry point: run every deterministic detector, then refine.
  *
  * "Refine" is the false-positive-resistance stage (docs/adr/0005-false-positive-resistance.md). It is a separate pass
- * rather than logic inside detectors because dampening needs to see *all* the signals to decide —
+ * rather than logic inside detectors because dampening needs to see *all* the signals to decide:
  * a content heuristic can only be safely softened once we know no link or identity rule fired.
  */
 import { brandOwns } from '../../shared/brands.js';
@@ -50,7 +50,7 @@ export function runRuleEngine(context: AnalysisContext): SecuritySignal[] {
  *  - severity and score only ever move *down*, and no finding is ever removed;
  *  - a single `medium`-or-worse technical finding cancels dampening entirely;
  *  - neither proof softens a `high` or `critical` finding, because the sender being genuine is exactly
- *    the situation a compromised account produces — save the fake-sign-in combinations a verified
+ *    the situation a compromised account produces, save the fake-sign-in combinations a verified
  *    brand with aligned links refutes (`DAMPENING.refutableCombinations`).
  */
 function refine(signals: SecuritySignal[], context: AnalysisContext): SecuritySignal[] {
@@ -63,7 +63,7 @@ function refine(signals: SecuritySignal[], context: AnalysisContext): SecuritySi
   /*
    * Proof of origin first, and for the same reason trust needs it: a From header is a claim, and forging a
    * famous one is the attack. Dampening on the domain alone therefore rewarded exactly the mail it should
-   * punish — "send me your verification code" from a `paypal.com` address that nothing tied to PayPal came
+   * punish: "send me your verification code" from a `paypal.com` address that nothing tied to PayPal came
    * out at 8/100 and Low Risk, the most reassuring thing this extension can say, about an unverified sender
    * making a request no real organisation makes. With a valid PayPal signature the same message still lands
    * in `low`, which is the half worth keeping.
@@ -73,8 +73,8 @@ function refine(signals: SecuritySignal[], context: AnalysisContext): SecuritySi
    * Google's, so every personal Gmail account was arriving here as a verified brand and having its
    * `content` findings quartered and its combinations zeroed. "Please send me your verification code"
    * from a stranger's Gmail scored 13/100 and Low Risk; the same sentence from a domain nobody has
-   * enumerated scored 50. The brand table is right to list those domains — that is what makes `gmai1.com`
-   * a lookalike — so the fix belongs here, at the one place that treats ownership as authority.
+   * enumerated scored 50. The brand table is right to list those domains (that is what makes `gmai1.com`
+   * a lookalike), so the fix belongs here, at the one place that treats ownership as authority.
    *
    * Both branches are gated, not just the claimless one: a message from a personal Gmail account that
    * *claims* to be Google is an impersonation attempt, and it would otherwise satisfy
@@ -136,7 +136,7 @@ function refine(signals: SecuritySignal[], context: AnalysisContext): SecuritySi
     // Refutable combinations are zeroed rather than merely downgraded. Their entire claim is an
     // inference about *intent* drawn from two themes co-occurring ("urgency plus a credential request
     // means someone is rushing you onto a fake login page"). Once the sender is verified as the
-    // organisation it claims to be and every link stays inside it, that inference has no basis — the
+    // organisation it claims to be and every link stays inside it, that inference has no basis; the
     // co-occurrence is just what a real password-reset notice looks like. The finding stays visible
     // for transparency, scoring nothing, instead of being deleted.
     if (refutable) {

@@ -2,7 +2,7 @@
  * Tests for the SPA message observer.
  *
  * This class decides *whether the extension does anything at all*, and every one of its negative
- * decisions is deliberately silent — a wrong `return false` produces no error, no badge, and no log in
+ * decisions is deliberately silent: a wrong `return false` produces no error, no badge, and no log in
  * a production build. That combination is why it needs direct tests rather than coverage via the
  * analysis stack.
  *
@@ -37,7 +37,7 @@ interface RenderedView {
   subject: string;
   bodyText: string;
   /**
-   * Evidence Gmail reveals after it has drawn the message — the `mailed-by` / `signed-by` rows behind the
+   * Evidence Gmail reveals after it has drawn the message: the `mailed-by` / `signed-by` rows behind the
    * details toggle. Here because it changes what the engine is given without changing which message is on
    * screen, which is the distinction the staleness guard turns on.
    */
@@ -309,7 +309,7 @@ describe('redundant re-render suppression', () => {
 
   /**
    * The half that must survive the staleness guard being narrowed to message identity: on the route the
-   * reader is actually on, evidence arriving is the most important re-analysis there is — Gmail's
+   * reader is actually on, evidence arriving is the most important re-analysis there is, because Gmail's
    * authentication summary is what several of the highest-severity rules read.
    */
   it('re-emits when evidence arrives on the message already on screen', () => {
@@ -330,7 +330,7 @@ describe('redundant re-render suppression', () => {
    * A signature answers whether the message changed. It cannot answer whether what the consumer drew is
    * still on screen, and those come apart: Gmail redraws the message header with equivalent markup, which
    * takes the injected badge with it and leaves every byte of the extraction identical. Suppressing that
-   * as redundant removed the badge for the rest of the message's time on screen — silently, because from
+   * as redundant removed the badge for the rest of the message's time on screen, silently, because from
    * here nothing had changed.
    */
   it('re-emits when the header it reported was replaced by an identical one', () => {
@@ -419,8 +419,8 @@ describe('staleness guard', () => {
   /**
    * Evidence arriving on the message the reader has just left.
    *
-   * Gmail reveals parts of a message after drawing the rest — the `mailed-by` / `signed-by` rows behind
-   * the details toggle, attachment chips — and it does so on the thread still in the pane, whether or not
+   * Gmail reveals parts of a message after drawing the rest (the `mailed-by` / `signed-by` rows behind
+   * the details toggle, attachment chips), and it does so on the thread still in the pane, whether or not
    * the route has moved on. Comparing the whole rendered *view* made that enrichment read as "Gmail has
    * re-rendered for the new route", so the previous thread's message was emitted under the new thread's
    * route: a verdict attributed to a message the reader is no longer looking at, which is the one thing
@@ -450,7 +450,7 @@ describe('staleness guard', () => {
    * Gmail's thread perm id is read from the subject heading, which it renders separately from the
    * conversation and swaps first: for a moment the heading names thread B while the message below it is
    * still A's. Counting that id as part of *which message is rendered* let a heading update alone satisfy
-   * the guard, so the previous thread's message was emitted under the new route — the same failure the
+   * the guard, so the previous thread's message was emitted under the new route: the same failure the
    * guard was narrowed to prevent, arriving through the one component of the identity that the message
    * does not own.
    */
@@ -572,7 +572,7 @@ describe('lifecycle', () => {
   /**
    * A MutationObserver holds the node it was given. Gmail replaces the conversation container on some
    * in-place actions, not only on navigation, and the observer then sits on an element that is no longer
-   * in the document, reporting nothing ever again — on a page that still looks like it is working, with a
+   * in the document, reporting nothing ever again, on a page that still looks like it is working, with a
    * badge still attached. Every other trigger in the observer is downstream of a mutation, so the
    * watchers on the path out of the root are the only thing that makes the replacement noticeable.
    */
@@ -625,7 +625,7 @@ describe('lifecycle', () => {
 
   /**
    * The badge and the popup are claims about a message on screen. Collapsing the open message, or replying
-   * to it so that the only expanded message is the user's own, leaves nothing readable — and the claim
+   * to it so that the only expanded message is the user's own, leaves nothing readable, and the claim
    * stood, because the evaluation simply returned. Retracting it needs a delay rather than an immediate
    * teardown: a momentary absence is exactly what an ordinary Gmail re-render looks like from here.
    */
@@ -739,7 +739,7 @@ describe('lifecycle', () => {
     /**
      * Retraction has to survive the signature being forgotten, because forgetting it is routine: it is how
      * a re-evaluation is forced. Reattaching to a replaced conversation root does it, and a replacement
-     * arriving without a readable message is precisely the case the grace period was added for — Gmail
+     * arriving without a readable message is precisely the case the grace period was added for: Gmail
      * rebuilding the pane around the user's own reply. Reading an empty signature as "nothing was
      * asserted" cancelled the retraction there, and left the badge on the message underneath.
      */
@@ -890,7 +890,7 @@ describe('signatures', () => {
   /**
    * The other half of the same distinction. The signature has to move when evidence arrives; the identity
    * the staleness guard compares has to stay still, because that guard reads a change as "Gmail has
-   * re-rendered for the route the reader has moved to" — and a details panel expanding on the thread still
+   * re-rendered for the route the reader has moved to", and a details panel expanding on the thread still
    * in the pane is not that.
    */
   describe('which message, as against what it says', () => {
@@ -916,7 +916,7 @@ describe('signatures', () => {
 
     /**
      * The thread perm id is read from the subject heading, which Gmail renders separately from the
-     * conversation and swaps first — so on its own it says the heading has caught up, not the message. It is
+     * conversation and swaps first, so on its own it says the heading has caught up, not the message. It is
      * not evidence of a new message even when no message id is available.
      */
     it('ignores the independently rendered thread heading with or without a message id', () => {
@@ -929,7 +929,7 @@ describe('signatures', () => {
 
   /**
    * Counting is not reading. A count answers "has something arrived", and the signature has to answer "is
-   * this the same evidence" — `invoice.pdf` becoming `invoice.exe` keeps the attachment count at one while
+   * this the same evidence": `invoice.pdf` becoming `invoice.exe` keeps the attachment count at one while
    * turning a score of 0 into a score of 75, and a rewritten href or an edited sentence of the same length
    * does the same for the link and content rules. Each of these is a stale verdict left standing behind a
    * signature that claims nothing has changed.

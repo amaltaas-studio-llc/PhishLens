@@ -22,7 +22,7 @@ export interface Brand {
    *
    * For a brand whose name is an ordinary word. As a keyword, `ledger` would make every accounting
    * subject a claim to be a hardware-wallet maker, which is why such brands carry only qualified
-   * keywords (`ledger live`) — and those miss the commonest phishing form of all, a sender called just
+   * keywords (`ledger live`), and those miss the commonest phishing form of all, a sender called just
    * "Ledger". Nobody's display name is the bare word by accident, so the name alone is the claim there.
    */
   standaloneNames?: readonly string[];
@@ -34,13 +34,13 @@ export interface Brand {
    * ICANN's Specification 13 is what makes this a rule rather than a list of guesses: a brand TLD's string
    * must match the operator's registered trademark, and registrations are restricted to the operator, its
    * affiliates, and its trademark licensees. So any name under `.apple` is Apple's without an entry in
-   * `domains` — nobody else can hold one at all. Without this, a genuine notice about a bank product the
+   * `domains`: nobody else can hold one at all. Without this, a genuine notice about a bank product the
    * brand operates jointly, sent from the brand's own TLD and authenticated, was reported as brand
    * impersonation because the domain was not one of the handful this file happens to list.
    *
    * Only strings whose Specification 13 request ICANN records as granted belong here. `.office` is the
    * instructive omission: Microsoft's request for it was withdrawn, so it carries no such guarantee even
-   * though Microsoft operates it. A TLD that is open to third parties must never appear — `.live` and
+   * though Microsoft operates it. A TLD that is open to third parties must never appear: `.live` and
    * `.me` are Microsoft's and Apple's in `domains` only as `live.com` and `me.com`, and treating either as
    * a brand TLD would hand every registrant of a cheap name the brand's identity.
    */
@@ -420,7 +420,7 @@ export function brandOwningDomain(registrable: string): Brand | undefined {
  * `brand.domains.includes(registrable)` instead looks equivalent and is not: it cannot see a brand's own
  * top-level domain, so four rules disagreed with `brandOwningDomain` about who owned a name under `.apple`.
  * A brand's genuine mail was then excluded from the alignment that dampens content heuristics, and its own
- * links were read as pointing somewhere else — a disagreement that showed up as unrelated symptoms in
+ * links were read as pointing somewhere else, a disagreement that showed up as unrelated symptoms in
  * unrelated files, which is what having one question answered in five places buys.
  */
 export function brandOwns(brand: Brand, registrable: string): boolean {

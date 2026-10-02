@@ -11,7 +11,7 @@ on-device models are over-suspicious and invent “technical” reasons they can
 ## Decision
 
 - The `llm` category is additive, weighted at most 15 of 100, and shown in a separate card section.
-- Score only risk above a dead zone; **uncorroborated readings contribute zero** — a deterministic signal
+- Score only risk above a dead zone; **uncorroborated readings contribute zero**: a deterministic signal
   must already exist.
 - The model cannot remove a finding, lower a score past a deterministic floor, or change a classification
   alone. This holds for Chrome’s model and for any server the user runs.

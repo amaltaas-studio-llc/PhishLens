@@ -3,7 +3,7 @@
  *
  * Pure so the mapping can be asserted without Chrome. The content script decides the appearance from
  * tab status + settings; the service worker only paints what it is told onto `chrome.action` for that
- * tab — content scripts cannot call the action API themselves.
+ * tab, because content scripts cannot call the action API themselves.
  */
 import type { Classification } from './types.js';
 import type { TabStatus } from './messaging.js';

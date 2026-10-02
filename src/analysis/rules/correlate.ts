@@ -7,7 +7,7 @@
  *   "A request to redirect salary payments" is a content observation.
  *   "The sender is an outside personal mailbox" is an identity observation.
  *   "A request to redirect salary payments, sent from an outside personal mailbox" is a different,
- *   much stronger finding than either — and it is an *identity* problem, because the sender is
+ *   much stronger finding than either, and it is an *identity* problem, because the sender is
  *   impersonating an employee.
  *
  * Putting this in the content detector would require it to know about domains; putting it in the
@@ -74,7 +74,7 @@ function externalFinancialRequest(
       severity: 'high',
       score: 30,
       title: 'Financial request sent from an outside personal mailbox',
-      description: `The message asks for money to be moved or for payment details to be changed, and it was sent from a consumer mailbox at ${context.senderRegistrable} rather than from ${target}. Requests of this kind are the mechanism of business email compromise: the wording is plausible precisely because the account it came from is real — it just does not belong to the organisation.`,
+      description: `The message asks for money to be moved or for payment details to be changed, and it was sent from a consumer mailbox at ${context.senderRegistrable} rather than from ${target}. Requests of this kind are the mechanism of business email compromise: the wording is plausible precisely because the account it came from is real; it just does not belong to the organisation.`,
       evidence: { value: `${context.senderEmail} → ${target}` },
     }),
   ];
@@ -88,8 +88,8 @@ function impersonationWithCredentialAsk(
   signals: readonly SecuritySignal[],
   context: AnalysisContext,
 ): SecuritySignal[] {
-  // The medium half of `unsupported_org_claim` is generous by design — "shares no name with the sending
-  // domain" is also every recruiting, ticketing and survey platform writing on a customer's behalf — and
+  // The medium half of `unsupported_org_claim` is generous by design ("shares no name with the sending
+  // domain" is also every recruiting, ticketing and survey platform writing on a customer's behalf), and
   // "confirm your account" is what those platforms send. Pairing the two made a `critical` of a job
   // application. Only the institutional claim, a bank or payment body writing from a personal mailbox,
   // is impersonation certain enough to carry this finding.

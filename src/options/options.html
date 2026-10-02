@@ -243,14 +243,14 @@
     <main>
       <h1>PhishLens</h1>
       <p class="sub">
-        Explainable phishing and social-engineering analysis for Gmail. Advisory only — PhishLens never
+        Explainable phishing and social-engineering analysis for Gmail. Advisory only: PhishLens never
         blocks links, downloads, or replies.
       </p>
 
       <fieldset>
         <legend><h2>AI analysis</h2></legend>
         <p class="hint">
-          Technical checks — sender domains, links, attachments, wording patterns — always run on this
+          Technical checks (sender domains, links, attachments, wording patterns) always run on this
           device and need no AI. Wording patterns cover English plus Spanish, French, German,
           Portuguese, Italian, Dutch, Hindi and Hinglish. This setting only controls the optional
           semantic layer.
@@ -282,7 +282,7 @@
           <span>
             <span class="option-title">Your own model server</span><br />
             <span class="option-desc">
-              Uses a model you run yourself — Ollama, LM Studio, Docker Model Runner, llama.cpp — for
+              Uses a model you run yourself (Ollama, LM Studio, Docker Model Runner, llama.cpp) for
               sharper reasoning than the browser's built-in model. The subject and body of the message
               you are reading are sent to the address you give below, so keep it on this machine unless
               you mean otherwise.
@@ -346,8 +346,8 @@
           <span>
             <span class="option-title">Cloud-assisted (not built)</span><br />
             <span class="option-desc">
-              Would send a redacted summary — subject, a body excerpt, and domains, with no recipient
-              address and no attachments — to a backend you run. No such backend exists yet, so this
+              Would send a redacted summary (subject, a body excerpt, and domains, with no recipient
+              address and no attachments) to a backend you run. No such backend exists yet, so this
               mode produces no assessment. Switch to on-device or your own model server.
             </span>
           </span>
@@ -386,7 +386,7 @@
       <h2>Trusted senders</h2>
       <p class="hint">
         Senders you have told PhishLens you get mail from often, from the assessment card. For these,
-        findings about a message's <em>wording</em> are weighted down — and only while Gmail can confirm
+        findings about a message's <em>wording</em> are weighted down, and only while Gmail can confirm
         the message really came from there. Findings about links, attachments, and who the sender is are
         never affected, and nothing is ever hidden from the card.
       </p>
@@ -410,7 +410,7 @@
         <span>
           <span class="option-title">Mark suspicious senders in the message list</span><br />
           <span class="option-desc">
-            A small warning beside a row whose sender looks wrong — an impersonated name, a lookalike
+            A small warning beside a row whose sender looks wrong: an impersonated name, a lookalike
             domain. Only the most serious of those are marked, so most inboxes show none at all; softer
             findings wait for the card, where the body and links give them context. A row has no body,
             links or authentication to check, so this is only ever a warning: an unmarked row means
@@ -470,7 +470,7 @@
         storage or logged in a release build. Results are cached in the tab only for as long as the tab
         is open. With AI off or on-device, nothing derived from a message leaves the browser. With your
         own model server, the display name, subject, and body excerpt go to the address you set above
-        and nowhere else — no link targets, no recipient address, no attachments, and no API key.
+        and nowhere else: no link targets, no recipient address, no attachments, and no API key.
       </p>
 
       <footer>

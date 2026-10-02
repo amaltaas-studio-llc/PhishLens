@@ -87,7 +87,7 @@ email clients.
 2. Unzip it into a folder you will keep on your computer.
 3. Enter `chrome://extensions` in Chrome's address bar and turn on **Developer mode**.
 4. Click **Load unpacked** and select the extracted folder containing `manifest.json`.
-5. Open or refresh Gmail, then open a received message. Look for the badge beside the sender — and
+5. Open or refresh Gmail, then open a received message. Look for the badge beside the sender, and
    the score on the PhishLens toolbar icon, coloured by the same risk band.
 
 No model setup is needed to use the core checks. Pin PhishLens from Chrome's Extensions menu for quick
@@ -130,7 +130,7 @@ phishing.
 | ! **Caution** | 25–49 | Some details deserve a closer look. Open the badge to see why. |
 | ⚠ **Suspicious** | 50–74 | Significant warning signs. Verify the request through a known contact or website before acting. |
 | ⛔ **High Risk** | 75–100 | Strong warning signs. Avoid using the message's links or attachments to follow up. |
-| ? **Not checked** | — | PhishLens could not read enough to assess the message. This is not a judgement of safety. |
+| ? **Not checked** | None | PhishLens could not read enough to assess the message. This is not a judgement of safety. |
 
 <img width="760" alt="The badge beside four senders in a Gmail header: Low Risk 12 out of 100 in green, Suspicious 50 out of 100 in amber, High Risk 75 out of 100 in red, and a dashed grey Not checked badge on a message whose sender could not be read." src="docs/assets/badges.png">
 
@@ -140,7 +140,7 @@ phishing.
 <img width="380" alt="The card headed Not checked, explaining that PhishLens could not read who the message is from, that this is not a judgement that the message is safe, and offering a diagnostic report to copy." src="docs/assets/card-unreadable.png">
 
 Gmail changes its markup from time to time. When a part of the message PhishLens depends on cannot be
-found, it says so instead of scoring what it managed to read — a confident **Low Risk** on a message
+found, it says so instead of scoring what it managed to read. A confident **Low Risk** on a message
 nobody checked is the one failure this project will not ship. The card offers a report naming the parts it
 could not find, which contains no part of your mail and which you can read before sending it anywhere.
 
@@ -173,8 +173,8 @@ An extension that reads email should be clear about what it does with it.
 Open **PhishLens in the Chrome toolbar → Settings** to adjust its behaviour.
 
 **Keep the inbox quieter.** Hide low-risk badges, or turn on optional sender warnings in the message list.
-List warnings check sender identity only — there is no body, no links and no authentication result to read
-from a list — so an unmarked row means nothing was visible, not that the message is safe.
+List warnings check sender identity only (there is no body, no links and no authentication result to read
+from a list), so an unmarked row means nothing was visible, not that the message is safe.
 
 <img width="760" alt="An inbox list where most rows carry no marker and four carry a small red warning beside the subject." src="docs/assets/inbox-list.png">
 
@@ -199,7 +199,7 @@ the AI took.
 <details>
 <summary><strong>No badge appears</strong></summary>
 
-Refresh Gmail after installing, and open a message you received — your own outgoing replies are not
+Refresh Gmail after installing, and open a message you received; your own outgoing replies are not
 assessed. Low-risk badges may be switched off in your settings. Click the toolbar icon to see what
 PhishLens thinks it is doing on the current tab.
 
@@ -219,7 +219,7 @@ PhishLens can miss phishing, and it can flag legitimate mail. It reads what Gmai
 Gmail's layout can stop a check finding anything until the extension is updated. The wording checks cover
 English plus Spanish, French, German, Portuguese, Italian, Dutch, Hindi and Hinglish; the sender, link and
 filename checks help in any language. It does not open attachments, and it consults no blocklists or
-reputation services — everything it knows comes from the message in front of it.
+reputation services. Everything it knows comes from the message in front of it.
 
 ## Open source
 

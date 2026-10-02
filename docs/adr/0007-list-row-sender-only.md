@@ -11,7 +11,7 @@ to turn into false all-clears or inbox noise that gets switched off.
 
 - An explicit allowlist of identity rules that need only name and address; everything else is classified
   “needs more.” A test forces every identity rule into one set or the other.
-- Verdicts are **warning or nothing** — never “looks fine.”
+- Verdicts are **warning or nothing**, never “looks fine.”
 - The mark floor is `high` (stricter than what the open-message card reports).
 
 ## Consequences

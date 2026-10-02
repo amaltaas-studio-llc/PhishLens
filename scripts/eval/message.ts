@@ -65,7 +65,7 @@ const SILENT = new VirtualConsole();
 
 /**
  * jsdom with its defaults, which matter here: scripts are not run and no subresource is loaded, so
- * parsing a message dereferences nothing in it — the same guarantee the extension makes.
+ * parsing a message dereferences nothing in it, the same guarantee the extension makes.
  */
 function fromHtml(html: string): Body {
   const { document } = new JSDOM(truncate(html, MAX_HTML_CHARS), { virtualConsole: SILENT }).window;

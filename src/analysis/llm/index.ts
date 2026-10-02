@@ -3,7 +3,7 @@
  *
  * Resolution is by explicit user setting, never by capability sniffing: if the user chose `off`, no
  * analyzer is constructed at all, and if they chose `local`, no adapter that could open a socket is even
- * instantiated. There is no fallback in any direction — silently sending content to a server because
+ * instantiated. There is no fallback in any direction: silently sending content to a server because
  * the on-device model was missing would violate the privacy contract, and falling back to a weaker model
  * would change the analysis without saying so.
  */
@@ -16,7 +16,7 @@ import { ModelServerAnalyzer } from './model-server.js';
  * The single on-device analyzer instance.
  *
  * Module-level so the (expensive) model session is reused across messages. Safe only because this
- * module is loaded exclusively in the content script — see docs/adr/0002-mv3-state-in-content-script.md. It must not be
+ * module is loaded exclusively in the content script; see docs/adr/0002-mv3-state-in-content-script.md. It must not be
  * imported by `src/background/`.
  */
 let sharedLocalAnalyzer: ChromePromptAnalyzer | null = null;

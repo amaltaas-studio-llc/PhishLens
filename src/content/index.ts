@@ -3,7 +3,7 @@
  *
  * Bundled as an IIFE because MV3 declared content scripts are classic scripts. Deliberately thin: it
  * picks an adapter, starts the controller, and arranges teardown. All behaviour lives in modules that
- * can be reasoned about — and in the case of the analysis layer, tested — independently.
+ * can be reasoned about (and in the case of the analysis layer, tested) independently.
  */
 import { GmailDomAdapter } from '../gmail/dom-adapter.js';
 import { disposeLocalAnalyzer } from '../analysis/llm/index.js';

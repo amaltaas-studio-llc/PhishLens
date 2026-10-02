@@ -4,7 +4,7 @@
  * Neither available signal works alone:
  *
  *  - **`hashchange`/`popstate` alone** fires while Gmail is still showing the *previous* thread.
- *    Extracting at that moment analyses the old message and attributes the result to the new one —
+ *    Extracting at that moment analyses the old message and attributes the result to the new one:
  *    a stale analysis, which is worse than no analysis in a security tool.
  *  - **`MutationObserver` alone** fires dozens of times per thread open (avatars resolving, quoted
  *    text collapsing, the chat roster, ads) and also fires when Gmail re-renders the *same* thread.
@@ -22,8 +22,8 @@
  *    stops staleness.
  *  - If reconciliation times out, `no-message` is emitted so the UI tears the badge down instead of
  *    leaving a stale one attached to the wrong message.
- *  - A message that was reported and is then no longer readable — collapsed, or replaced by the user's own
- *    reply — is retracted the same way, after a grace period, because a brief absence is what an ordinary
+ *  - A message that was reported and is then no longer readable (collapsed, or replaced by the user's own
+ *    reply) is retracted the same way, after a grace period, because a brief absence is what an ordinary
  *    re-render looks like from here.
  *
  * The staleness guard compares **the DOM against itself**, never the route against the DOM. Gmail's
@@ -118,14 +118,14 @@ export class GmailObserver {
   /** Signature of the last emitted message. The redundancy guard, and *only* that. */
   #lastSignature = '';
   /**
-   * Whether a message event is outstanding — whether the UI is, right now, asserting something about a
+   * Whether a message event is outstanding: whether the UI is, right now, asserting something about a
    * message.
    *
    * Separate from `#lastSignature` because the two answer different questions, and conflating them made
    * the answer to this one wrong whenever the other was deliberately forgotten. Clearing the signature is
    * how a re-evaluation is forced: `refresh()` does it on a settings change, and reattaching to a replaced
    * conversation root does it because the replacement holds a render nothing has looked at. Read as "there
-   * is no assertion on screen", an empty signature then cancelled the retraction — so replacing the root
+   * is no assertion on screen", an empty signature then cancelled the retraction, so replacing the root
    * with a view whose message cannot be read left a badge and a card standing on the previous message,
    * which is the one thing the disappearance grace exists to prevent.
    */
@@ -138,7 +138,7 @@ export class GmailObserver {
   /**
    * The elements the last emitted handle pointed at.
    *
-   * Held because the consumer *draws into* them — the badge is injected into the header element — and a
+   * Held because the consumer *draws into* them (the badge is injected into the header element), and a
    * signature cannot answer whether what was drawn is still on screen. Gmail redraws the message header
    * with equivalent markup, which takes the badge with it and leaves every byte of the extraction
    * identical; read as redundant, the message then spent the rest of its time on screen with no badge and
@@ -149,7 +149,7 @@ export class GmailObserver {
    * The body subtree whose inline styles are watched, kept so the watch follows the message.
    *
    * Scoped to the body rather than added to the root's filter because `style` is Gmail's most-written
-   * attribute — sizing, animation, scroll position — and almost none of it is inside a message. Only there
+   * attribute (sizing, animation, scroll position), and almost none of it is inside a message. Only there
    * does it decide what the engine reads. See `VISIBILITY_ATTRIBUTES`.
    */
   #watchedBody: Element | null = null;
@@ -220,7 +220,7 @@ export class GmailObserver {
      * Structure is not the only way a message changes. Gmail collapses a message by adding a class to the
      * container it already rendered, and it rewrites text in place: an attachment chip's filename, a
      * subject, a link's href. Watching `childList` alone meant the extension never re-evaluated any of
-     * that — the open message could become collapsed, and unreadable, with the badge still asserting a
+     * that: the open message could become collapsed, and unreadable, with the badge still asserting a
      * verdict about it, and `invoice.pdf` could become `invoice.exe` with no evaluation to notice. A
      * signature covering every field of the message helps only where something asks for it to be recomputed.
      *
@@ -292,7 +292,7 @@ export class GmailObserver {
    * Polls until the DOM catches up with the route, or the deadline passes.
    *
    * A poll rather than waiting on mutations because the render that completes a thread open does not
-   * reliably produce an observable mutation inside the observed subtree on the first pass — the
+   * reliably produce an observable mutation inside the observed subtree on the first pass; the
    * conversation root itself is sometimes replaced, which detaches the observer.
    */
   #startReconciling(): void {
@@ -355,7 +355,7 @@ export class GmailObserver {
     /*
      * Unless the adapter has said the body is there and could not be read. That is waited on too, but
      * only for a grace: waiting on it indefinitely meant a message that never emitted, and a message that
-     * never emits gets no badge — which on a quiet install is exactly what a clean message looks like.
+     * never emits gets no badge, which on a quiet install is exactly what a clean message looks like.
      */
     if (empty && !this.#unreadableGraceOver(handle.bodyElement)) return null;
     return { handle, email: extraction.email, missing: extraction.missing };
@@ -398,7 +398,7 @@ export class GmailObserver {
    * Absence has to be confirmed rather than acted on, because a momentary absence is the normal shape of
    * a Gmail re-render: the container is replaced, or the header arrives before the body, and `#readView`
    * correctly declines both. Retracting immediately would tear the badge off and rebuild it on ordinary
-   * churn. Waiting *indefinitely* is the bug this replaces, though — collapsing the open message, or
+   * churn. Waiting *indefinitely* is the bug this replaces, though: collapsing the open message, or
    * replying to it so that the only expanded message is the user's own, left the badge and the popup
    * asserting a verdict about a message no longer on screen, which is a claim the reader cannot check.
    */
@@ -505,8 +505,8 @@ export class GmailObserver {
   /**
    * Whether the elements last reported are no longer the ones rendered.
    *
-   * Compared by reference, which is the question being asked: not "does this message look the same" — the
-   * signature answers that, and answers it identically for a header Gmail has redrawn from the same data —
+   * Compared by reference, which is the question being asked: not "does this message look the same" (the
+   * signature answers that, and answers it identically for a header Gmail has redrawn from the same data)
    * but "is the element the badge was put into still the element on screen". Where the message is gone
    * rather than redrawn, `#readView` has already declined and the disappearance grace handles it.
    */
@@ -543,7 +543,7 @@ export function viewSignature(
  * The staleness guard needs this rather than the signature below, and the difference between the two is
  * the difference between the two questions asked of the DOM. "Has anything changed?" must move when a
  * Reply-To line or an attachment chip arrives late, or the enrichment is dropped. "Is this still the
- * message I reported?" must *not* move when it does — the guard reads inequality as "Gmail has
+ * message I reported?" must *not* move when it does: the guard reads inequality as "Gmail has
  * re-rendered for the new route", so expanding the details panel on a message the reader has navigated
  * away from was enough to have it emitted under the next thread's route, with its own ids unchanged and
  * every id in the comparison agreeing that it had not changed.
@@ -552,7 +552,7 @@ export function viewSignature(
  * same reason the body is: Gmail renders the thread's subject element separately from the message, so a
  * transition where it is briefly absent would read as a different message, which is the failure this is
  * guarding against. Where the ids are unreadable and the sender is the same, the guard blocks a render it
- * should have allowed and the reconciliation poll reports a timeout — silence rather than a verdict
+ * should have allowed and the reconciliation poll reports a timeout: silence rather than a verdict
  * attributed to the wrong thread, which is the direction this project errs in.
  */
 export function messageIdentity(handle: MessageHandle, email: EmailMessage): string {
@@ -581,14 +581,14 @@ export function messageIdentity(handle: MessageHandle, email: EmailMessage): str
  * parts of a message after it has drawn the rest: expanding the details panel adds the Reply-To line and
  * the `mailed-by` / `signed-by` rows, and attachment chips arrive late. A signature that does not move when
  * they arrive reads the enrichment as "nothing has changed" and drops it, leaving the score standing on
- * evidence that has since been superseded — and the fields most often revealed that way are the
+ * evidence that has since been superseded, and the fields most often revealed that way are the
  * authentication and Reply-To checks, which is to say the ones hardest to argue with.
  *
  * **Values, not summaries, and every field rather than a chosen list.** Counting was tried twice and was
  * wrong twice: `invoice.pdf` becoming `invoice.exe` leaves the attachment count at one, which is a score of
  * 0 becoming a score of 75 behind an identical signature, and a rewritten href or an edited sentence of the
  * same length does the same for the link and content rules. Any hand-picked list of fields is a list that a
- * later field is left out of, so the whole extracted message is fingerprinted — everything the engine is
+ * later field is left out of, so the whole extracted message is fingerprinted: everything the engine is
  * given is exactly what decides whether the engine has to run again.
  */
 export function domSignature(handle: MessageHandle, email: EmailMessage): string {
@@ -600,8 +600,8 @@ export function domSignature(handle: MessageHandle, email: EmailMessage): string
 /**
  * Everything the extraction produced, as one string to hash.
  *
- * `EmailMessage` is a plain data structure by contract — it is what crosses from the Gmail adapter into an
- * engine that may not touch the DOM — so serialising it is total, and it stays total as fields are added.
+ * `EmailMessage` is a plain data structure by contract (it is what crosses from the Gmail adapter into an
+ * engine that may not touch the DOM), so serialising it is total, and it stays total as fields are added.
  * Bounded by extraction rather than here: the adapter truncates the body and caps links and attachments
  * before any of this is reached.
  */
@@ -613,7 +613,7 @@ function evidenceOf(email: EmailMessage): string {
      * Unreachable with the types in `shared/types.ts`, which admit only strings, numbers, booleans and
      * arrays of those. Kept because this runs inside a timer callback: a throw here would stop the observer
      * for the life of the tab, and detection that has quietly stopped is the worst outcome available. The
-     * fallback is deliberately coarse — it misses a changed value, as the old signature did — because
+     * fallback is deliberately coarse (it misses a changed value, as the old signature did) because
      * re-analysing on every mutation instead would be a different silent failure.
      */
     return `${email.subject ?? ''}|${String(email.bodyText.length)}|${String(email.links.length)}|${String(email.attachments.length)}`;

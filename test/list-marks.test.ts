@@ -5,7 +5,7 @@
  *
  * The rules a row may use are asserted in `test/triage.test.ts`; what is asserted here is the half that
  * decides whether any of them run. A row remembers what it was marked for and is skipped while that is
- * unchanged, which is what keeps a constantly re-rendering list cheap — and is also the place where a
+ * unchanged, which is what keeps a constantly re-rendering list cheap, and is also the place where a
  * verdict can be lost permanently rather than merely delayed.
  *
  * Markup is built with `DOMParser`, not `innerHTML`, as everywhere else in this suite.
@@ -60,7 +60,7 @@ async function settle(): Promise<void> {
 
 /**
  * Started markers, stopped after each test. A marker keeps asking for passes while it waits for the
- * account address, so one left running scans the *next* test's page — and with the root resolved afresh
+ * account address, so one left running scans the *next* test's page, and with the root resolved afresh
  * each pass, it would find it.
  */
 let markers: ListMarks[] = [];
@@ -98,8 +98,8 @@ describe('marking inbox rows', () => {
   });
 
   /**
-   * The account address arrives late — the first passes run at `document_idle`, before Gmail has rendered
-   * its account chrome — and `identity.lookalike_of_recipient_domain` cannot fire without it. It is the
+   * The account address arrives late (the first passes run at `document_idle`, before Gmail has rendered
+   * its account chrome), and `identity.lookalike_of_recipient_domain` cannot fire without it. It is the
    * most valuable thing a row can say, because no brand table contains the reader's own employer. Keyed on
    * the sender alone, every row already on screen when the address resolved kept its "nothing to say" and
    * was skipped for the life of the tab, so the check only ever ran on mail that arrived afterwards.
@@ -152,7 +152,7 @@ describe('marking inbox rows', () => {
   /**
    * Recycling a row does not have to replace anything in it: the same `span` can be given a different
    * `email` and `name`. Watching structure alone, the mark computed for the message that used to be in the
-   * row stayed beside the one that replaced it — a warning about the wrong sender, which is worse than none.
+   * row stayed beside the one that replaced it: a warning about the wrong sender, which is worse than none.
    */
   it('re-evaluates a row whose sender attributes were rewritten in place', async () => {
     // Starting from mail with nothing to say about it, so the only thing that can wake the marker is the
@@ -173,7 +173,7 @@ describe('marking inbox rows', () => {
   /**
    * Gmail replaces its main region wholesale on a view change, and a `MutationObserver` holds the node it
    * was given. Pointed at an element, the marker went on watching a region that was no longer in the
-   * document — rows kept arriving and none was ever looked at — and no mark is indistinguishable from mail
+   * document (rows kept arriving and none was ever looked at), and no mark is indistinguishable from mail
    * with nothing to say about it. Nothing else restarts it: the message observer reattaches for its own
    * purposes and says nothing to this.
    */
@@ -191,8 +191,8 @@ describe('marking inbox rows', () => {
   });
 
   /**
-   * Opening a marked message and coming back to the list. Gmail keeps the `tr` — same sender, same
-   * attributes — and rewrites the cells inside it to draw the row as read, which throws the mark away. A
+   * Opening a marked message and coming back to the list. Gmail keeps the `tr` (same sender, same
+   * attributes) and rewrites the cells inside it to draw the row as read, which throws the mark away. A
    * skip that trusted the recorded sender alone read that as "already handled": the warning vanished from
    * the one row the reader had just been told to distrust, and never came back for the life of the tab.
    */

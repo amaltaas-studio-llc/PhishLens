@@ -2,7 +2,7 @@
  * Sender / domain identity detectors.
  *
  * The question every rule here answers: *is the sender who the message says it is?* All of it is
- * decidable from strings — no judgement required — which is exactly why it belongs in rules rather
+ * decidable from strings (no judgement required), which is exactly why it belongs in rules rather
  * than in the LLM.
  */
 import { type Brand, BRANDS, brandOwningDomain, brandOwns } from '../../shared/brands.js';
@@ -80,8 +80,8 @@ function displayNameImpersonation(context: AnalysisContext): SecuritySignal[] {
  * Settlement Administrator", "Northwind Class Action Administrator".
  *
  * Class-action and settlement notices name the defendant in the sender line and are sent by a claims
- * administrator from its own domain, so the impersonation rule's premise — the name claims to *be* the
- * brand — is false for them, and at `high` its floor put every genuine notice at Suspicious. The mismatch
+ * administrator from its own domain, so the impersonation rule's premise (the name claims to *be* the
+ * brand) is false for them, and at `high` its floor put every genuine notice at Suspicious. The mismatch
  * is still reported, because a fake settlement is a real scam and looks the same at the string level;
  * what changes is the wording and a `medium` severity that sets no floor.
  *
@@ -113,8 +113,8 @@ function legalNoticeNamingBrand(context: AnalysisContext, brand: Brand): Securit
  *
  * Reported rather than judged, because the message cannot settle it: `hsbc.fr` is either HSBC France or
  * somebody who registered HSBC's name in France, and no string in the mail distinguishes them. What is
- * stated is the part that is true — the domain is named for the brand and is not one of the brand's known
- * domains — at a severity that sets no floor, so a genuine country domain does not reach High Risk on this
+ * stated is the part that is true (the domain is named for the brand and is not one of the brand's known
+ * domains), at a severity that sets no floor, so a genuine country domain does not reach High Risk on this
  * alone and a registration that is not the brand's still contributes to any other finding it earns.
  *
  * `medium` rather than `low` because the reader is the one who can check it: they know which domain their
@@ -132,7 +132,7 @@ function unverifiedBrandDomain(context: AnalysisContext): SecuritySignal[] {
       severity: 'medium',
       score: 18,
       title: `Cannot confirm ${context.senderRegistrable} belongs to ${brand.label}`,
-      description: `The message was sent from ${context.senderRegistrable}, which carries ${brand.label}'s name under a domain ending PhishLens does not know ${brand.label} to use. Large organisations run the same name in every market they sell in, so this may be genuine — and a domain carrying a brand's name can equally have been registered by somebody else. Compare it against the address ${brand.label} mail normally arrives from before acting on anything in this message.`,
+      description: `The message was sent from ${context.senderRegistrable}, which carries ${brand.label}'s name under a domain ending PhishLens does not know ${brand.label} to use. Large organisations run the same name in every market they sell in, so this may be genuine, and a domain carrying a brand's name can equally have been registered by somebody else. Compare it against the address ${brand.label} mail normally arrives from before acting on anything in this message.`,
       evidence: { value: context.senderRegistrable },
     }),
   ];
@@ -172,15 +172,15 @@ export interface LookalikeMatch {
  * The brand a domain is *named after* while not being one the brand is known to own.
  *
  * The third answer to "does this brand own this domain", between the two the code used to have. A brand
- * runs one name across the suffixes of every market it sells in — `paypal.it`, `hsbc.fr`,
- * `netflix.com.br` — and the table lists a handful of them, so every other one was a domain the brand did
+ * runs one name across the suffixes of every market it sells in (`paypal.it`, `hsbc.fr`,
+ * `netflix.com.br`), and the table lists a handful of them, so every other one was a domain the brand did
  * not own, which the lookalike rule then reported as a `critical` imitation of the `.com`: 45 points and a
  * floor, High Risk, on authentic mail. Thirty-odd brands against two hundred country suffixes is not a list
  * anyone can finish, which is the argument for answering the question structurally instead.
  *
  * The name must be *literally* identical, not merely identical after confusable folding: `pаypal.it` spelled
  * with a Cyrillic а is a homoglyph domain and stays with the lookalike rule, which is what that rule is for.
- * And a suffix that is the brand's own with characters dropped — `.co`, `.cm`, `.om` against `.com` — is a
+ * And a suffix that is the brand's own with characters dropped (`.co`, `.cm`, `.om` against `.com`) is a
  * typo trap rather than a market, so it stays there too. What is left is a name that is the brand's under a
  * suffix that is not a misspelling of anything: either the brand's own country domain or somebody who
  * registered the brand's name elsewhere, and nothing readable from the message can tell those apart.
@@ -188,7 +188,7 @@ export interface LookalikeMatch {
 /**
  * A suffix a brand would run a market under: a country code, or a country's own second level beneath one
  * (`com.br`, `co.jp`, `org.uk`). Generic suffixes are not markets. Nobody localises to `.support`,
- * `.secure` or `.online`, and those are what a phishing kit registers the brand's exact name under — so
+ * `.secure` or `.online`, and those are what a phishing kit registers the brand's exact name under, so
  * reading them as "perhaps the brand's" handed the kit an `unverified` instead of a lookalike.
  */
 const MARKET_SUFFIX = /^(?:(?:com?|net|org|gov|gob|edu|ac|or|ne|go|ltd|plc)\.)?[a-z]{2}$/u;
@@ -234,7 +234,7 @@ function isDroppedCharacterVariant(candidate: string, original: string): boolean
 /**
  * Compares a registrable domain against every known brand domain.
  *
- * Exported because the link detectors need exactly the same comparison — one implementation means
+ * Exported because the link detectors need exactly the same comparison: one implementation means
  * a link and a sender are judged by the same standard.
  */
 export function findLookalike(candidate: string): LookalikeMatch | null {
@@ -372,7 +372,7 @@ function senderDomainUnicodeSpoofing(context: AnalysisContext): SecuritySignal[]
         severity: 'medium',
         score: 18,
         title: 'Sender name is spelled with decorative letter substitutes',
-        description: `The name "${context.senderName}" is not written in ordinary letters. It uses characters from Unicode's mathematical alphabet, which render as bold or italic text but are different characters underneath — so the name reads normally to you and matches nothing to any system checking it against a list. There is no reason to address mail this way other than to avoid being checked.`,
+        description: `The name "${context.senderName}" is not written in ordinary letters. It uses characters from Unicode's mathematical alphabet, which render as bold or italic text but are different characters underneath, so the name reads normally to you and matches nothing to any system checking it against a list. There is no reason to address mail this way other than to avoid being checked.`,
         evidence: { text: context.senderName },
       }),
     );
@@ -386,7 +386,7 @@ function senderDomainUnicodeSpoofing(context: AnalysisContext): SecuritySignal[]
  *
  * The most conclusive thing a string on its own can say about a sender. `alert@example.ldk` cannot
  * resolve, cannot be registered and cannot receive a reply, because IANA has never delegated `.ldk` to
- * anybody — so the From address is not a mistyped address, it is a fabricated one. It needs no brand
+ * anybody, so the From address is not a mistyped address, it is a fabricated one. It needs no brand
  * table, no reputation data and no lookalike comparison, which is what makes it hold against a sender who
  * has thought about every one of those.
  *
@@ -395,7 +395,7 @@ function senderDomainUnicodeSpoofing(context: AnalysisContext): SecuritySignal[]
  * name under an undelegated TLD cannot belong to anyone at all.
  *
  * **The two ways this can be wrong, and what is done about each.** `IANA_TLDS` is a committed snapshot,
- * because nothing here may perform DNS — so a TLD delegated after it was taken reads as nonexistent until
+ * because nothing here may perform DNS, so a TLD delegated after it was taken reads as nonexistent until
  * `scripts/gen-tlds.mjs` is run. And private-use names (`.local`, `.corp`) are undelegated *by design*;
  * mail from one is a misconfigured appliance far more often than an attack, so it is reported separately
  * and softly rather than as a fabrication.
@@ -426,7 +426,7 @@ function nonexistentSenderTld(context: AnalysisContext): SecuritySignal[] {
       id: 'identity.nonexistent_sender_tld',
       category: 'identity',
       // `high`, not `critical`, and the distinction is about the snapshot rather than the message. The
-      // observation is conclusive — no mail can come from a TLD that was never delegated — but it is only
+      // observation is conclusive (no mail can come from a TLD that was never delegated), but it is only
       // as current as `IANA_TLDS`, and `critical` floors the score at high risk. That would let one aging
       // list hand a high-risk verdict to a legitimate sender under a newly delegated TLD, on its own, with
       // nothing else wrong. At `high` the same staleness tops out at suspicious, which is a defensible
@@ -587,7 +587,7 @@ const EXECUTIVE_TITLE = new RegExp(`\\b(${EXECUTIVE_TITLES})\\b`, 'u');
  * The writer giving themselves the title, which is what the body has to do to count.
  *
  * A title anywhere in the opening was enough before, and the opening is where ordinary mail *mentions*
- * one — "our president announced", "the founder of a bakery I like". The fraud states it of the sender:
+ * one: "our president announced", "the founder of a bakery I like". The fraud states it of the sender:
  * "this is your CEO", or a sign-off with the name and the title after it.
  */
 const EXECUTIVE_SELF_DESCRIPTION = new RegExp(
@@ -638,7 +638,7 @@ function externalExecutiveClaim(context: AnalysisContext): SecuritySignal[] {
  * The display name asserts an *institutional* identity that the sending domain does not support.
  *
  * Every other impersonation rule is gated on `BRANDS`, and no table will ever hold every insurer, bank,
- * utility and agency — so `"Northwind Life Offer" <…@kv38mailer.com>` scored zero on identity. This asks
+ * utility and agency, so `"Northwind Life Offer" <…@kv38mailer.com>` scored zero on identity. This asks
  * a brand-list-free question: does the display name share any name with the domain that sent it?
  * `"Kestrel Coffee Roasters" <hello@kestrelcoffee.co.uk>` does; the life-offer example does not.
  *
@@ -652,7 +652,7 @@ function unsupportedOrganizationalClaim(context: AnalysisContext): SecuritySigna
   if (context.primaryClaim !== undefined) return [];
   // A brand's own domain may call itself whatever it likes. Freemail is the exception: `gmail.com` is
   // Google-owned, but a Gmail *mailbox* is not Google, and exempting it here would exempt every
-  // consumer mailbox — the single most important case this rule exists to catch.
+  // consumer mailbox, the single most important case this rule exists to catch.
   if (context.senderOwnedByBrand !== undefined && !context.senderIsFreemail) return [];
   if (isKnownSendingPlatform(context.senderDomain)) return [];
   if (!ORGANISATION_MARKER.test(context.senderNameMatch)) return [];
@@ -744,7 +744,7 @@ function senderDomainTokens(domain: string): string[] {
  * The sender's local part is not a plausible mailbox name.
  *
  * `DoNoT.rEpLy.DoNoT.rEpLy.DoNoT.rEpLy.DoNoT.rEpLy@…` is a real example. Repeating a token several
- * times is a bulk-sender fingerprint — it pads the address and varies it per send — and it does not
+ * times is a bulk-sender fingerprint (it pads the address and varies it per send), and it does not
  * occur in mail from an organisation that runs its own mail properly.
  *
  * Only *structural* implausibility counts. Long opaque local parts are not enough on their own: ESP
@@ -774,8 +774,8 @@ function implausibleSenderLocalPart(context: AnalysisContext): SecuritySignal[] 
 /**
  * The sender's address uses randomised capitalisation: `DoNoT.rEpLy@…`.
  *
- * Alternating case is a filter-evasion technique — it varies the address per send and defeats naive
- * string blocklists — and it is essentially absent from mail sent by an organisation that runs its own
+ * Alternating case is a filter-evasion technique (it varies the address per send and defeats naive
+ * string blocklists), and it is essentially absent from mail sent by an organisation that runs its own
  * mail. It reads as normal to a human, because a mail client displays the display name.
  *
  * Reads `rawSenderLocalPart`, since the normalised address has been case-folded by then. This is one of
@@ -797,7 +797,7 @@ function randomisedAddressCase(context: AnalysisContext): SecuritySignal[] {
       severity: 'medium',
       score: 14,
       title: 'Sender address uses randomised capitalisation',
-      description: `The address alternates upper and lower case within words (${scrambled.slice(0, 3).join(', ')}). Mail systems treat addresses case-insensitively, so this changes nothing about delivery — it exists to vary the address between sends and slip past filters that match on exact text.`,
+      description: `The address alternates upper and lower case within words (${scrambled.slice(0, 3).join(', ')}). Mail systems treat addresses case-insensitively, so this changes nothing about delivery; it exists to vary the address between sends and slip past filters that match on exact text.`,
       evidence: { value: context.email.raw?.senderEmail ?? context.senderEmail },
     }),
   ];
@@ -855,7 +855,7 @@ export function repeatedUnitCount(localPart: string): number {
 /**
  * The sender's domain imitates the *recipient's own* domain.
  *
- * The brand table cannot help here — nobody's brand list contains the user's employer. But
+ * The brand table cannot help here: nobody's brand list contains the user's employer. But
  * `northwind-Iogistics.com` (capital I for lowercase l) targeting `northwind-logistics.com` is one
  * of the most effective attacks there is, because internal mail carries implicit trust. The
  * recipient's domain is derived from the mailbox the message was delivered to, so this works for any
@@ -910,7 +910,7 @@ const INTERNAL_FUNCTION_NAME =
  *
  * The commonest shape in current credential phishing names no brand at all: "northwind.com IT Support",
  * "Mailbox Administrator northwind.com", the recipient's own address as the sender's name. The brand
- * table cannot see it, and neither can the lookalike rule, because the sending domain imitates nothing —
+ * table cannot see it, and neither can the lookalike rule, because the sending domain imitates nothing;
  * it is simply somebody else's. Like the lookalike rule, it needs no configuration: the organisation is
  * read from the mailbox the message was delivered to.
  *
@@ -1011,9 +1011,9 @@ const ALERT_ITEM_FAMILIES: readonly RegExp[] = [
  * is the claim to be that provider, which is why this is an identity finding: in `content` the genuine
  * service's proven, aligned links would dampen it to nothing.
  *
- * One alert feature is `medium`: an IT team does share "Account locked due to inactivity — procedure".
- * Two are `high` — a locked account *and* a fraud cause, or a security event *and* a deadline is the
- * alert itself, not a document about one — and the floor is what lets the finding count at all, since
+ * One alert feature is `medium`: an IT team does share "Account locked due to inactivity: procedure".
+ * Two are `high` (a locked account *and* a fraud cause, or a security event *and* a deadline is the
+ * alert itself, not a document about one), and the floor is what lets the finding count at all, since
  * the identity weight is already spent on such a lure's mismatched Reply-To.
  */
 function alertNamedSharedItem(context: AnalysisContext): SecuritySignal[] {
@@ -1041,7 +1041,7 @@ function alertNamedSharedItem(context: AnalysisContext): SecuritySignal[] {
  * The recipient's own name, spelled identically, under a suffix that does not misspell theirs.
  *
  * An organisation's staff write from its `.net` and its `.com`, and a colleague abroad from its `.fr`,
- * all day — so reporting `example.net` to someone at `example.com` as a `critical` imitation put one
+ * all day, so reporting `example.net` to someone at `example.com` as a `critical` imitation put one
  * company's internal mail at High Risk, hundreds of messages at a time. The thread rule reached the same
  * conclusion for the same reason. What this keeps is the one suffix change that *is* a trap: the reader's
  * own suffix with characters dropped (`.co`, `.cm`, `.om` against `.com`), judged the way the brand rule

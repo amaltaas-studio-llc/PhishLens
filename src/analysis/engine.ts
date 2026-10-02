@@ -2,10 +2,10 @@
  * The analysis pipeline, split into two entry points so that "the LLM is optional" is structural rather
  * than a promise:
  *
- *  - `analyzeDeterministic()` — pure and synchronous. No I/O, no Chrome, no DOM, no clock beyond one
+ *  - `analyzeDeterministic()`: pure and synchronous. No I/O, no Chrome, no DOM, no clock beyond one
  *    injected timestamp. It produces a complete, classified result on its own, and it is what the test
  *    suite exercises against fixtures.
- *  - `analyze()` — the same thing, plus at most the semantic category's weight folded on top.
+ *  - `analyze()`: the same thing, plus at most the semantic category's weight folded on top.
  *
  * The deterministic result is the product, not a degraded mode.
  */
@@ -93,7 +93,7 @@ export async function analyze(
  * `analyze()` for a caller that already has the deterministic result, so the rule engine runs once per
  * message rather than once for the first paint and again under the model.
  *
- * `deterministic` must have been produced from `email` with the same options — in particular the same
+ * `deterministic` must have been produced from `email` with the same options, in particular the same
  * trust list, or the refined score would silently undo the trust the first paint applied.
  */
 export async function refine(
@@ -136,7 +136,7 @@ interface SemanticOutcome {
  * Runs the analyzer such that no failure mode reaches the caller.
  *
  * `isAvailable()` is contractually non-throwing, but this does not rely on adapters honouring their
- * contract — an unstable browser API is exactly where one gets broken.
+ * contract: an unstable browser API is exactly where one gets broken.
  *
  * The statuses are kept apart because they mean different things downstream: `unavailable` describes
  * the browser and is permanent, `no-output` and `error` describe this one message, and `cancelled`
@@ -173,7 +173,7 @@ async function runSemanticSafely(
  *
  * `false` when no technical check found anything that stands on its own, because an uncorroborated
  * reading contributes nothing (`SEMANTIC_SCORING.uncorroboratedFactor`). The caller uses it to skip an
- * inference whose only output would be a zero-point note — which is also why it must be the same
+ * inference whose only output would be a zero-point note, which is also why it must be the same
  * predicate `semanticToSignals` scores by, and not a lookalike.
  */
 export function semanticCanScore(result: Pick<AnalysisResult, 'signals'>): boolean {
@@ -229,7 +229,7 @@ export function assessmentSignals(result: AnalysisResult): SecuritySignal[] {
  * The signals a count shown to a reader should include.
  *
  * Not every signal, because the engine also emits observations that exist for transparency and never
- * contributed anything — `authentication.passed` is on nearly every legitimate message — and counting
+ * contributed anything (`authentication.passed` is on nearly every legitimate message), and counting
  * those tells someone with a clean inbox that PhishLens found one thing on mail where it found nothing.
  * That is the reassuring surface being wrong, which is the direction this project cares most about.
  *

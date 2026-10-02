@@ -3,7 +3,7 @@
  *
  * Locating a finding's excerpt in the message, which runs on every hover and focus of a finding.
  *
- * The search used to read every element's full `textContent`, which re-reads everything beneath it — the
+ * The search used to read every element's full `textContent`, which re-reads everything beneath it: the
  * body's length times its depth, both of which the message chooses. These assert that the single-pass
  * search still finds the tightest element, that it gives up within its bounds rather than running on, and
  * that it treats quoted history the way extraction does.
@@ -79,7 +79,7 @@ describe('finding an excerpt in the message', () => {
     const root = body(`${markup}${'<span>filler text</span>'.repeat(8000)}<p>verify your account now</p>`);
 
     const started = Date.now();
-    // Past the node bound, so not located — which costs a highlight and nothing else.
+    // Past the node bound, so not located, which costs a highlight and nothing else.
     expect(findSmallestElementContaining(root, 'verify your account now')).toBeNull();
     expect(Date.now() - started).toBeLessThan(1000);
   });

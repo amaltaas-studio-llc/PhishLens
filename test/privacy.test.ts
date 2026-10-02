@@ -4,7 +4,7 @@
  * Two things are tested here, and they are the two places where a mistake would leak mailbox content:
  *
  *  1. **Settings validation.** The defaults must favour local processing, and a value read back from
- *     storage — possibly written by an older build — must never be able to turn the cloud path on or
+ *     storage (possibly written by an older build) must never be able to turn the cloud path on or
  *     point it somewhere unintended.
  *  2. **Redaction.** `buildCloudPayload` is the *only* function whose output would ever leave the
  *     browser. These tests assert what it drops, not just what it keeps, because a field silently
@@ -395,7 +395,7 @@ describe('buildCloudPayload: what is dropped', () => {
 /**
  * `EmailMessage.raw` holds un-normalised header values so that formatting detectors can see evidence
  * normalisation destroys. It is the least redacted data in the message, so it must never reach the
- * payload. `buildCloudPayload` uses an explicit allowlist, which is what makes this hold — these tests
+ * payload. `buildCloudPayload` uses an explicit allowlist, which is what makes this hold; these tests
  * exist so that a future refactor to spreading the email fails here.
  */
 describe('buildCloudPayload never forwards raw header values', () => {
@@ -456,7 +456,7 @@ describe('cloud payload redaction at the edges of what is kept', () => {
   const base = { senderEmail: 'a@example.com', links: [], attachments: [] };
 
   it('redacts an address the body cut would otherwise split', () => {
-    // Cut first, this would end in `jane.doe@example` — no dot after the @, so no longer an address.
+    // Cut first, this would end in `jane.doe@example`: no dot after the @, so no longer an address.
     const bodyText = `${'x '.repeat(1994)}jane.doe@example.co.uk and more`;
     const payload = buildCloudPayload({ ...base, subject: 's', bodyText }, []);
     expect(payload.bodyExcerpt).not.toContain('jane.doe');
@@ -503,8 +503,8 @@ describe('describeNameShape', () => {
 /**
  * The builder is not where the guarantee lives. It runs in the content script; the service worker is what
  * opens the socket, and it is handed the built payload over a runtime message. So every assertion above
- * describes a function the network never sees the output of directly, and a caller that skipped it — a
- * compromised content script, or any other surface able to reach `sendMessage` — could have posted an
+ * describes a function the network never sees the output of directly, and a caller that skipped it (a
+ * compromised content script, or any other surface able to reach `sendMessage`) could have posted an
  * unredacted mailbox while all of those tests still passed.
  *
  * These assert the same contract at the egress point, against payloads the builder could not have

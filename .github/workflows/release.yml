@@ -1,6 +1,6 @@
 # Publishes a release when a v* tag is pushed, with the packaged extension attached.
 #
-#   npm version patch    # or minor / major — writes package.json and creates the tag
+#   npm version patch    # or minor / major; writes package.json and creates the tag
 #   git push --follow-tags
 #
 # The tag is required to agree with package.json, because the manifest version is generated from it and

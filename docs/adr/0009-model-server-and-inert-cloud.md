@@ -25,8 +25,8 @@ permissions.
 
 ## Rejected alternatives
 
-- **Per-runner native APIs** — duplicate clients for one benefit.
-- **Required `localhost` host permission** — taxes every install; breaks the two-permission claim.
-- **Endpoint arriving in a message** — turns the worker into an open proxy.
-- **Raising the cap for “better” models** — configuration must not weaken the invariant.
-- **Shipping cloud now** — left designed and inert on purpose.
+- **Per-runner native APIs**: duplicate clients for one benefit.
+- **Required `localhost` host permission**: taxes every install; breaks the two-permission claim.
+- **Endpoint arriving in a message**: turns the worker into an open proxy.
+- **Raising the cap for “better” models**: configuration must not weaken the invariant.
+- **Shipping cloud now**: left designed and inert on purpose.

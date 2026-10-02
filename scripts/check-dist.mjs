@@ -8,7 +8,7 @@
  *
  * The file list is read out of the manifest rather than hardcoded. A hardcoded list only checks the files
  * someone remembered to add to it, which means the guard stops covering the manifest the moment the
- * manifest grows a new reference — exactly when it would start being useful.
+ * manifest grows a new reference, exactly when it would start being useful.
  */
 import { readFile, access, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -45,7 +45,7 @@ if (manifest.manifest_version !== 3) {
   fail(`expected manifest_version 3, found ${JSON.stringify(manifest.manifest_version)}`);
 }
 
-// The manifest version is generated from package.json, so a mismatch means the build was stale — and a
+// The manifest version is generated from package.json, so a mismatch means the build was stale, and a
 // release whose asset reports a different version than its tag is worse than no release at all.
 if (manifest.version !== pkg.version) {
   fail(`manifest version ${manifest.version} does not match package.json ${pkg.version}`);
@@ -64,7 +64,7 @@ if (
 
 /*
  * The README and docs/PRIVACY.md tell users exactly which permissions they are granting. A change here is
- * a change to that promise, so it fails until this list — and both documents — are updated in the same
+ * a change to that promise, so it fails until this list (and both documents) are updated in the same
  * commit. Optional host permissions are not listed: they are requested per origin on a click, and a
  * default install never holds them.
  */
@@ -158,7 +158,7 @@ for (const page of (await readdir(dist)).filter((f) => f.endsWith('.html'))) {
  * The HTML-sink names are a second line behind the ESLint ban. Lint sees only this repository's source;
  * the bundle also contains whatever a future dependency or build plugin inlines, and a minified build
  * carries no comments or wording that could mention these names innocently. If a legitimate occurrence
- * ever appears, find where it came from before narrowing this — it is the property docs/adr/0008 states.
+ * ever appears, find where it came from before narrowing this; it is the property docs/adr/0008 states.
  */
 const HTML_SINKS =
   /\b(?:innerHTML|outerHTML|insertAdjacentHTML|createContextualFragment|setHTMLUnsafe|srcdoc|DOMParser)\b|\bdocument\.write(?:ln)?\b/;

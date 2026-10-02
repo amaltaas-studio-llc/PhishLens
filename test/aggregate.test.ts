@@ -102,7 +102,7 @@ describe('cappedSignalScore', () => {
 });
 
 describe('aggregateCategory', () => {
-  it('returns zero for no signals — this is the "local LLM unavailable" path', () => {
+  it('returns zero for no signals, which is the "local LLM unavailable" path', () => {
     expect(aggregateCategory([], CATEGORY_WEIGHTS.llm)).toBe(0);
     for (const category of ALL_CATEGORIES) {
       expect(aggregateCategory([], CATEGORY_WEIGHTS[category])).toBe(0);

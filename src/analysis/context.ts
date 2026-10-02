@@ -3,7 +3,7 @@
  *
  * Two reasons this exists rather than each detector parsing what it needs:
  *  1. **Correctness.** Comparing a link to a sender domain is only meaningful if both went through
- *     the same normalisation — same parser, same redirect unwrapping, same registrable-domain rule.
+ *     the same normalisation: same parser, same redirect unwrapping, same registrable-domain rule.
  *     Doing it per-detector guarantees they eventually diverge.
  *  2. **Cost.** URL parsing and confusable folding are the expensive parts. Hostile input can
  *     contain hundreds of links; each is parsed once.
@@ -82,7 +82,7 @@ export interface LinkAnalysis {
    * The reason host rules iterate this rather than reading `hostname`. Unwrapping a redirect *adds* a
    * host to examine; it does not replace the one in the href, which is the server the reader's click
    * actually reaches. Judging only the unwrapped target let `paypa1.com/invoice?next=https://paypal.com/`
-   * pass every host rule, since the parameter named a destination nobody would question — the parameter
+   * pass every host rule, since the parameter named a destination nobody would question. The parameter
    * is whatever the attacker typed, and the entry host is the one thing they cannot dress up. Empty for
    * a non-web href.
    */
@@ -107,7 +107,7 @@ export interface LinkAnalysis {
    */
   wrappedByKnownTracker: boolean;
   /**
-   * The href's own host is on the **sender's own registrable domain** — the sender is routing clicks
+   * The href's own host is on the **sender's own registrable domain**: the sender is routing clicks
    * through its own infrastructure.
    *
    * Complements `wrappedByKnownTracker`, which can only recognise redirectors we have listed. This
@@ -117,8 +117,8 @@ export interface LinkAnalysis {
    *
    * It licenses suppression rather than merely explaining it, because a rewrite to the sender's own
    * domain transfers no trust: the sender already chose every link in the message, so routing one
-   * through itself gives it no capability it did not have. The deceptions these rules exist to catch —
-   * borrowing a *third party's* recognisable domain — are unaffected. Checked on the entry host, like
+   * through itself gives it no capability it did not have. The deceptions these rules exist to catch
+   * (borrowing a *third party's* recognisable domain) are unaffected. Checked on the entry host, like
    * `wrappedByKnownTracker`, because that is the host the reader's click actually reaches.
    */
   onSenderDomain: boolean;
@@ -158,7 +158,7 @@ export interface AttachmentAnalysis {
 /**
  * A party already in the conversation, normalised the same way the sender is.
  *
- * `nameKey` is confusable-folded so `Maria Delgado` and `Мaria Delgado` compare equal — the point of
+ * `nameKey` is confusable-folded so `Maria Delgado` and `Мaria Delgado` compare equal; the point of
  * reusing a name is that it looks identical to a reader, not that it is byte-identical.
  */
 export interface ThreadParty {
@@ -215,7 +215,7 @@ export interface AnalysisContext {
   /**
    * The sender's local part with its original case, and the subject with its original whitespace.
    *
-   * For detectors that examine **formatting** only — randomised capitalisation, padding. Never compare
+   * For detectors that examine **formatting** only: randomised capitalisation, padding. Never compare
    * these to anything: two spellings of one address are not equal, which is the whole reason the
    * normalised fields exist. Both fall back to the normalised value when the client gave us no raw
    * form, so a detector reading them still works, it just sees nothing anomalous.
@@ -236,7 +236,7 @@ export interface AnalysisContext {
    * Parties that sent a message earlier in this conversation, excluding any whose address matches the
    * sender's own, oldest first.
    *
-   * Empty both when the message opens a thread and when the client could not tell us — the detectors
+   * Empty both when the message opens a thread and when the client could not tell us. The detectors
    * treat those identically, since neither is evidence of anything.
    */
   priorParties: ThreadParty[];
@@ -258,12 +258,12 @@ export interface AnalysisContext {
   primaryClaim: BrandClaim | undefined;
   /**
    * True when the message claims a brand and the sender's own domain is one that brand legitimately
-   * owns — the condition under which content heuristics get dampened.
+   * owns: the condition under which content heuristics get dampened.
    */
   senderAlignedWithClaim: boolean;
 
   /**
-   * The user's trust entry covering this sender, if any — set whether or not the message's origin could
+   * The user's trust entry covering this sender, if any. Set whether or not the message's origin could
    * be proved, so the card can distinguish "trusted" from "trusted, but this message was not verified".
    */
   trustedEntry: string | undefined;
@@ -279,7 +279,7 @@ export interface AnalysisContext {
 export interface ContextOptions {
   /**
    * Senders the user trusts. Passed in rather than read from storage because `analysis/` may not touch
-   * `chrome.*` — which also means the engine's behaviour stays a function of its arguments, and a test
+   * `chrome.*`, which also means the engine's behaviour stays a function of its arguments, and a test
    * can exercise trust without a browser.
    */
   trustedSenders?: readonly string[];
@@ -561,7 +561,7 @@ function containsKeyword(source: ClaimSource, folded: string): boolean {
  *
  * Matching is on confusable-folded text, so `PayPaI`, `p-a-y-p-a-l` and `pаypal` all resolve to the
  * same claim. Since folding strips separators, a match is a substring match (one that may not begin
- * mid-word, see `containsKeyword`) — safe for a long keyword and wrong for a short one, because `irs` sits inside "first" and "chairs" and `aws` inside "lawsuit".
+ * mid-word, see `containsKeyword`): safe for a long keyword and wrong for a short one, because `irs` sits inside "first" and "chairs" and `aws` inside "lawsuit".
  * Short keywords therefore have to be a whole folded word. The cost is missing `I.R.S.`, which no rule
  * relies on; the benefit is that ordinary prose no longer claims to be a tax authority.
  */
@@ -582,7 +582,7 @@ function detectBrandClaims(
  *
  * Ordering matters because the impersonation rules read the first claim, and a display name naming two
  * brands is not unusual: a product can carry one brand's word inside its own name. A name like `Amazon
- * Appstore Team` claims Amazon and, through the `appstore` keyword, Apple — so with the table's own order
+ * Appstore Team` claims Amazon and, through the `appstore` keyword, Apple, so with the table's own order
  * as the only tiebreak, mail from a domain Amazon owns was reported as Apple impersonation at `high`,
  * with a correlation on top of it. Nothing about such a message is wrong; the answer to "which brand is
  * this?" was decided by which entry happens to be written first in `brands.ts`, which is not a fact
@@ -590,7 +590,7 @@ function detectBrandClaims(
  *
  * So, after the source that named it: a brand that owns the sending domain wins, because a message from
  * `amazon.com` naming Amazon *is* Amazon and the second name is a product word. Failing that, the
- * earliest mention wins, which reads a name left to right the way a person does — and keeps the wording
+ * earliest mention wins, which reads a name left to right the way a person does, and keeps the wording
  * right on the phishing version of the same name, where no claimed brand owns the domain and the finding
  * should say Amazon rather than Apple.
  */
@@ -615,7 +615,7 @@ const FOLDED_KEYWORDS: ReadonlyMap<Brand, readonly (readonly [string, string])[]
  * The claim from the most authoritative source that names this brand.
  *
  * Sources are ordered, so a keyword in the display name outranks a different keyword of the same brand
- * appearing in the body — a message from "PayPal Service" claims to be PayPal even if its body merely
+ * appearing in the body: a message from "PayPal Service" claims to be PayPal even if its body merely
  * mentions receipts.
  */
 function strongestClaim(brand: Brand, sources: readonly ClaimSource[]): BrandClaim | undefined {

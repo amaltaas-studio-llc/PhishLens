@@ -3,7 +3,7 @@
  *
  * The contract is all-or-nothing for what is scored: a missing or non-numeric `risk` or `confidence`,
  * or no usable reason, yields `null` and the `llm` category contributes zero, because a model that
- * returned a malformed object is a model whose *values* we have no reason to trust either — and a
+ * returned a malformed object is a model whose *values* we have no reason to trust either, and a
  * hostile email may well be the reason the output is malformed. The lists are filtered rather than
  * rejected: a non-string reason or an unknown category is dropped, since neither can raise the score
  * and the remaining entries are still the model's own words.
@@ -111,7 +111,7 @@ function toReasons(value: unknown): string[] {
  *
  * A hard slice is what produced reasons ending mid-word: the cut is inside a statement and looks like
  * the model gave up. Keep the words that fit, then prefer ending on the last complete sentence among
- * them — unmarked, since nothing of that sentence is missing — and otherwise end on a word with `…`.
+ * them (unmarked, since nothing of that sentence is missing) and otherwise end on a word with `…`.
  * Text without spaces (Japanese, a pasted token) has no words to count, so the character cap decides.
  */
 function boundReason(text: string): string {
@@ -132,7 +132,7 @@ function boundReason(text: string): string {
   const lastSpace = kept.lastIndexOf(' ');
   const splitWord = !/\s/u.test(text[kept.length] ?? ' ');
   const cut = splitWord && lastSpace > kept.length / 2 ? kept.slice(0, lastSpace) : kept;
-  return `${cut.replace(/[\s,;:–—-]+$/u, '')}…`;
+  return `${cut.replace(/[\s,;:–\u2014-]+$/u, '')}…`;
 }
 
 /** The longest prefix of at most `limit` UTF-16 units that does not split a surrogate pair. */
@@ -146,7 +146,7 @@ function codePointPrefix(text: string, limit: number): string {
  * Index just past the last sentence end in `text`, or -1.
  *
  * Three things look like a sentence end and are not. A period inside a quotation ends the quoted
- * excerpt, not the reason — the prompt asks for an excerpt *followed by* why it matters, so cutting
+ * excerpt, not the reason: the prompt asks for an excerpt *followed by* why it matters, so cutting
  * there keeps the email's words and drops the explanation. A period followed by a lowercase word is an
  * abbreviation ("Northwind Inc. and"). And a period followed by anything but whitespace is `0.35` or
  * a domain. The CJK stops need no following space, since those scripts do not use one.

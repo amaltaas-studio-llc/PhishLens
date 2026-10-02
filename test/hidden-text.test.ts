@@ -4,7 +4,7 @@
  * Two failure directions, and they are not symmetric. Missing concealed text lets a message dilute the
  * wording the content rules read, which is the attack this exists to stop. But *over*-reporting deletes
  * text from the visible body before anything scores it, so a rule that is too eager silently removes the
- * evidence — a worse outcome than the one it was added to prevent. Nearly every case below is therefore a
+ * evidence, a worse outcome than the one it was added to prevent. Nearly every case below is therefore a
  * legitimate style attribute that must be left alone.
  *
  * The style tests need no DOM at all, which is why that decision is a separate string function. The
@@ -176,7 +176,7 @@ describe('hidingTechnique', () => {
   });
 
   /**
-   * A box with no height does not erase what is in it — the content overflows and is drawn anyway — which
+   * A box with no height does not erase what is in it (the content overflows and is drawn anyway), which
    * is why the preheader idiom is `max-height:0;overflow:hidden` and never the height alone. Without the
    * pair, this read a spacer row and any `height:0` layout reset as concealment and removed the visible
    * paragraphs *inside* them.
@@ -198,7 +198,7 @@ describe('hidingTechnique', () => {
 
   /**
    * A value beginning `0.` is not zero, and reading it as zero costs more than a false finding: a caller
-   * strips what this matches out of the body, so `font-size:0.9em` — a common way to set small print —
+   * strips what this matches out of the body, so `font-size:0.9em` (a common way to set small print)
    * would delete a paragraph the reader can see from everything downstream of extraction.
    */
   it('does not read the leading zero of a fraction as the whole value', () => {
@@ -252,7 +252,7 @@ describe('countContentChars', () => {
    * concealed prose and make the threshold meaningless.
    */
   it('does not count invisible padding as content', () => {
-    expect(countContentChars('\u00a0 \u200b \u2060 \ufeff - — · ! ?')).toBe(0);
+    expect(countContentChars('\u00a0 \u200b \u2060 \ufeff - \u2014 · ! ?')).toBe(0);
     expect(countContentChars('  \n\t  ')).toBe(0);
   });
 
@@ -311,8 +311,8 @@ describe('findHiddenSubtrees', () => {
    * The bug this file existed to prevent, arriving through the one door it left open: a technique was
    * judged on an element and then applied to its whole subtree. `font-size:0` on a container is how bulk
    * mail collapses the whitespace between its tags, and every paragraph inside it names its own size and is
-   * drawn at it. A genuine newsletter built that way had its entire body — a thousand characters the reader
-   * was looking at — removed before scoring, which left the message scored on its subject and sender alone
+   * drawn at it. A genuine newsletter built that way had its entire body (a thousand characters the reader
+   * was looking at) removed before scoring, which left the message scored on its subject and sender alone
    * with nothing on the card to say so.
    */
   it('leaves a zero font size alone when what is inside sets its own', () => {
@@ -366,7 +366,7 @@ describe('findHiddenSubtrees', () => {
     }
   });
 
-  /** `rem` is measured from the page's root, not the container, so it does escape — as do keywords. */
+  /** `rem` is measured from the page's root, not the container, so it does escape, as do keywords. */
   it('reads a size independent of the parent as an override', () => {
     for (const size of ['1rem', '12pt', 'medium', 'small', '16px !important']) {
       const root = element().append(

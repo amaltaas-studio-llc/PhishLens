@@ -84,7 +84,7 @@ const BOUNDARY = String.raw`(?:(?<!${WORD})(?=${WORD})|(?<=${WORD})(?!${WORD}))`
  * rewritten into a Unicode-aware boundary so accented Latin and Devanagari word edges still count.
  *
  * German `ß` is written as `ss` in patterns. NFKC does not touch `ß`, so `normalizeForMatching` folds it
- * to `ss` explicitly — the Swiss spelling, and the one every keyboard can type — and a pattern written
+ * to `ss` explicitly (the Swiss spelling, and the one every keyboard can type), and a pattern written
  * with `ß` would match neither form.
  */
 export function compile(source: string): RegExp {

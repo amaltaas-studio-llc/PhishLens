@@ -15,7 +15,7 @@ server cannot preview it. As a security product, transitive dependency surface a
 - Bundle with esbuild driven by `scripts/build.mjs`.
 - TypeScript targeting ES2022 with `strict` and `noUncheckedIndexedAccess`.
 - Vitest in Node; ESLint (flat config, `typescript-eslint` typed rules).
-- No UI framework and no runtime `dependencies` — only `devDependencies`.
+- No UI framework and no runtime `dependencies`, only `devDependencies`.
 - `analysis/` must not reference `chrome.*`, `document`, `window` or `fetch`, so the engine runs under
   Vitest; ESLint enforces this for direct references. `shared/` is mostly pure helpers, but also holds the
   thin `chrome.*` wrappers (`messaging.ts` sends runtime and tab messages). Those touch `chrome` only

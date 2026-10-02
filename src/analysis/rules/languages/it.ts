@@ -105,7 +105,7 @@ export const it: LanguagePack = {
     ],
   },
   negation: {
-    // "non le chiederà mai di inviarci il codice" — reach across the ask-verb to the solicitation.
+    // "non le chiederà mai di inviarci il codice": reach across the ask-verb to the solicitation.
     before: compile(
       String.raw`\b(mai|non|non deve|non dovete)\b(?:[^.!?,;]{0,50}\b(?:chieder\w*|richieder\w*|esiger\w*)\b[^.!?,;]{0,40}\b(?:di|che))?\s{1,3}$`,
     ),

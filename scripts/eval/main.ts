@@ -13,7 +13,7 @@
  *   --group <name>   report every path as one group, rather than one group per path
  *   --rows <dir>     also write every flagged message's sender, subject, link hosts and findings
  *
- * The report on stdout holds rule ids, severities and counts — nothing from any message — so it can be
+ * The report on stdout holds rule ids, severities and counts (nothing from any message), so it can be
  * pasted into an issue. `--rows` is the opposite, which is why it refuses a directory inside this
  * repository: corpora used here include people's own mailboxes, and one `git add .` would publish them.
  */

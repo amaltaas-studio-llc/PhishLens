@@ -185,7 +185,7 @@ class WelcomePage {
       this.#status.textContent =
         outcome.reason === 'unavailable'
           ? // Chrome reports a switched-off setting, a policy block and an ineligible device alike.
-            'Chrome says its model cannot run right now. The setting may be off, blocked by policy, or this device may not qualify — see below.'
+            'Chrome says its model cannot run right now. The setting may be off, blocked by policy, or this device may not qualify; see below.'
           : 'Chrome did not start the download. Check the requirements below, then try again.';
     }
     void this.#refresh();

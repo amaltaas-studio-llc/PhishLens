@@ -13,7 +13,7 @@ of that score. Two properties matter more than any feature:
 2. **It is trustworthy with mail.** Zero runtime dependencies, two permissions, no network calls in the
    default configuration.
 
-Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before changing anything structural — it is a short
+Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before changing anything structural; it is a short
 map of where code runs and where to edit. When the change touches a past decision (bundler, scoring
 floors, trust list, model cap, …), open the matching file under [docs/adr/](docs/adr/); those records
 are why the obvious alternative was rejected.
@@ -21,7 +21,7 @@ are why the obvious alternative was rejected.
 ## Definition of done
 
 ```bash
-npm run verify   # lint, typecheck, test, build, check:dist — all five, every time
+npm run verify   # lint, typecheck, test, build, check:dist: all five, every time
 ```
 
 The build and the dist check are in there because a green test run says nothing about whether the thing
@@ -52,12 +52,12 @@ reason the suite is fast enough to be useful. Anything needing a browser belongs
 `ui/`, or `background/`.
 
 **Gmail selectors live in one file.** `src/gmail/selectors.ts`, as prioritised candidate lists. A selector
-inline in `dom-adapter.ts` is a bug — when Gmail changes its markup, one file should need editing.
+inline in `dom-adapter.ts` is a bug: when Gmail changes its markup, one file should need editing.
 
 **A message that could not be read is never scored.** `extract()` returns the message *and* the parts it
 could not find; `isScorable()` in `src/gmail/adapter.ts` decides whether a score would be honest. With no
 sender, nearly every check has nothing to test, so the engine returns no findings and the aggregation
-turns that into **Low Risk** — a confident all-clear on mail nobody checked, which is the one failure
+turns that into **Low Risk**: a confident all-clear on mail nobody checked, which is the one failure
 direction this project does not accept. Do not "fix" that by scoring it anyway, by removing the badge
 (indistinguishable from a clean message when `showBadgeWhenLow` is off), or by softening the card's
 wording: the sentence saying this is not a judgement of safety is load-bearing and is asserted by a test.
@@ -69,23 +69,23 @@ wrong, not the cap. This holds for *every* source, including a large model a use
 feature buys better reasons, not more weight. See [docs/LOCAL-AI.md](docs/LOCAL-AI.md).
 
 **All egress is in the service worker, to an address read from settings.** `src/background/index.ts` is the
-only file that may call `fetch`. Never let an endpoint arrive in a message — that turns the worker into a
+only file that may call `fetch`. Never let an endpoint arrive in a message; that turns the worker into a
 general-purpose fetcher. `http://` is valid only for loopback (`normalizeModelBaseUrl`); everything else
 needs `https:`. New network reach goes in `optional_host_permissions` and is requested per-origin from the
 options page on a click, so a default install keeps the two permissions the README advertises.
 
 **Severity floors are deterministic-only.** Never let a semantic signal set a floor, and keep
-`authentication.gmail_warning` excluded — Gmail renders that banner conditionally on the folder, so a floor
+`authentication.gmail_warning` excluded. Gmail renders that banner conditionally on the folder, so a floor
 from it would make a message's score change when it is moved to Spam.
 
 **Trust cannot silence identity.** A trusted sender dampens `content` findings only, only when Gmail's
 summary proves the sender's domain, and never a `high` or `critical` finding. Widening any
-of the three turns the trust list into the spoofing hole it is designed not to be — trusting `paypal.com`
+of the three turns the trust list into the spoofing hole it is designed not to be: trusting `paypal.com`
 must never quieten `paypa1.com`. Dampened findings stay visible and reversible; nothing is removed.
 
 **A list row is sender-only, and never an all-clear.** `analysis/triage.ts` runs an explicit allowlist of
 identity rules against a name and an address. Do not add a rule needing a body, links, or an authentication
-result, do not add a "looks fine" verdict, and do not lower the `high` floor — an unmarked row means
+result, do not add a "looks fine" verdict, and do not lower the `high` floor. An unmarked row means
 unchecked, and a marker on ordinary mail is what gets the feature switched off. A test forces every new
 identity rule to be classified either way.
 
@@ -110,7 +110,7 @@ trust than a missed phish. So:
   signal fires on the malicious case, *and* that every legitimate fixture stays `low` with no `high` or
   `critical` deterministic signal. The second half is what makes severity floors safe.
 - **Prefer brand-independent signals.** A curated table gives the best wording but only for what is in it.
-  If a check can only work via `src/shared/brands.ts`, ask whether a structural version exists — "does the
+  If a check can only work via `src/shared/brands.ts`, ask whether a structural version exists: "does the
   display name share any name with the sending domain" needs no table at all.
 - **Write findings a user can verify.** "Sender domain resembles Microsoft but is not Microsoft-owned" is
   useful. "Suspicious sender" is not. Include the evidence and, where the UI can locate it, a locator.
@@ -125,7 +125,7 @@ suppression rules whose purpose is to stop exactly the false positive a new chec
 Do not guess at what a UI change looks like, and do not ask the user to check for you:
 
 ```bash
-npm run harness      # http://127.0.0.1:5199 — real components, real engine, any fixture
+npm run harness      # http://127.0.0.1:5199: real components, real engine, any fixture
 npm run screenshots  # regenerates docs/assets/ from that page
 ```
 
@@ -146,12 +146,12 @@ The codebase holds a high standard here, and matching it is part of the task.
 - Keep the docs true. `README.md` is for end users and should stay non-technical; technical detail belongs
   in `docs/`. If behaviour changes, update the document that describes it in the same commit.
 - **Never name a real organisation seen in someone's own mailbox.** Testing against live Gmail produces the
-  best bug reports this project gets, and the detail that makes one concrete — which bank, which supplier,
-  which brand the model misjudged — is private correspondence, published permanently the moment it reaches
+  best bug reports this project gets, and the detail that makes one concrete (which bank, which supplier,
+  which brand the model misjudged) is private correspondence, published permanently the moment it reaches
   a commit message, a comment, or a fixture. Record the shape instead: "a genuine bank notification",
   "a supplier the brand table does not contain". Nothing of value is lost, because the shape is what the
   next reader needs. Invented organisations follow the `northwind-*` house names already in
-  `test/fixtures/`, and the curated `src/shared/brands.ts` entries are the one exception — those are public
+  `test/fixtures/`, and the curated `src/shared/brands.ts` entries are the one exception; those are public
   brands chosen for being widely phished, not messages anyone received.
 
 ## Git
@@ -166,7 +166,7 @@ The codebase holds a high standard here, and matching it is part of the task.
 
 Do not "fix" these without discussion:
 
-- No framework, no runtime dependencies, no CSS files — the UI is hand-written with Shadow DOM.
+- No framework, no runtime dependencies, no CSS files; the UI is hand-written with Shadow DOM.
 - No `dist/` in the repository. CI builds and attaches it.
 - The public suffix list and brand table are curated subsets, with the limitation documented rather than
   papered over.

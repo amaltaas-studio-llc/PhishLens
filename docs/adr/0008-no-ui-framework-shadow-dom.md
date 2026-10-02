@@ -25,7 +25,7 @@ The UI is a small number of elements. Message content is attacker-controlled. Gm
 
 ## Rejected alternatives
 
-- **A UI framework** — supply chain and `dangerouslySetInnerHTML` temptation for a short list of nodes.
-- **Card anchored to the badge** — needs scroll/resize handling; leaves the viewport when reading evidence.
-- **Modal card** — dismissed before the findings are read.
-- **One “no AI” string for every failure mode** — contradicts itself within seconds of a pending state.
+- **A UI framework**: supply chain and `dangerouslySetInnerHTML` temptation for a short list of nodes.
+- **Card anchored to the badge**: needs scroll/resize handling; leaves the viewport when reading evidence.
+- **Modal card**: dismissed before the findings are read.
+- **One “no AI” string for every failure mode**: contradicts itself within seconds of a pending state.

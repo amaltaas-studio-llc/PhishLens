@@ -16,7 +16,7 @@ a confident Low Risk score.
 - Assess the last expanded message that is not written by the user (from the account *and* addressed to
   someone else). Headers only for that judgement.
 - All Gmail selectors live in `src/gmail/selectors.ts`. `extract()` reports gaps; `isScorable()` decides
-  honesty. Unscorable mail shows **Not checked** — the badge stays.
+  honesty. Unscorable mail shows **Not checked**; the badge stays.
 
 ## Consequences
 

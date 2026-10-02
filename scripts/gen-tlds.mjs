@@ -3,7 +3,7 @@
  * Refreshes `src/shared/tlds.ts` from IANA's authoritative list of delegated top-level domains.
  *
  * Run by hand, not by the build. A build that reaches the network cannot be reproduced offline, and a
- * detection rule whose input changes silently between builds is one whose behaviour nobody can review —
+ * detection rule whose input changes silently between builds is one whose behaviour nobody can review,
  * so the snapshot is committed and its refresh is a visible diff.
  *
  *   node scripts/gen-tlds.mjs
@@ -48,7 +48,7 @@ const file = `/**
  *
  * **What this is for.** \`isMalformedHost\` in \`url.ts\` checks that a TLD is *shaped* like one; this
  * checks that it *is* one. A sending domain under a TLD that does not exist cannot resolve, cannot
- * accept a reply, and cannot have been registered by anyone — so the From address is fabricated, which
+ * accept a reply, and cannot have been registered by anyone, so the From address is fabricated, which
  * is worth stating plainly rather than inferring from softer signals.
  *
  * **Why a snapshot and not a lookup.** Nothing in this extension performs DNS or any other network
@@ -60,7 +60,7 @@ const file = `/**
  * \`high\`, never \`critical\`, so a stale entry can raise a legitimate message to "suspicious" but can
  * never on its own produce "high risk". Refresh with \`node scripts/gen-tlds.mjs\`.
  *
- * Generated file — do not edit by hand.
+ * Generated file. Do not edit by hand.
  * Source: ${SOURCE}
  * ${version}
  * ${String(tlds.length)} entries, of which ${String(punycode)} are internationalised (\`xn--\`).

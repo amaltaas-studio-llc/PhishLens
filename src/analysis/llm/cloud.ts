@@ -1,5 +1,5 @@
 /**
- * Cloud semantic analyzer — designed, wired, and inert.
+ * Cloud semantic analyzer: designed, wired, and inert.
  *
  * Disabled with no default backend URL, so no configuration of the shipped extension sends message
  * content off the machine. It exists so that enabling cloud analysis later is configuration plus a
@@ -40,7 +40,7 @@ export class CloudAnalyzer implements SemanticAnalyzer {
 
   /**
    * Requires *both* an explicit `cloud` choice and a configured backend. Absent either, this
-   * analyzer does nothing — which is the MVP's state.
+   * analyzer does nothing, which is the MVP's state.
    */
   isAvailable(): Promise<boolean> {
     return Promise.resolve(isCloudConfigured(this.#settings));

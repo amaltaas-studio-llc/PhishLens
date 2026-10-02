@@ -1,5 +1,5 @@
 /**
- * Adapter for an OpenAI-compatible model server the user runs — Ollama, LM Studio, Docker Model Runner,
+ * Adapter for an OpenAI-compatible model server the user runs: Ollama, LM Studio, Docker Model Runner,
  * llama.cpp, vLLM.
  *
  * This is the same trade as the on-device path, made with a better model: the user supplies the compute
@@ -16,7 +16,7 @@
  *    loopback origin or an https one before it reaches storage.
  *  - **The cap does not move.** A 70B model on the user's own GPU is still bound by the `llm` category
  *    ceiling and still scores zero uncorroborated. What a better model buys is a better *explanation*,
- *    not a louder vote — configuration must not be able to weaken an invariant.
+ *    not a louder vote; configuration must not be able to weaken an invariant.
  */
 import { isAborted } from '../../shared/abort.js';
 import { logger } from '../../shared/logger.js';
@@ -48,7 +48,7 @@ export class ModelServerAnalyzer implements SemanticAnalyzer {
   /**
    * `options.signal` is checked either side of the round trip but cannot cancel it, exactly as in the
    * cloud adapter: the request belongs to the worker. Checking is enough to stop a superseded result
-   * being applied when the reader has already moved to another message — which matters more here than
+   * being applied when the reader has already moved to another message, which matters more here than
    * for the cloud path, since a slow local model makes that window seconds wide.
    */
   async analyze(
@@ -72,7 +72,7 @@ export class ModelServerAnalyzer implements SemanticAnalyzer {
     /*
      * Thrown rather than returned as "no answer", because the two mean different things to the reader.
      * `null` here becomes the `no-output` status, whose card says the model did not return a usable
-     * assessment — true when a model was asked and answered badly, and misleading when a server refused,
+     * assessment: true when a model was asked and answered badly, and misleading when a server refused,
      * timed out or was never reached, since it sends someone looking at their model instead of their
      * configuration. A rejection becomes `error` instead, and carries the worker's explanation with it.
      */

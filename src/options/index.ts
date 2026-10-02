@@ -7,8 +7,8 @@
  * "apply" step.
  *
  * The page's markup is static and ships with the extension, so it is written in `options.html`. Nothing
- * here interpolates message-derived content; the user-supplied strings — the backend URL, the model
- * server address and the model name — are set via `value`, and model names returned by a server become
+ * here interpolates message-derived content; the user-supplied strings (the backend URL, the model
+ * server address and the model name) are set via `value`, and model names returned by a server become
  * `option.value`, never markup.
  *
  * It is also where the one optional permission is requested. Access to a model server is asked for
@@ -105,7 +105,7 @@ class OptionsPage {
     });
 
     // Access to the server is requested here rather than when the URL is saved, because
-    // `chrome.permissions.request` needs a real user gesture — and because a permission prompt that
+    // `chrome.permissions.request` needs a real user gesture, and because a permission prompt that
     // appears while someone is still typing reads as the extension overstepping.
     this.#connect.addEventListener('click', () => {
       void this.#connectToServer();
@@ -146,7 +146,7 @@ class OptionsPage {
    * The trust list, in full, with a way out of every entry.
    *
    * The card can only offer to stop trusting the sender of the message on screen, which is no help to
-   * someone who wants to know what they have accumulated — and an allowlist a user cannot enumerate is
+   * someone who wants to know what they have accumulated, and an allowlist a user cannot enumerate is
    * one they cannot audit. Entries are `textContent`, like everything else derived from a message.
    */
   #renderTrusted(entries: readonly string[]): void {
@@ -191,7 +191,7 @@ class OptionsPage {
         : !granted
           ? // Both fields can be filled in by hand, which looks complete and fails on every request:
             // the worker refuses to contact an address the user has not granted. Chrome alone would
-            // not stop it — an ungranted request still leaves, as an ordinary cross-origin one.
+            // not stop it: an ungranted request still leaves, as an ordinary cross-origin one.
             'Press Connect to allow PhishLens to reach this address. Until then, nothing is sent to it.'
           : settings.modelName === ''
             ? 'Choose a model. Press Connect to list what this server has loaded.'
@@ -291,7 +291,7 @@ class OptionsPage {
         await this.#save({ modelName: only });
       }
       this.#renderServerState(this.#current);
-      this.#showStatus(`Connected — ${String(response.models.length)} model(s) available`);
+      this.#showStatus(`Connected: ${String(response.models.length)} model(s) available`);
     } finally {
       this.#connect.disabled = this.#modelBaseUrl.value.trim() === '';
     }

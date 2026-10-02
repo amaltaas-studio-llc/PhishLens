@@ -1,6 +1,6 @@
 {
   "name": "legitimate-antivirus-renewal",
-  "description": "False-positive resistance: a genuine card-expiry notice from a security vendor's own authenticated domain. It asks the reader to update a payment method and names the date protection lapses — the same vocabulary as the scam it is imitated by — so it must be separated by the sender, not by the wording.",
+  "description": "False-positive resistance: a genuine card-expiry notice from a security vendor's own authenticated domain. It asks the reader to update a payment method and names the date protection lapses (the same vocabulary as the scam it is imitated by), so it must be separated by the sender, not by the wording.",
   "email": {
     "senderName": "Norton",
     "senderEmail": "noreply@mail.norton.com",

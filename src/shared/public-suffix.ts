@@ -47,8 +47,8 @@ export const MULTI_LABEL_SUFFIXES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Hosts where anyone can publish in seconds. A page under one of these is not inherently malicious —
- * plenty of real products live here — but the address says nothing about who wrote the page, which is
+ * Hosts where anyone can publish in seconds. A page under one of these is not inherently malicious
+ * (plenty of real products live here), but the address says nothing about who wrote the page, which is
  * what matters when the page is asking for credentials.
  *
  * Two shapes, matched by the same `host === suffix || host.endsWith('.' + suffix)` test:
@@ -126,7 +126,7 @@ export const URL_SHORTENERS: ReadonlySet<string> = new Set([
 /**
  * Services that send mail, or sign and relay it, on behalf of other organisations.
  *
- * For the *envelope* only — a DKIM signer, a `via` host, a sending address — where the question is "is
+ * For the *envelope* only (a DKIM signer, a `via` host, a sending address), where the question is "is
  * this a third party that sends for its customers?". Never for links: several of these also host pages
  * their customers write, and a domain that sends on anyone's behalf says nothing about where a click
  * goes. `KNOWN_CLICK_TRACKERS` answers that question.

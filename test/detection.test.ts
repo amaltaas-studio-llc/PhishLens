@@ -1,7 +1,7 @@
 /**
  * End-to-end detection tests against fixtures.
  *
- * Runs the real pipeline — context building, every detector, refinement, aggregation, classification —
+ * Runs the real pipeline (context building, every detector, refinement, aggregation, classification)
  * in plain Node with no Chrome and no Gmail.
  */
 import { describe, expect, it } from 'vitest';
@@ -65,7 +65,7 @@ const LEGITIMATE_FIXTURES = [
  *
  * `paypal.it` is either PayPal Italy or somebody who registered PayPal's name in Italy, and nothing in the
  * mail distinguishes them. Demanding `low` here would mean pretending the ambiguity is resolved, and
- * demanding `high` — which is what the lookalike rule did — means calling authentic mail an imitation. So
+ * demanding `high` (which is what the lookalike rule did) means calling authentic mail an imitation. So
  * these are held to a different standard: no `high` or `critical` deterministic signal and no severity
  * floor, as with any legitimate fixture, but `caution` rather than `low`, carrying the finding that says
  * which part could not be confirmed.
@@ -258,7 +258,7 @@ describe('legitimate password reset (false-positive resistance)', () => {
 
   /**
    * The genuine notice trips no wording rule at all, including on the sentence promising never to ask
-   * for credentials — "we will never ask you to confirm your details" used to be reported as a request
+   * for credentials: "we will never ask you to confirm your details" used to be reported as a request
    * to confirm credentials, which inverted the meaning of the only sentence in the message about them.
    */
   it('raises no content findings on a real provider notice', () => {
@@ -268,7 +268,7 @@ describe('legitimate password reset (false-positive resistance)', () => {
 
   /**
    * Dampening on its own terms: hold the verified sender constant and give the message wording that
-   * genuinely matches a heuristic. The finding must survive, weighted down — a score whose reasoning is
+   * genuinely matches a heuristic. The finding must survive, weighted down; a score whose reasoning is
    * hidden is not one a user can check, so a softened finding is still shown.
    */
   it('dampens rather than deletes a wording finding from a verified sender', () => {
@@ -476,7 +476,7 @@ describe('mismatched anchor URL in isolation', () => {
  *
  * The last test is the important one. The guard must not become a way to launder a brand claim by
  * pointing the link at your own domain, so it is asserted to yield when the *displayed* domain is a
- * brand's — the case where reputation is genuinely being borrowed.
+ * brand's, the case where reputation is genuinely being borrowed.
  */
 describe('click tracking on the sender own domain', () => {
   const result = analyzeFixture('legitimate-substack-newsletter');
@@ -496,7 +496,7 @@ describe('click tracking on the sender own domain', () => {
 
   /**
    * Isolates the guard from the tracker list. The platform here is deliberately unlisted, so the only
-   * thing that can suppress the first case is `onSenderDomain` — and the second case, identical but
+   * thing that can suppress the first case is `onSenderDomain`, and the second case, identical but
    * for the sender's domain, proves the rule still fires on the shape when nobody owns the redirector.
    */
   it('suppresses the rewrite only for the domain that sent the message', () => {
@@ -604,7 +604,7 @@ describe('click tracking on the sender own domain', () => {
 /**
  * The commonest shape in ordinary bulk mail: the footer shows the sender's own
  * address and the href goes through the email provider's tracker, a domain nobody can list in advance.
- * Excused only when authentication proves the sender, and only for a destination shaped like a tracker —
+ * Excused only when authentication proves the sender, and only for a destination shaped like a tracker;
  * the rest of the block is the forgery and compromised-account cases that look the same in the footer.
  */
 describe("a proven sender showing its own address through an email provider's tracker", () => {
@@ -693,7 +693,7 @@ describe("a proven brand linking another brand's address through its own host", 
 /**
  * The same guard, for the rule whose anchor text is prose rather than a URL. A social footer links the
  * networks it has profiles on *by name*, through the sender's own click tracker, so every bulk sender
- * produces "anchor names a brand, destination is not that brand's" — the observed false positive.
+ * produces "anchor names a brand, destination is not that brand's", the observed false positive.
  *
  * As with its sibling, the guard must not become a way to launder a brand claim by pointing the link at
  * a domain you control, so the last test asserts it yields when the message claims to be the brand.
@@ -745,7 +745,7 @@ describe('a social footer routed through the sender own tracker', () => {
 
 /**
  * A proven sender naming another brand in passing, through a host that is not its own: an email
- * provider's tracker, a sister domain, a short link. Reported at `medium` so it sets no floor — and the
+ * provider's tracker, a sister domain, a short link. Reported at `medium` so it sets no floor, and the
  * three things a lure needs, a claim, an ask, or an unproven sender, each keep it `high`.
  */
 describe('a proven sender mentioning another brand through a host of its provider', () => {
@@ -1098,7 +1098,7 @@ describe('every host a click passes through', () => {
 
 /**
  * Staff write from their organisation's `.net` and `.com`, and colleagues abroad from its country
- * domain, so the same name under another suffix is the same organisation — unless the suffix is the
+ * domain, so the same name under another suffix is the same organisation, unless the suffix is the
  * reader's own with characters dropped, which is a trap and not a market.
  */
 describe("a sender under another of the recipient's own suffixes", () => {
@@ -1710,7 +1710,7 @@ describe('fake payroll-change email', () => {
  * Both directions of the one distinction this rule rests on: a message that *contains* a code is
  * delivering one, and a message that asks the reader to hand a code over is the attack. The wording
  * overlaps almost entirely, which is why a pattern matching "your verification code is 123456" scored
- * every OTP notification ever sent at 50/100 — from a domain with no dampening available, precision in
+ * every OTP notification ever sent at 50/100. From a domain with no dampening available, precision in
  * the rule is the only thing standing between ordinary mail and a Suspicious verdict.
  */
 describe('a verification code being delivered rather than solicited', () => {
@@ -1807,7 +1807,7 @@ describe('a warning not to share a code, and the request that quotes it', () => 
 
   /**
    * A negation that governs some other verb entirely. "Do not" belongs to "hesitate" here, and what
-   * follows is as plain a request as the rule ever sees — which is why what may stand between a negation
+   * follows is as plain a request as the rule ever sees, which is why what may stand between a negation
    * and the verb it suppresses is enumerated rather than merely bounded in length.
    */
   it.each([
@@ -1878,7 +1878,7 @@ describe('MFA code request', () => {
 
   /**
    * The correlation that makes this more than a code request, and the case that exposed its wording. The
-   * impersonation here is of the reader's own employer, which no brand table contains — so a description
+   * impersonation here is of the reader's own employer, which no brand table contains, so a description
    * built from `primaryClaim` called it "a known organisation" and named nothing the reader could check.
    */
   it('describes the impersonation it actually found, without inventing an organisation', () => {
@@ -1901,7 +1901,7 @@ describe('MFA code request', () => {
 /**
  * The regression this suite exists for.
  *
- * A real message impersonating a life insurer scored 24/100 — one point below `caution` — because every
+ * A real message impersonating a life insurer scored 24/100 (one point below `caution`) because every
  * identity detector was gated on the enumerated `BRANDS` table and the insurer is not in it. No table
  * ever contains every insurer, bank, utility and agency, so identity detection cannot depend on one
  * being complete.
@@ -1982,7 +1982,7 @@ describe('reply-chain hijack by a lookalike domain', () => {
 
   /**
    * The same message without the conversation is the control. Its wording still reaches `suspicious`
-   * on the content rules alone — asking for bank details to be changed is not innocent language — but
+   * on the content rules alone (asking for bank details to be changed is not innocent language), but
    * only the thread comparison turns that into a verdict, which is the capability being added.
    */
   it('needs the conversation to reach high risk', () => {
@@ -2026,7 +2026,7 @@ describe('reply-chain hijack reusing a participant name', () => {
 /**
  * `confirm`/`update` near `details`/`information` is most of ordinary business correspondence. Matching
  * it reported those messages under a title asserting they asked for a credential, which is both wrong
- * and unverifiable — the reader looks for the request and there is none.
+ * and unverifiable: the reader looks for the request and there is none.
  */
 describe('credential wording versus ordinary business wording', () => {
   const fires = (bodyText: string): boolean =>
@@ -2062,7 +2062,7 @@ describe('credential wording versus ordinary business wording', () => {
 /**
  * "Closed" is the one consequence verb that also describes a *bank* account, and payment-diversion mail
  * leans on it: "my old account is being closed, use these details instead". Reported as a threat to
- * account access, it sends the reader hunting for a warning about their login the message never made —
+ * account access, it sends the reader hunting for a warning about their login the message never made,
  * while the real problem, a changed payee, is reported by the payment rules with the right words.
  */
 describe('threats to account access versus a sender closing an account', () => {
@@ -2315,7 +2315,7 @@ describe('ordinary changes of cast within a thread', () => {
   /**
    * `northwind-supply.de` against `northwind-supply.com` is the case that decides whether this rule is
    * usable. The names are identical and only the suffix differs, which is overwhelmingly one company
-   * rather than an imitation — companies reply from country domains every day — so it is deliberately
+   * rather than an imitation (companies reply from country domains every day), so it is deliberately
    * not reported, unlike the brand rule where the real domains are enumerated.
    */
   it('treats the same name under a different suffix as the same organisation', () => {
@@ -2372,7 +2372,7 @@ describe('participant lookalike comparison', () => {
 /**
  * Brand keywords are matched on separator-stripped text so `p-a-y-p-a-l` still reads as PayPal. The
  * cost is that a short keyword can hide inside an ordinary word once the spaces are gone: `irs` sits
- * in "first", `aws` in "laws". A claim invented that way is not cosmetic — it decides whether the
+ * in "first", `aws` in "laws". A claim invented that way is not cosmetic: it decides whether the
  * message is treated as presenting itself as that organisation.
  */
 describe('short brand keywords inside ordinary words', () => {
@@ -2472,7 +2472,7 @@ describe('a tax authority newsletter from its government sending platform', () =
 /**
  * A display name can name two brands honestly, because a product name can contain another brand's word:
  * `Amazon Appstore Team` claims Amazon, and `appstore` is one of Apple's keywords. Both claims are real,
- * so the question is not which to keep but which the message is *making* — and that used to be answered
+ * so the question is not which to keep but which the message is *making*, and that used to be answered
  * by whichever brand appeared earlier in `brands.ts`, which is a fact about the table and not about the
  * message. Apple precedes Amazon there, so authenticated mail from a domain Amazon owns was reported as
  * Apple impersonation at `high`, correlated with the verification wording into a `critical`, 75/100.
@@ -2504,7 +2504,7 @@ describe('a display name that names two brands', () => {
 
   /**
    * The same name from a domain neither brand owns. Ownership cannot break this tie, so the earliest
-   * mention does — which is what a reader does with a name, and it keeps the sentence checkable: the
+   * mention does, which is what a reader does with a name, and it keeps the sentence checkable: the
    * name says Amazon, so the finding has to say Amazon.
    */
   it('still flags the same name sent from an unrelated domain, and names the brand the name claims', () => {
@@ -2526,7 +2526,7 @@ describe('a display name that names two brands', () => {
   /**
    * The links of the same message, in the form its sending platform writes them: the destination sits in
    * the tracker's path with its separators percent-encoded. `URL` leaves those encoded, so a pattern
-   * written for the literal form reads the tracker as the destination — and a verification button that
+   * written for the literal form reads the tracker as the destination, and a verification button that
    * the brand's own console serves became a sign-in link the brand supposedly sent to a domain it does
    * not own, three times over, saturating the link category on its own.
    */
@@ -2579,8 +2579,8 @@ describe('a display name that names two brands', () => {
 });
 
 /**
- * A brand that operates its own top-level domain, where the brand table's question — is this one of the
- * domains we list? — has the wrong shape. ICANN's Specification 13 restricts registrations in a brand TLD
+ * A brand that operates its own top-level domain, where the brand table's question ("is this one of the
+ * domains we list?") has the wrong shape. ICANN's Specification 13 restricts registrations in a brand TLD
  * to the operator, its affiliates and its trademark licensees, so a name under `.apple` is Apple's by the
  * registry agreement rather than by appearing in a list, and no list of second-level names can keep up
  * with one. Until the TLD itself counted as ownership, an authenticated notice from Apple's own TLD with a
@@ -2669,7 +2669,7 @@ describe("a sender on a brand's own top-level domain", () => {
   });
 
   /**
-   * Scoped to the brand the anchor text names, not to whether *some* brand owns the destination —
+   * Scoped to the brand the anchor text names, not to whether *some* brand owns the destination;
    * otherwise showing one brand's address while linking to another's would suppress itself, and every
    * brand in the table would be a usable disguise for every other.
    */
@@ -2694,7 +2694,7 @@ describe("a sender on a brand's own top-level domain", () => {
    * The mistake this must never become. A brand TLD carries its guarantee because nobody else can register
    * under it; a TLD that anyone can buy a name in carries none, and treating one as a brand's would hand
    * the brand's identity to every registrant. Both of these are in Apple's and Microsoft's `domains` as
-   * second-level names — `me.com`, `live.com` — which is exactly as far as it goes.
+   * second-level names (`me.com`, `live.com`), which is exactly as far as it goes.
    */
   it.each(['phish-support.me', 'account-verify.live', 'secure-login.app', 'apple-id.dev'])(
     'claims no ownership of %s, whose TLD is open to anyone',
@@ -2718,7 +2718,7 @@ describe("a sender on a brand's own top-level domain", () => {
 /**
  * The same open-world problem as the brand TLD, in its most expensive form. A brand runs one name across
  * every market it sells in, the table lists a few of those domains, and the lookalike rule read every other
- * one as a `critical` imitation of the `.com` — 45 points and a severity floor, so authentic mail from
+ * one as a `critical` imitation of the `.com`: 45 points and a severity floor, so authentic mail from
  * `hsbc.fr` was High Risk. Thirty-odd brands against two hundred country suffixes is not a list anyone
  * finishes, so the question is answered structurally: a name that is literally the brand's, under a suffix
  * that misspells none of the brand's own, is reported as unverifiable rather than judged as imitation.
@@ -2751,7 +2751,7 @@ describe("a brand's own name under a suffix the table does not list", () => {
 
   /**
    * What must not be softened with it. A suffix that is the brand's own with characters dropped is a typo
-   * trap, not a market — `.co`, `.cm` and `.om` are the reason anyone registers them — and a name that is
+   * trap, not a market (`.co`, `.cm` and `.om` are the reason anyone registers them), and a name that is
    * only *confusably* the brand's is a homoglyph domain, which is the lookalike rule's entire purpose.
    */
   it.each([
@@ -2898,7 +2898,7 @@ describe('repeated-fragment local parts', () => {
 });
 
 /**
- * Randomised case and subject padding are both destroyed by normalisation — the adapter case-folds the
+ * Randomised case and subject padding are both destroyed by normalisation: the adapter case-folds the
  * address and collapses the subject's whitespace, because every comparison downstream depends on it.
  * `EmailMessage.raw` carries the originals so formatting detectors can still see them.
  */
@@ -3100,8 +3100,8 @@ describe('phishing that is innocent one field at a time', () => {
   /**
    * Three categories are saturated at their weights, so the additive sum stops in the suspicious band
    * however much more is wrong. What carries it to high risk is that the severe findings are independent:
-   * each category is a different way for the message to be wrong. The checks reach the verdict themselves
-   * — the model is not what gets a message like this over the line.
+   * each category is a different way for the message to be wrong. The checks reach the verdict themselves;
+   * the model is not what gets a message like this over the line.
    */
   it('reaches high risk on deterministic findings alone, because severe findings converge', () => {
     const sum = Object.values(result.categoryScores).reduce((a, b) => a + b, 0);
@@ -3132,7 +3132,7 @@ describe('phishing that is innocent one field at a time', () => {
     /**
      * Deliberately `high` and not `critical`, and the reason is about the list rather than the message.
      * The observation is conclusive, but it is only as current as the committed IANA snapshot, and
-     * `critical` floors the score at high risk — which would let one aging file hand a high-risk verdict
+     * `critical` floors the score at high risk, which would let one aging file hand a high-risk verdict
      * to a legitimate sender under a newly delegated TLD with nothing else wrong. At `high` that same
      * staleness tops out at suspicious.
      */
@@ -3188,7 +3188,7 @@ describe('phishing that is innocent one field at a time', () => {
 
     /**
      * The consequence, not just the observation. Folding the name for *matching* is what lets the
-     * brand-independent organisational-claim rule see `payment declined` at all — spelled in the
+     * brand-independent organisational-claim rule see `payment declined` at all; spelled in the
      * mathematical alphabet it matched no pattern, which is the entire reason it is spelled that way.
      */
     it('still reads what the name claims, through the substitution', () => {
@@ -3258,7 +3258,7 @@ describe('phishing that is innocent one field at a time', () => {
 
     /**
      * The footers a mail gateway staples onto outbound business mail, and the notice a bank's secure
-     * portal sends. Logically these are the same move — a claim inside a message about that message — but
+     * portal sends. Logically these are the same move (a claim inside a message about that message), but
      * the population carrying them is overwhelmingly honest, so matching them would put 22 points on
      * ordinary correspondence from any organisation with a scanning appliance.
      */
@@ -3293,7 +3293,7 @@ describe('phishing that is innocent one field at a time', () => {
 
     /**
      * The suppression this message bought for the price of an unsubscribe link. Bulk-mail shape exists to
-     * keep marketing wording out of the score, and concealed filler is not marketing — so the message that
+     * keep marketing wording out of the score, and concealed filler is not marketing, so the message that
      * pads itself no longer gets the benefit of the doubt it was engineered to claim.
      */
     it('withdraws the bulk-mail suppression that concealment was buying', () => {
@@ -3325,7 +3325,7 @@ describe('phishing that is innocent one field at a time', () => {
  *
  * Gmail prints `via` whenever the authenticated sending domain differs from the From domain, which is the
  * ordinary consequence of sending through any third-party service. It appears on a large share of real
- * commercial mail, so a few points for it lifts most of an inbox at once — and a signal equally present in
+ * commercial mail, so a few points for it lifts most of an inbox at once, and a signal equally present in
  * the honest and the dishonest population is not evidence, however irregular the relay host looks.
  */
 describe('a relay host is context, not a finding', () => {
@@ -3349,7 +3349,7 @@ describe('a relay host is context, not a finding', () => {
   /**
    * The one configuration where a relay is evidence: it contradicts a specific claim. A message calling
    * itself Microsoft and arriving through someone else's platform is not describing how Microsoft sends
-   * mail — and unlike the plain case, that conclusion needs no reputation data about the relay.
+   * mail, and unlike the plain case, that conclusion needs no reputation data about the relay.
    */
   it('scores when the relay contradicts a brand the message claims to be', () => {
     const spoof = analyzeDeterministic({
@@ -3479,7 +3479,7 @@ describe('Gmail banner: verdicts versus placement notices', () => {
 /**
  * Which message in a thread gets assessed.
  *
- * Taking the last expanded message assessed the user's own reply once they had replied to something —
+ * Taking the last expanded message assessed the user's own reply once they had replied to something,
  * scoring their own writing while the inbound message they might need warning about sat collapsed above
  * it. Skipping their own messages fixes that, but the obvious form of the skip ("ignore anything from my
  * address") would hand a free pass to mail forged to look like it came from the reader, which is a scam
@@ -3887,7 +3887,7 @@ describe('invariants across all fixtures', () => {
         expect(result.categoryScores.llm).toBe(0);
       });
 
-      it('is deterministic — identical input gives an identical result', () => {
+      it('is deterministic: identical input gives an identical result', () => {
         const again = analyzeDeterministic(fixture.email, { now: FIXED_NOW });
         expect(JSON.stringify(again.signals)).toBe(JSON.stringify(result.signals));
         expect(again.score).toBe(result.score);
@@ -3940,7 +3940,7 @@ describe('ranking sanity: phishing must outscore legitimate mail', () => {
 /**
  * The severity floors in `scoring/config.ts` are only safe if legitimate mail never produces a `high`
  * or `critical` deterministic signal. That is a load-bearing assumption, so it is asserted directly
- * rather than left implicit — if a future detector starts flagging real mail as `high`, this fails
+ * rather than left implicit: if a future detector starts flagging real mail as `high`, this fails
  * here rather than silently marking every newsletter as suspicious in production.
  */
 describe('severity floor safety', () => {
@@ -3966,7 +3966,7 @@ describe('severity floor safety', () => {
 
 /**
  * Language packs feed the existing content themes. Each language has a credential lure that must fire,
- * and a code-delivery and newsletter that must stay honest — the same both-directions contract as the
+ * and a code-delivery and newsletter that must stay honest, the same both-directions contract as the
  * English fixtures, so a pack cannot buy coverage by over-firing on ordinary mail.
  */
 describe('multilingual wording packs', () => {

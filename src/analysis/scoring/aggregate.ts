@@ -1,5 +1,5 @@
 /**
- * Score aggregation — pure functions, no detector knowledge, no I/O.
+ * Score aggregation: pure functions, no detector knowledge, no I/O.
  *
  * This is deliberately separable from detection so the weighting rule can be retuned or replaced
  * without touching a single detector, and so it can be unit-tested on synthetic signals that no
@@ -92,7 +92,7 @@ export function groupByCategory(signals: readonly SecuritySignal[]): Record<Sign
  * The total score: sum of capped category subtotals, clamped to `[0, 100]`.
  *
  * With the default weights summing to exactly 100 the outer clamp is unreachable, which is
- * intentional — it is a guard against a misconfigured weight table, not part of normal operation.
+ * intentional: it is a guard against a misconfigured weight table, not part of normal operation.
  */
 export function computeTotalScore(
   signalsByCategory: SignalsByCategory,
@@ -119,7 +119,7 @@ export function scoreSignals(
 }
 
 /**
- * Categories that added to the score, largest first — the order the card's ring and breakdown share,
+ * Categories that added to the score, largest first: the order the card's ring and breakdown share,
  * and the one the diagnostic report prints, so the two can never disagree.
  */
 export function contributions(
@@ -151,7 +151,7 @@ export interface ScoreFloor {
  * The minimum score established by *deterministic* findings, and which rule established it.
  *
  * `llm` signals are excluded by `SCORE_FLOORS.eligibleCategories`, so a semantic verdict can neither
- * raise a floor nor count towards convergence — see `config.ts` for why floors exist at all.
+ * raise a floor nor count towards convergence; see `config.ts` for why floors exist at all.
  */
 export function scoreFloor(
   signals: readonly SecuritySignal[],
@@ -236,7 +236,7 @@ export function lowerSeverity(severity: Severity, steps: number): Severity {
 
 /**
  * Two findings read the same when everything the reader is shown matches, which leaves only where in the
- * message they point — the id's link index and the evidence URL — to differ.
+ * message they point (the id's link index and the evidence URL) to differ.
  */
 export function displayKey(signal: SecuritySignal): string {
   return [

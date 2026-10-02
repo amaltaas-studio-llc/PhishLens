@@ -5,7 +5,7 @@
  * in it, and therefore the part that can be tested. That matters more here than the file count: every
  * decision below exists because a real runner behaved in a way the code did not expect, and the next
  * runner update is as likely to move the ground again. A protocol detail nothing asserts is one that
- * regresses silently — and its symptom, as this feature has already demonstrated, is a card politely
+ * regresses silently, and its symptom, as this feature has already demonstrated, is a card politely
  * saying the model returned nothing usable.
  */
 import { RESPONSE_SCHEMA } from '../analysis/llm/prompt.js';
@@ -24,7 +24,7 @@ import { RESPONSE_SCHEMA } from '../analysis/llm/prompt.js';
  *
  * A rung that fails costs one round trip and no generation, so old servers pay for this and current ones
  * do not. The parser tolerates fenced and prose-wrapped JSON regardless, which is what makes the last
- * rung — asking for no structure at all — still viable.
+ * rung (asking for no structure at all) still viable.
  */
 export const REQUEST_VARIANTS: readonly Readonly<Record<string, unknown>>[] = Object.freeze([
   Object.freeze({
@@ -44,7 +44,7 @@ export const REQUEST_VARIANTS: readonly Readonly<Record<string, unknown>>[] = Ob
  *
  * The assessment is around 150 tokens and 500 looked generous until a reasoning model met it: a
  * Qwen3-class model spends several hundred tokens thinking *before* answering, the runner counts those
- * against this budget, and the reply arrives cut off mid-string — `finish_reason: 'length'`, unparseable,
+ * against this budget, and the reply arrives cut off mid-string: `finish_reason: 'length'`, unparseable,
  * reported to the user as a model that returned nothing usable. Nothing in that message points at a token
  * limit, which is what made it expensive to find. So the budget assumes a model thinks at length even
  * though the request asks it not to, because `reasoning_effort` is not honoured everywhere. Unused tokens
@@ -58,8 +58,8 @@ export const MAX_TOKENS = 2000;
  * 403 earns its own sentence because it is the first thing nearly everyone pointing this at Ollama sees,
  * and because the cause is invisible from here: Chrome attaches `Origin: chrome-extension://<id>` to every
  * request the worker makes, and Ollama refuses any origin it was not told to expect. Nothing in the
- * extension can work around it — the header cannot be suppressed, and the address, the port and the
- * permission grant are all correct — so the only useful thing to report is which setting the server needs.
+ * extension can work around it (the header cannot be suppressed, and the address, the port and the
+ * permission grant are all correct), so the only useful thing to report is which setting the server needs.
  * "Returned 403" sends the reader hunting for a fault that is not there.
  */
 export function describeHttpFailure(status: number): string {

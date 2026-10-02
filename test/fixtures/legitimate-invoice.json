@@ -1,12 +1,12 @@
 {
   "name": "legitimate-invoice",
-  "description": "False-positive resistance: a real invoice from an established supplier with a PDF attachment and payment language. Business-as-usual mail must not be flagged. It is also sent through a billing platform, so Gmail annotates it `via` a host that is not the sender's domain and is not on any list of recognised bulk-mail services — the shape a large share of legitimate commercial mail has, and the one that turned a dormant rule into points on ordinary mail once the extraction of that annotation was fixed.",
+  "description": "False-positive resistance: a real invoice from an established supplier with a PDF attachment and payment language. Business-as-usual mail must not be flagged. It is also sent through a billing platform, so Gmail annotates it `via` a host that is not the sender's domain and is not on any list of recognised bulk-mail services. That is the shape a large share of legitimate commercial mail has, and the one that turned a dormant rule into points on ordinary mail once the extraction of that annotation was fixed.",
   "email": {
     "senderName": "Brightline Supplies Accounts",
     "senderEmail": "accounts@brightline-supplies.co.uk",
     "recipientEmail": "sam.okafor@northwind-logistics.com",
     "subject": "Invoice BL-2291 for October deliveries",
-    "bodyText": "Hi Sam,\n\nInvoice BL-2291 is attached, covering the October pallet deliveries to Rotterdam plus the two credit notes for the short shipment on the 9th.\n\nNet total is 6,412.50 on our usual 30 day terms, so payment is due 30 November. Bank details are unchanged and are printed on the invoice as always.\n\nThe credit notes are itemised on page two — shout if the numbers don't line up with your goods-received records and I'll take another look.\n\nHope the Q3 review went well.\n\nBest,\nTom Adeyemi\nAccounts, Brightline Supplies Ltd\n0117 946 0033",
+    "bodyText": "Hi Sam,\n\nInvoice BL-2291 is attached, covering the October pallet deliveries to Rotterdam plus the two credit notes for the short shipment on the 9th.\n\nNet total is 6,412.50 on our usual 30 day terms, so payment is due 30 November. Bank details are unchanged and are printed on the invoice as always.\n\nThe credit notes are itemised on page two, so shout if the numbers don't line up with your goods-received records and I'll take another look.\n\nHope the Q3 review went well.\n\nBest,\nTom Adeyemi\nAccounts, Brightline Supplies Ltd\n0117 946 0033",
     "links": [
       { "text": "brightline-supplies.co.uk", "href": "https://brightline-supplies.co.uk" }
     ],

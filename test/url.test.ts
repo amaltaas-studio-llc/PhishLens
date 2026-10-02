@@ -259,7 +259,7 @@ describe('domain reputation lists', () => {
 
 /**
  * `isMalformedHost` asks whether a TLD is *shaped* like one; this asks whether it exists. The distinction
- * earns its keep on names an attacker picks precisely because they look unremarkable — `.ldk` passes
+ * earns its keep on names an attacker picks precisely because they look unremarkable: `.ldk` passes
  * every structural test there is and has simply never been delegated to anyone.
  */
 describe('hasUnknownTld', () => {
@@ -361,7 +361,7 @@ describe('unwrapRedirects', () => {
 
   /**
    * Parameters are tried in a fixed order, so an unresolvable one early in that order must not end the
-   * search — otherwise adding `?q=//` is enough to hide the destination from every comparison that
+   * search; otherwise adding `?q=//` is enough to hide the destination from every comparison that
    * depends on it.
    */
   it('keeps looking past a decoy parameter that leads nowhere', () => {

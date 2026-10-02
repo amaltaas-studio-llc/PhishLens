@@ -1,6 +1,6 @@
 {
   "name": "legitimate-verification-code",
-  "description": "False-positive resistance for the most ordinary transactional mail there is: a one-time code being delivered. It contains the exact phrase an OTP phish contains, and the safety advice next to it names the code in the same words a request for one would — never share your verification code — which is what makes the negation load-bearing rather than incidental. From a domain no brand table contains and with no dampening available, so nothing but the rule's own precision keeps it low.",
+  "description": "False-positive resistance for the most ordinary transactional mail there is: a one-time code being delivered. It contains the exact phrase an OTP phish contains, and the safety advice next to it names the code in the same words a request for one would (\"never share your verification code\"), which is what makes the negation load-bearing rather than incidental. From a domain no brand table contains and with no dampening available, so nothing but the rule's own precision keeps it low.",
   "email": {
     "senderName": "Northwind Tools",
     "senderEmail": "notifications@northwind-tools.com",
