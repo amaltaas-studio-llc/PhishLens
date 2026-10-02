@@ -4,7 +4,7 @@
 
 <br>
 
-<a href="https://github.com/nilayk/PhishLens/releases/latest"><img alt="Download the latest release" src="https://img.shields.io/github/v/release/nilayk/PhishLens?label=download&color=6366f1&style=for-the-badge"></a>
+<a href="https://github.com/amaltaas-studio-llc/PhishLens/releases/latest"><img alt="Download the latest release" src="https://img.shields.io/github/v/release/amaltaas-studio-llc/PhishLens?label=download&color=6366f1&style=for-the-badge"></a>
 <img alt="Works in Chrome 120 and later" src="https://img.shields.io/badge/Chrome-120%2B-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white">
 <img alt="No network requests in the default configuration" src="https://img.shields.io/badge/uploads-none%20by%20default-3b1f8c?style=for-the-badge">
 <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-blue?style=for-the-badge"></a>
@@ -173,7 +173,7 @@ An extension that reads your email should be completely clear about what it does
 **You need:** Gmail in Chrome 120 or later on a computer. PhishLens does not run in the Gmail phone apps or
 in other email programs.
 
-1. Open the **[latest release](https://github.com/nilayk/PhishLens/releases/latest)** and, under
+1. Open the **[latest release](https://github.com/amaltaas-studio-llc/PhishLens/releases/latest)** and, under
    **Assets**, download `phishlens-<version>.zip`. (Not the **Source code** downloads.)
 2. Unzip it into a folder you will keep, for example `Documents\PhishLens`.
 3. Type `chrome://extensions` into Chrome's address bar and switch on **Developer mode** (top right).
@@ -206,7 +206,7 @@ npm run verify    # lint, typecheck, test, build, distribution check
 
 The [development guide](docs/DEVELOPMENT.md) covers the project layout, the UI harness and releases.
 Published downloads can lag behind the source on this page; check the
-[release notes](https://github.com/nilayk/PhishLens/releases) for the version you install.
+[release notes](https://github.com/amaltaas-studio-llc/PhishLens/releases) for the version you install.
 
 </details>
 
@@ -285,7 +285,7 @@ on the current tab.
 <br>
 
 The toolbar popup and the card can both produce a diagnostic report.
-[Open an issue](https://github.com/nilayk/PhishLens/issues) with your extension version, what you
+[Open an issue](https://github.com/amaltaas-studio-llc/PhishLens/issues) with your extension version, what you
 expected, and what you saw. Read anything you attach first and remove private details: message text,
 addresses, links, and screenshots of real mail.
 
