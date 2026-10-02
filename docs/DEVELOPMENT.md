@@ -275,6 +275,7 @@ no longer runs the next time the floor moves. Add an aggregate job with a stable
 - `npm run verify` must pass before a commit (lint, typecheck, test, build, `check:dist`).
 - Scoring numbers live in `src/analysis/scoring/config.ts`; Gmail selectors in `src/gmail/selectors.ts`.
 - New detection behaviour needs a fixture asserted in both directions.
-- Commit messages describe why, not what. Do not add co-author trailers.
+- Commit messages are a short subject and at most three lines of why; longer reasoning goes in the code,
+  `docs/`, or a fixture. Do not add co-author trailers.
 
 Invariants agents break most often are listed in [AGENTS.md](../AGENTS.md). Design history: [adr/](adr/).

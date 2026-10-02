@@ -158,7 +158,11 @@ The codebase holds a high standard here, and matching it is part of the task.
 
 - **Never add co-author trailers.** No `Co-authored-by: Cursor`, no agent attribution of any kind. A local
   `commit-msg` hook strips them; do not rely on it, and do not remove it.
-- Commit messages: a short imperative subject, then why the change was needed. Not a list of files.
+- Commit messages: a short imperative subject, then at most three lines on what was wrong and why
+  this fixes it. Not a list of files, not a tour of every scenario the change handles, not measurements.
+  Reasoning a future reader needs belongs where they will look for it: a comment beside the constraint,
+  `docs/DETECTION.md` for a rule's scope, an ADR for a rejected alternative, a fixture for an example.
+  A message is read once, in a log; those are read every time the code is.
 - Do not commit `dist/`, `harness/.build/`, or anything in `.gitignore`.
 - Do not push, tag, or open a pull request unless asked.
 
