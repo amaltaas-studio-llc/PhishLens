@@ -4,6 +4,7 @@
   "private": true,
   "description": "Explainable phishing, malware and social-engineering risk analysis for Gmail, as a Chrome extension.",
   "license": "MIT",
+  "author": "Amaltaas Studio LLC",
   "type": "module",
   "engines": {
     "node": ">=22.13.0"
