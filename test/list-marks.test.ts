@@ -14,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ListMarks } from '../src/content/list-marks.js';
 
-const MARK = '.phishlens-row-mark';
+const MARK = '.shoutphish-row-mark';
 
 /** An inbox of rows in Gmail's shape: the address in `email`, the display name in `name`. */
 function render(rows: { email: string; name: string }[]): void {
@@ -118,7 +118,7 @@ describe('marking inbox rows', () => {
     await settle();
 
     expect(marks()).toHaveLength(1);
-    expect(marks()[0]).toContain('PhishLens warning');
+    expect(marks()[0]).toContain('ShoutPhish warning');
   });
 
   it('stops looking for an account address that never arrives', async () => {
@@ -248,7 +248,7 @@ describe('marking inbox rows', () => {
     marker.stop();
 
     expect(marks()).toEqual([]);
-    expect(document.querySelectorAll('[data-phishlens-row]')).toHaveLength(0);
-    expect(document.querySelectorAll('[data-phishlens-mark]')).toHaveLength(0);
+    expect(document.querySelectorAll('[data-shoutphish-row]')).toHaveLength(0);
+    expect(document.querySelectorAll('[data-shoutphish-mark]')).toHaveLength(0);
   });
 });

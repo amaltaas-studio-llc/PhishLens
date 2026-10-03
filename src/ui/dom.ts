@@ -109,7 +109,7 @@ export function requireElement<T extends HTMLElement>(id: string, ctor: new () =
  * the page could not reach into our isolated world anyway.
  */
 export function createShadowHost(id: string, css: string): { host: HTMLElement; root: ShadowRoot } {
-  const host = el('div', { attrs: { id, 'data-phishlens': 'host' } });
+  const host = el('div', { attrs: { id, 'data-shoutphish': 'host' } });
   const root = host.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
   // Static CSS authored in this repository, never derived from email content.

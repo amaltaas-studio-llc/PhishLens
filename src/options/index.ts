@@ -29,7 +29,7 @@ import { withoutTrustedSender } from '../shared/trust.js';
 import type { Settings } from '../shared/types.js';
 import { el, requireElement } from '../ui/dom.js';
 
-declare const __PHISHLENS_VERSION__: string;
+declare const __SHOUTPHISH_VERSION__: string;
 
 const STATUS_MS = 1600;
 
@@ -63,7 +63,7 @@ class OptionsPage {
   #current: Settings = { ...DEFAULT_SETTINGS };
 
   async init(): Promise<void> {
-    this.#version.textContent = `Version ${typeof __PHISHLENS_VERSION__ === 'undefined' ? 'dev' : __PHISHLENS_VERSION__}`;
+    this.#version.textContent = `Version ${typeof __SHOUTPHISH_VERSION__ === 'undefined' ? 'dev' : __SHOUTPHISH_VERSION__}`;
 
     const settings = await requestSettings();
     // Access is checked before the first paint, since whether it is held is part of what the page has to
@@ -192,7 +192,7 @@ class OptionsPage {
           ? // Both fields can be filled in by hand, which looks complete and fails on every request:
             // the worker refuses to contact an address the user has not granted. Chrome alone would
             // not stop it: an ungranted request still leaves, as an ordinary cross-origin one.
-            'Press Connect to allow PhishLens to reach this address. Until then, nothing is sent to it.'
+            'Press Connect to allow ShoutPhish to reach this address. Until then, nothing is sent to it.'
           : settings.modelName === ''
             ? 'Choose a model. Press Connect to list what this server has loaded.'
             : '';
@@ -203,7 +203,7 @@ class OptionsPage {
     const normalized = normalizeBackendUrl(raw);
 
     if (raw !== '' && normalized === '') {
-      this.#backendError.textContent = 'Enter a full https:// URL, for example https://phishlens.example.com';
+      this.#backendError.textContent = 'Enter a full https:// URL, for example https://shoutphish.example.com';
       return;
     }
     await this.#save({ backendBaseUrl: normalized });
@@ -261,7 +261,7 @@ class OptionsPage {
       }
       if (!granted) {
         this.#serverError.textContent =
-          'Access to that address was declined, so PhishLens cannot reach the server.';
+          'Access to that address was declined, so ShoutPhish cannot reach the server.';
         return;
       }
       this.#grantedPattern = pattern;

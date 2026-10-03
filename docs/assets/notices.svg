@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The README's "What it notices" strip. Same column width, greys and indigo as steps.svg, and the same
+  reason for character references: an SVG is XML, so one mis-encoded punctuation byte replaces the image.
+  The "rn" is the hero banner's lookalike, and the file name is the double-extension case from the tests.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 838 222" width="838" height="222" role="img" aria-labelledby="notices-title notices-desc">
+  <title id="notices-title">What ShoutPhish notices</title>
+  <desc id="notices-desc">Four things ShoutPhish checks. The sender: lookalike addresses such as rnicrosoft
+    for microsoft, misleading display names, and replies that imitate someone already in the conversation.
+    The links: text that names one place while the destination is another, or a trusted name placed in front
+    of an unrelated address. The request: verification codes, payments, changed bank details or gift cards,
+    and pressure to act right now. The attachments: programs and disguised file types, judged from the file
+    name alone, without opening or downloading anything.</desc>
+
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+    .box { fill: #ffffff; stroke: #d0d7de; }
+    .stage { fill: #f5f7ff; stroke: #e0e7ff; }
+    .chip { fill: #ffffff; stroke: #c7d2fe; }
+    .t { fill: #1f2328; font-weight: 600; }
+    .s { fill: #656d76; }
+    .hit { fill: #b42318; font-weight: 700; }
+    .link { fill: #1a73e8; font-weight: 600; }
+    .doc { fill: none; stroke: #4f46e5; stroke-width: 1.3; stroke-linejoin: round; }
+    .num { fill: #ffffff; font-weight: 700; }
+    .cau { fill: #fef7e0; stroke: #fde293; }
+    .cau-t { fill: #8a5300; font-weight: 600; }
+
+    @media (prefers-color-scheme: dark) {
+      .box { fill: #161b22; stroke: #30363d; }
+      .stage { fill: #1b1a36; stroke: #2e2b5f; }
+      .chip { fill: #0d1117; stroke: #4f46e5; }
+      .t { fill: #e6edf3; }
+      .s { fill: #9198a1; }
+      .link { fill: #8ab4f8; }
+      .doc { stroke: #a5b4fc; }
+      .cau { fill: #3d3122; stroke: #5c4a2e; }
+      .cau-t { fill: #fdd663; }
+    }
+  </style>
+
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6366f1" />
+      <stop offset="1" stop-color="#3b1f8c" />
+    </linearGradient>
+  </defs>
+
+  <!-- 199px cards on a 213px stride, so the 1px strokes keep a 14px gap and stay inside 838. -->
+  <g>
+    <rect class="box" x="0.5" y="0.5" width="198" height="220" rx="14" />
+    <rect class="stage" x="12.5" y="12.5" width="174" height="78" rx="10" />
+    <circle cx="48" cy="52" r="15" fill="url(#tile)" />
+    <text class="num" x="48" y="57" font-size="14" text-anchor="middle">M</text>
+    <text x="70" y="47" font-size="12.5"><tspan class="hit">rn</tspan><tspan class="t">icrosoft.com</tspan></text>
+    <text class="s" x="70" y="66" font-size="11">named Microsoft</text>
+    <text class="t" x="16" y="116" font-size="14">The sender</text>
+    <text class="s" font-size="12.5">
+      <tspan x="16" y="140">Lookalikes, like rnicrosoft</tspan>
+      <tspan x="16" y="157">for microsoft. Misleading</tspan>
+      <tspan x="16" y="174">names, and replies that</tspan>
+      <tspan x="16" y="191">imitate someone you know.</tspan>
+    </text>
+  </g>
+
+  <g transform="translate(213 0)">
+    <rect class="box" x="0.5" y="0.5" width="198" height="220" rx="14" />
+    <rect class="stage" x="12.5" y="12.5" width="174" height="78" rx="10" />
+    <text class="link" x="99" y="44" font-size="15" text-anchor="middle" text-decoration="underline">Sign in</text>
+    <text class="hit" x="99" y="68" font-size="12" text-anchor="middle">other-domain.example</text>
+    <text class="t" x="16" y="116" font-size="14">The links</text>
+    <text class="s" font-size="12.5">
+      <tspan x="16" y="140">Text that names one place</tspan>
+      <tspan x="16" y="157">but leads somewhere else.</tspan>
+      <tspan x="16" y="174">Or a trusted name put in</tspan>
+      <tspan x="16" y="191">front of another address.</tspan>
+    </text>
+  </g>
+
+  <g transform="translate(426 0)">
+    <rect class="box" x="0.5" y="0.5" width="198" height="220" rx="14" />
+    <rect class="stage" x="12.5" y="12.5" width="174" height="78" rx="10" />
+    <rect class="cau" x="50.5" y="37.5" width="98" height="28" rx="14" />
+    <text class="cau-t" x="99.5" y="56" font-size="13" text-anchor="middle">Act now</text>
+    <text class="t" x="16" y="116" font-size="14">The request</text>
+    <text class="s" font-size="12.5">
+      <tspan x="16" y="140">Codes, payments, changed</tspan>
+      <tspan x="16" y="157">bank details, gift cards,</tspan>
+      <tspan x="16" y="174">and pressure to act</tspan>
+      <tspan x="16" y="191">right now.</tspan>
+    </text>
+  </g>
+
+  <g transform="translate(639 0)">
+    <rect class="box" x="0.5" y="0.5" width="198" height="220" rx="14" />
+    <rect class="stage" x="12.5" y="12.5" width="174" height="78" rx="10" />
+    <rect class="chip" x="22.5" y="36.5" width="154" height="30" rx="7" />
+    <path class="doc" d="M34 44 h8 l3 3 v12 h-11 z" />
+    <text x="52" y="56" font-size="12"><tspan class="t">invoice.pdf</tspan><tspan class="hit">.exe</tspan></text>
+    <text class="t" x="16" y="116" font-size="14">The attachments</text>
+    <text class="s" font-size="12.5">
+      <tspan x="16" y="140">Programs and disguised</tspan>
+      <tspan x="16" y="157">file types, judged from</tspan>
+      <tspan x="16" y="174">the name alone. Nothing</tspan>
+      <tspan x="16" y="191">is opened or downloaded.</tspan>
+    </text>
+  </g>
+</svg>

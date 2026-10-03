@@ -75,9 +75,9 @@ jobs:
           set -euo pipefail
           mkdir -p release
           cd dist
-          zip -qr "../release/phishlens-${{ steps.meta.outputs.version }}.zip" .
+          zip -qr "../release/shoutphish-${{ steps.meta.outputs.version }}.zip" .
           cd ..
-          unzip -l "release/phishlens-${{ steps.meta.outputs.version }}.zip"
+          unzip -l "release/shoutphish-${{ steps.meta.outputs.version }}.zip"
 
       # Commit subjects only. They lead with an imperative summary of why the change was needed, which is
       # already the sentence a reader of the release wants; the bodies are for someone reading the history,
@@ -101,9 +101,9 @@ jobs:
           cat >> release/notes.md <<'NOTES'
           ### Install
 
-          PhishLens is not on the Chrome Web Store. To install this build:
+          ShoutPhish is not on the Chrome Web Store. To install this build:
 
-          1. Download `phishlens-${{ steps.meta.outputs.version }}.zip` below and unzip it.
+          1. Download `shoutphish-${{ steps.meta.outputs.version }}.zip` below and unzip it.
           2. Open `chrome://extensions` and turn on **Developer mode**.
           3. Choose **Load unpacked** and select the unzipped folder.
           4. Open a message in Gmail. The risk score appears beside the sender's address.
@@ -112,7 +112,7 @@ jobs:
           the deterministic checks produce a full score without it. You can turn it on in the options to use
           Chrome's on-device model, where your Chrome provides one, or a model server you run yourself.
 
-          PhishLens is advisory. It does not block links, downloads or replies.
+          ShoutPhish is advisory. It does not block links, downloads or replies.
           NOTES
           cat release/notes.md
 
@@ -142,7 +142,7 @@ jobs:
           VERSION: ${{ needs.build.outputs.version }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
-            "release/phishlens-${VERSION}.zip" \
+            "release/shoutphish-${VERSION}.zip" \
             --repo "${{ github.repository }}" \
-            --title "PhishLens $GITHUB_REF_NAME" \
+            --title "ShoutPhish $GITHUB_REF_NAME" \
             --notes-file release/notes.md

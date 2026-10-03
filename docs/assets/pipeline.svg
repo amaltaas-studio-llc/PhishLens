@@ -8,7 +8,7 @@
   labels and 1px rules land between pixels. The accent is the indigo of the extension icon.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 838 330" width="838" height="330" role="img" aria-labelledby="pipeline-title pipeline-desc">
-  <title id="pipeline-title">How PhishLens analyses a message</title>
+  <title id="pipeline-title">How ShoutPhish analyses a message</title>
   <desc id="pipeline-desc">A message is read from the Gmail page, its fields are extracted, deterministic
     rules produce explainable signals, and those become a score from 0 to 100 shown as a badge and card.
     An optional on-device language model contributes at most 15 points and only when a technical check

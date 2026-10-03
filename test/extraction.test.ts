@@ -103,7 +103,7 @@ describe('what the card says when nothing was checked', () => {
 
   it('names a cause for every part, so a new one cannot ship unworded', () => {
     for (const part of parts) {
-      expect(unreadableNotes([part])[0]?.text).toContain('PhishLens could not read');
+      expect(unreadableNotes([part])[0]?.text).toContain('ShoutPhish could not read');
     }
 
     // Distinct wording per part, or the card would say the same thing about different failures.

@@ -4,7 +4,7 @@
  *
  * Uses headless Chrome's own `--screenshot` rather than Puppeteer or Playwright: this repository ships
  * zero runtime dependencies and keeps its dev tree small on purpose, and a browser automation stack is
- * a large amount of supply chain to own for eight PNGs. The cost is that each shot is a separate process
+ * a large amount of supply chain to own for a dozen PNGs. The cost is that each shot is a separate process
  * and the window size is the only cropping tool, which is why the harness has a `view=card` mode sized
  * to the card.
  *
@@ -21,7 +21,7 @@ import path from 'node:path';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = path.join(root, 'docs/assets');
-const base = process.env['PHISHLENS_HARNESS_URL'] ?? 'http://127.0.0.1:5199';
+const base = process.env['SHOUTPHISH_HARNESS_URL'] ?? 'http://127.0.0.1:5199';
 
 /**
  * Each shot names its own window size.
@@ -44,6 +44,14 @@ const SHOTS = [
     width: 838,
     height: 760,
     caption: 'badge in the header and the card open',
+  },
+  {
+    name: 'in-message-dark.png',
+    query: { fixture: 'microsoft-phish', semantic: 'ready', view: 'full', card: '1', bare: '1' },
+    width: 838,
+    height: 760,
+    dark: true,
+    caption: 'the same message in dark mode',
   },
   {
     name: 'card-light.png',
@@ -87,6 +95,14 @@ const SHOTS = [
     caption: 'the card when a message could not be read',
   },
   {
+    name: 'card-unreadable-dark.png',
+    query: { fixture: 'microsoft-phish', missing: 'sender', view: 'card', bare: '1' },
+    width: 404,
+    height: 520,
+    dark: true,
+    caption: 'the same unreadable card in dark mode',
+  },
+  {
     name: 'badges.png',
     query: { view: 'badges', semantic: 'ready', bare: '1' },
     width: 760,
@@ -95,12 +111,28 @@ const SHOTS = [
     caption: 'the badge at each risk level, and unable to read',
   },
   {
+    name: 'badges-dark.png',
+    query: { view: 'badges', semantic: 'ready', bare: '1' },
+    width: 760,
+    height: 336,
+    dark: true,
+    caption: 'the same badges in dark mode',
+  },
+  {
     name: 'inbox-list.png',
     query: { view: 'list', bare: '1' },
     width: 760,
     // The whole fixture corpus as one inbox, so the shot shows how few rows are marked as well as which.
     height: 830,
     caption: 'markers on inbox rows',
+  },
+  {
+    name: 'inbox-list-dark.png',
+    query: { view: 'list', bare: '1' },
+    width: 760,
+    height: 830,
+    dark: true,
+    caption: 'the same inbox in dark mode',
   },
 ];
 
@@ -146,7 +178,7 @@ function urlFor(shot) {
 }
 
 async function capture(chrome, shot) {
-  const profile = await mkdtemp(path.join(tmpdir(), 'phishlens-shot-'));
+  const profile = await mkdtemp(path.join(tmpdir(), 'shoutphish-shot-'));
   const target = path.join(outDir, shot.name);
 
   const args = [

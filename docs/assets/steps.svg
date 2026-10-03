@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The README's "How it works" strip. It follows pipeline.svg: 838 wide for GitHub's README column, the
+  same greys for each colour scheme, punctuation as character references so no editor's encoding can
+  corrupt it. The badges use the colours in src/ui/styles.ts, so the strip shows what a reader will see in
+  Gmail; change one and change the other. The lens and its "rn" are the hero banner's lookalike case.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 838 230" width="838" height="230" role="img" aria-labelledby="steps-title steps-desc">
+  <title id="steps-title">How ShoutPhish works, in three steps</title>
+  <desc id="steps-desc">One: open an email in Gmail as you always do; there is nothing to set up and
+    nothing to click. Two: ShoutPhish takes a second look at the sender, links, requests and attachment
+    names, all inside your browser. Three: a badge appears beside the sender. Green means few warning signs,
+    red means stop and check, and clicking it shows every reason.</desc>
+
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+    .box { fill: #ffffff; stroke: #d0d7de; }
+    .stage { fill: #f5f7ff; stroke: #e0e7ff; }
+    .sheet { fill: #ffffff; stroke: #6366f1; }
+    .fold { fill: none; stroke: #6366f1; }
+    .fold-soft { fill: none; stroke: #a5b4fc; }
+    .bar { fill: #dde3f7; }
+    .t { fill: #1f2328; font-weight: 600; }
+    .s { fill: #656d76; }
+    .num { fill: #ffffff; font-weight: 700; }
+    .arrow { stroke: #8c959f; fill: none; }
+    .head { fill: #8c959f; }
+    .low { fill: #e6f4ea; stroke: #ceead6; }
+    .low-t { fill: #137333; font-weight: 600; }
+    .high { fill: #b3261e; stroke: #8c1d18; }
+    .high-t { fill: #ffffff; font-weight: 600; }
+    .cursor { fill: #ffffff; stroke: #1f2328; }
+
+    @media (prefers-color-scheme: dark) {
+      .box { fill: #161b22; stroke: #30363d; }
+      .stage { fill: #1b1a36; stroke: #2e2b5f; }
+      .sheet { fill: #0d1117; stroke: #818cf8; }
+      .fold { stroke: #818cf8; }
+      .fold-soft { stroke: #4f46e5; }
+      .bar { fill: #34306b; }
+      .t { fill: #e6edf3; }
+      .s { fill: #9198a1; }
+      .arrow { stroke: #6e7681; }
+      .head { fill: #6e7681; }
+      .low { fill: #1e3a28; stroke: #2d5a3d; }
+      .low-t { fill: #81c995; }
+      .high { stroke: #d93025; }
+      .cursor { fill: #e6edf3; stroke: #0d1117; }
+    }
+  </style>
+
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6366f1" />
+      <stop offset="1" stop-color="#3b1f8c" />
+    </linearGradient>
+    <linearGradient id="rim-dark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6366f1" />
+      <stop offset="1" stop-color="#312e81" />
+    </linearGradient>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path class="head" d="M0 0 L10 5 L0 10 z" />
+    </marker>
+    <clipPath id="glass"><circle cx="146" cy="60" r="26" /></clipPath>
+  </defs>
+
+  <path class="arrow" d="M256.5 64.5 H284.5" marker-end="url(#a)" />
+  <path class="arrow" d="M552.5 64.5 H580.5" marker-end="url(#a)" />
+
+  <!-- Each card is drawn in its own 245-wide space; half-pixel offsets keep the 1px strokes on whole pixels. -->
+  <g>
+    <rect class="box" x="0.5" y="0.5" width="244" height="228" rx="14" />
+    <rect class="stage" x="12.5" y="12.5" width="220" height="104" rx="10" />
+    <rect class="sheet" x="78.5" y="38.5" width="88" height="56" rx="7" stroke-width="2" />
+    <path class="fold-soft" d="M81 91 L110 67 M164 91 L135 67" stroke-width="2" stroke-linecap="round" />
+    <path class="fold" d="M81 42 L122.5 71 L164 42" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+    <circle cx="166" cy="39" r="8" fill="url(#tile)" />
+
+    <circle cx="30" cy="145" r="12" fill="url(#tile)" />
+    <text class="num" x="30" y="150" font-size="13" text-anchor="middle">1</text>
+    <text class="t" x="50" y="150" font-size="15">Open an email</text>
+    <text class="s" font-size="12.5">
+      <tspan x="22" y="177">Use Gmail as you always do.</tspan>
+      <tspan x="22" y="195">There is nothing to set up</tspan>
+      <tspan x="22" y="213">and nothing to click.</tspan>
+    </text>
+  </g>
+
+  <g transform="translate(296 0)">
+    <rect class="box" x="0.5" y="0.5" width="244" height="228" rx="14" />
+    <rect class="stage" x="12.5" y="12.5" width="220" height="104" rx="10" />
+    <rect class="bar" x="36" y="36" width="96" height="8" rx="4" />
+    <rect class="bar" x="36" y="56" width="74" height="8" rx="4" />
+    <rect class="bar" x="36" y="76" width="88" height="8" rx="4" />
+    <rect class="bar" x="36" y="96" width="60" height="8" rx="4" />
+    <path d="M165 79 L186 100" stroke="#312e81" stroke-width="9" stroke-linecap="round" />
+    <path d="M165 79 L170 84" stroke="#6366f1" stroke-width="9" stroke-linecap="round" />
+    <g clip-path="url(#glass)">
+      <circle cx="146" cy="60" r="26" fill="#fff5f5" />
+      <text x="146" y="70" font-size="27" font-weight="700" text-anchor="middle" fill="#b42318">rn</text>
+    </g>
+    <circle cx="146" cy="60" r="26" fill="none" stroke="url(#rim-dark)" stroke-width="5" />
+    <circle cx="146" cy="60" r="23" fill="none" stroke="#ffffff" stroke-opacity="0.6" />
+
+    <circle cx="30" cy="145" r="12" fill="url(#tile)" />
+    <text class="num" x="30" y="150" font-size="13" text-anchor="middle">2</text>
+    <text class="t" x="50" y="150" font-size="15">It takes a second look</text>
+    <text class="s" font-size="12.5">
+      <tspan x="22" y="177">Sender, links, requests and</tspan>
+      <tspan x="22" y="195">attachment names, all checked</tspan>
+      <tspan x="22" y="213">inside your browser.</tspan>
+    </text>
+  </g>
+
+  <!--
+    textLength holds each badge label to its width in Segoe UI, as in hero.svg, so the padding inside the
+    pills survives a reader's system font being wider or narrower.
+  -->
+  <g transform="translate(592 0)">
+    <rect class="box" x="0.5" y="0.5" width="244" height="228" rx="14" />
+    <rect class="stage" x="12.5" y="12.5" width="220" height="104" rx="10" />
+    <rect class="low" x="44.5" y="28.5" width="156" height="28" rx="14" />
+    <text class="low-t" x="122.5" y="47" font-size="13" text-anchor="middle" textLength="122">&#10003; Low Risk &#183; 8/100</text>
+    <rect class="high" x="44.5" y="70.5" width="156" height="28" rx="14" />
+    <circle cx="62" cy="84.5" r="7" fill="#ffffff" />
+    <rect x="58" y="83" width="8" height="3" rx="1" fill="#b3261e" />
+    <text class="high-t" x="76" y="89" font-size="13" textLength="112">High Risk &#183; 76/100</text>
+    <path class="cursor" transform="translate(194 88)" d="M0 0 L0 17 L4.5 13 L7.5 20 L10.5 18.7 L7.5 12 L13 12 Z" stroke-width="1.2" stroke-linejoin="round" />
+
+    <circle cx="30" cy="145" r="12" fill="url(#tile)" />
+    <text class="num" x="30" y="150" font-size="13" text-anchor="middle">3</text>
+    <text class="t" x="50" y="150" font-size="15">A badge tells you</text>
+    <text class="s" font-size="12.5">
+      <tspan x="22" y="177">Green: few warning signs.</tspan>
+      <tspan x="22" y="195">Red: stop and check.</tspan>
+      <tspan x="22" y="213">Click it to see every reason.</tspan>
+    </text>
+  </g>
+</svg>

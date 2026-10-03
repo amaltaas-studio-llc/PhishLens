@@ -114,7 +114,7 @@ const FLOOR_ELIGIBLE_CATEGORIES: readonly SignalCategory[] = Object.freeze([
  * it, and it is *rendered conditionally on the folder being viewed*: Gmail annotates messages in the
  * spam folder in ways it does not in the inbox. A floor here made the headline verdict a function of
  * where the user happened to be looking rather than of the message, and would have let a manual "mark
- * as spam" turn into PhishLens confirming the user's own action.
+ * as spam" turn into ShoutPhish confirming the user's own action.
  */
 const FLOOR_EXCLUDED_SIGNAL_IDS: readonly string[] = Object.freeze(['authentication.gmail_warning']);
 

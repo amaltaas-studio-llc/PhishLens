@@ -17,7 +17,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
   trustedSenders: Object.freeze([]),
 });
 
-export const STORAGE_KEY = 'phishlens.settings.v1';
+export const STORAGE_KEY = 'shoutphish.settings.v1';
 
 type BooleanSettingKey = {
   [K in keyof Settings]: Settings[K] extends boolean ? K : never;

@@ -12,8 +12,8 @@
   the banner shows the same case the page then explains in full.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 400" width="1280" height="400" role="img" aria-labelledby="hero-title hero-desc">
-  <title id="hero-title">PhishLens: a second look before you click</title>
-  <desc id="hero-desc">The PhishLens banner. The logo, a magnifying lens scanning a fish, sits beside the
+  <title id="hero-title">ShoutPhish: a second look before you click</title>
+  <desc id="hero-desc">The ShoutPhish banner. The logo, a magnifying lens scanning a fish, sits beside the
     tagline. On the right a lens magnifies the letters r and n in a sender address pretending to be
     Microsoft, and a red High Risk badge scores the message 76 out of 100.</desc>
 
@@ -185,7 +185,7 @@
       <path d="M-0.4655 -0.2939 A0.36 0.36 0 0 1 -0.2564 -0.4807" fill="none" stroke="#ffffff" stroke-opacity="0.7" stroke-width="0.05" />
     </g>
   </g>
-  <text class="word" x="168" y="146" font-size="60">PhishLens</text>
+  <text class="word" x="168" y="146" font-size="60">ShoutPhish</text>
   <text class="tag" x="70" y="218" font-size="30">A second look before you click.</text>
 
   <!--
@@ -202,7 +202,7 @@
     <text class="chip-t" x="557" y="275" text-anchor="middle" textLength="132">Free &#183; open source</text>
   </g>
 
-  <!-- A Gmail-like sender line with the badge PhishLens adds. -->
+  <!-- A Gmail-like sender line with the badge ShoutPhish adds. -->
   <g filter="url(#shadow)">
     <rect class="card" x="700" y="90" width="510" height="220" rx="16" />
   </g>

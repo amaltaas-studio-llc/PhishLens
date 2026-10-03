@@ -12,7 +12,7 @@ import type { ExtensionResponse } from '../src/shared/messaging.js';
 import { DEFAULT_SETTINGS, STORAGE_KEY } from '../src/shared/settings.js';
 import type { Settings } from '../src/shared/types.js';
 
-const EXTENSION_ID = 'phishlens-test-id';
+const EXTENSION_ID = 'shoutphish-test-id';
 const EXTENSION_ORIGIN = `chrome-extension://${EXTENSION_ID}/`;
 const GMAIL_SENDER = { id: EXTENSION_ID, url: 'https://mail.google.com/mail/u/0/', tab: { id: 7 } };
 const OPTIONS_SENDER = { id: EXTENSION_ID, url: `${EXTENSION_ORIGIN}options.html`, tab: { id: 9 } };
@@ -180,7 +180,7 @@ describe('requests to a model server', () => {
 });
 
 describe('the toolbar badge', () => {
-  const appearance = { text: '62', background: '#d93025', textColor: '#ffffff', title: 'PhishLens: 62/100' };
+  const appearance = { text: '62', background: '#d93025', textColor: '#ffffff', title: 'ShoutPhish: 62/100' };
 
   it('paints only the tab that asked, whatever the message says', async () => {
     const response = await send({ type: 'SET_TOOLBAR_BADGE', ...appearance, tabId: 99 }, GMAIL_SENDER);

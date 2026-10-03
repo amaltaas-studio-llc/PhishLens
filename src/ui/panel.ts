@@ -11,7 +11,7 @@
  * The card reads top to bottom in the order a reader asks their questions: how bad (the ring and the
  * verdict), why (the findings, grouped by what they are about), what the model thought (kept apart),
  * and how the number was reached (the breakdown). Three kinds of text are drawn three ways so they
- * cannot be confused: PhishLens's own statements in plain prose, words from the email as quotations,
+ * cannot be confused: ShoutPhish's own statements in plain prose, words from the email as quotations,
  * and measured values (domains, destinations, filenames) as code.
  *
  * All geometry is in `PANEL_CSS`; this file positions nothing. See docs/adr/0008-no-ui-framework-shadow-dom.md.
@@ -61,7 +61,7 @@ import {
 } from './labels.js';
 import { PANEL_CSS } from './styles.js';
 
-const HOST_ID = 'phishlens-panel-host';
+const HOST_ID = 'shoutphish-panel-host';
 
 /** How often the running counter beside a pending reading is redrawn. */
 const ELAPSED_TICK_MS = 200;
@@ -94,7 +94,7 @@ const FOCUS_TARGETS = [
  */
 const TRUST_NOTES: Readonly<Record<Exclude<TrustState['kind'], 'none'>, (entry: string) => string>> = {
   offer: (entry) =>
-    `If you get mail from ${entry} often, PhishLens can weight down findings about its wording: only its wording, and only while Gmail can confirm a message really came from there. Links, attachments and identity are always scored in full, and nothing is ever hidden from this card.`,
+    `If you get mail from ${entry} often, ShoutPhish can weight down findings about its wording: only its wording, and only while Gmail can confirm a message really came from there. Links, attachments and identity are always scored in full, and nothing is ever hidden from this card.`,
   trusted: (entry) =>
     `You trust ${entry}, and Gmail confirmed this message came from there, so findings about its wording are weighted down. Anything found in its links, attachments, or identity is scored in full.`,
   unproven: (entry) =>
@@ -241,7 +241,7 @@ export class Panel {
     const scroll = el('div', { class: 'scroll' });
     const panel = el('div', {
       class: 'panel',
-      attrs: { role: 'dialog', 'aria-modal': 'false', 'aria-label': 'PhishLens security assessment' },
+      attrs: { role: 'dialog', 'aria-modal': 'false', 'aria-label': 'ShoutPhish security assessment' },
       children: [live, head, scroll],
     });
 
@@ -394,7 +394,7 @@ export class Panel {
     return el('div', {
       class: 'head-top',
       children: [
-        el('span', { class: 'brand', text: 'PhishLens' }),
+        el('span', { class: 'brand', text: 'ShoutPhish' }),
         el('button', {
           class: 'close',
           text: '×',
@@ -428,7 +428,7 @@ export class Panel {
   }
 
   // -------------------------------------------------------------------------
-  // What the checks found
+  // What ShoutPhish noticed
   // -------------------------------------------------------------------------
 
   /**
@@ -452,7 +452,7 @@ export class Panel {
     return el('section', {
       class: 'observed',
       children: [
-        el('h3', { class: 'section-title', text: 'What the checks found' }),
+        el('h3', { class: 'section-title', text: 'What ShoutPhish noticed' }),
         el('p', {
           class: 'section-note',
           // "Nothing of concern" is only true when the notes below are transparency: authentication
@@ -857,7 +857,7 @@ export class Panel {
       children: [
         timing === null ? null : el('span', { class: 'timing', text: timing }),
         el('span', {
-          text: 'Advisory only. PhishLens does not block links, downloads, or replies.',
+          text: 'Advisory only. ShoutPhish does not block links, downloads, or replies.',
         }),
       ],
     });
@@ -930,7 +930,7 @@ function renderRing(result: AnalysisResult): HTMLElement {
     arc((circumference * value) / 100, { class: 'seg', 'data-category': category });
   }
   const raised = result.score - addedUp(result);
-  if (raised > 0) arc((circumference * raised) / 100, { class: 'seg-floor', stroke: 'url(#phishlens-hatch)' });
+  if (raised > 0) arc((circumference * raised) / 100, { class: 'seg-floor', stroke: 'url(#shoutphish-hatch)' });
 
   return el('div', {
     class: 'ring',
@@ -947,7 +947,7 @@ function renderRing(result: AnalysisResult): HTMLElement {
             children: [
               svg('pattern', {
                 attrs: {
-                  id: 'phishlens-hatch',
+                  id: 'shoutphish-hatch',
                   width: 4,
                   height: 4,
                   patternUnits: 'userSpaceOnUse',

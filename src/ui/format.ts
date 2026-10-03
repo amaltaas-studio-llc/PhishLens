@@ -24,7 +24,7 @@ import { CATEGORY_LABELS, CLASSIFICATION_LABELS } from './labels.js';
 
 export function ariaLabel(classification: Classification, score: number, findings: number): string {
   const noun = findings === 1 ? 'finding' : 'findings';
-  return `PhishLens: ${CLASSIFICATION_LABELS[classification]}, ${String(score)} out of 100, ${String(findings)} ${noun}. Activate for details.`;
+  return `ShoutPhish: ${CLASSIFICATION_LABELS[classification]}, ${String(score)} out of 100, ${String(findings)} ${noun}. Activate for details.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -40,9 +40,9 @@ export function ariaLabel(classification: Classification, score: number, finding
  */
 const UNREADABLE_CAUSES: Readonly<Record<MessagePart, string>> = {
   sender:
-    'PhishLens could not read who this message is from. Most of what it checks (whether the sending domain imitates a brand, whether it matches the display name, whether it belongs in this conversation) depends on that, so it has not produced a score.',
-  body: 'PhishLens could not read the text of this message, so it has not checked its links, wording, or attachments.',
-  subject: 'PhishLens could not read the subject of this message.',
+    'ShoutPhish could not read who this message is from. Most of what it checks (whether the sending domain imitates a brand, whether it matches the display name, whether it belongs in this conversation) depends on that, so it has not produced a score.',
+  body: 'ShoutPhish could not read the text of this message, so it has not checked its links, wording, or attachments.',
+  subject: 'ShoutPhish could not read the subject of this message.',
 };
 
 /**
@@ -66,17 +66,17 @@ export interface UnreadableNote {
 export function unreadableNotes(missing: readonly MessagePart[]): UnreadableNote[] {
   const causes = missing.map((part) => UNREADABLE_CAUSES[part]);
   if (causes.length === 0) {
-    causes.push('PhishLens could not read this message, so it has not produced a score.');
+    causes.push('ShoutPhish could not read this message, so it has not produced a score.');
   }
 
   return [
     ...causes.map((text) => ({ text, emphatic: false })),
     {
-      text: 'This is not a judgement that the message is safe. Nothing was checked, so treat it with the caution you would use if PhishLens were not installed.',
+      text: 'This is not a judgement that the message is safe. Nothing was checked, so treat it with the caution you would use if ShoutPhish were not installed.',
       emphatic: true,
     },
     {
-      text: 'The usual cause is that Gmail changed the structure of its pages and PhishLens needs updating. The report below names the parts it could not find; it contains no part of your mail, and you can read it before sending it anywhere.',
+      text: 'The usual cause is that Gmail changed the structure of its pages and ShoutPhish needs updating. The report below names the parts it could not find; it contains no part of your mail, and you can read it before sending it anywhere.',
       emphatic: false,
     },
   ];
@@ -125,7 +125,7 @@ export function isLocatable(signal: SecuritySignal): boolean {
  * a signal carrying both a URL and a value showed the value under the heading for a link.
  *
  * The kind is what the card styles by, and the distinction is one a reader needs: `quote` is words the
- * sender wrote, while `value` and `url` are things PhishLens measured (a domain, a filename, where a
+ * sender wrote, while `value` and `url` are things ShoutPhish measured (a domain, a filename, where a
  * link actually goes) and are drawn as code so they are never mistaken for prose.
  */
 export interface Evidence {
@@ -244,7 +244,7 @@ export function formatDuration(ms: number): string {
  * The footer's account of how long this took, or `null` when there is nothing honest to say.
  *
  * Present so a slow card has an explanation the reader can see: the checks are milliseconds and the
- * model is seconds, and without the two numbers side by side every delay looks like PhishLens itself.
+ * model is seconds, and without the two numbers side by side every delay looks like ShoutPhish itself.
  */
 export function timingLine(
   timing: AnalysisTiming | null,

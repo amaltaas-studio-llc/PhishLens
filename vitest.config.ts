@@ -13,7 +13,7 @@ export default defineConfig({
     },
   },
   define: {
-    __PHISHLENS_DEV__: 'false',
-    __PHISHLENS_VERSION__: '"0.1.0-test"',
+    __SHOUTPHISH_DEV__: 'false',
+    __SHOUTPHISH_VERSION__: '"0.1.0-test"',
   },
 });

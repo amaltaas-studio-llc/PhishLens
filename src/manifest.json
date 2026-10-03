@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "PhishLens",
+  "name": "ShoutPhish",
   "version": "0.13.0",
   "description": "Explainable phishing and social-engineering risk analysis for Gmail.",
   "minimum_chrome_version": "120",
@@ -12,7 +12,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "PhishLens",
+    "default_title": "ShoutPhish",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",

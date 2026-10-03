@@ -17,7 +17,7 @@ export interface ToolbarBadgeAppearance {
   title: string;
 }
 
-const DEFAULT_TITLE = 'PhishLens';
+const DEFAULT_TITLE = 'ShoutPhish';
 
 /**
  * Solid colours matched to the in-mail badge bands. The toolbar only supports a flat fill, so these
@@ -43,7 +43,7 @@ const UNREADABLE: ToolbarBadgeAppearance = {
   text: '?',
   background: '#5f6368',
   textColor: '#ffffff',
-  title: 'PhishLens: Not checked',
+  title: 'ShoutPhish: Not checked',
 };
 
 /**
@@ -69,7 +69,7 @@ export function toolbarBadgeAppearance(
         text: String(status.score),
         background: band.background,
         textColor: band.textColor,
-        title: `PhishLens: ${band.label} ${String(status.score)}/100`,
+        title: `ShoutPhish: ${band.label} ${String(status.score)}/100`,
       };
     }
   }

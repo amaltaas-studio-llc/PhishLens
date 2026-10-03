@@ -159,7 +159,7 @@ describe('legitimate email', () => {
   /**
    * Those two transparency signals are why a count of findings cannot be a count of signals. Ordinary
    * authenticated mail carries both, so counting every signal told a reader with a clean inbox that
-   * PhishLens had found something, on the surface most likely to be read alone. The badge counted
+   * ShoutPhish had found something, on the surface most likely to be read alone. The badge counted
    * correctly and the popup did not, which is how the disagreement was noticed.
    */
   it('counts none of its transparency signals as findings', () => {

@@ -263,7 +263,7 @@ describe('reportRow', () => {
 
   it('describes the session instead when no message has been scored', () => {
     const row = reportRow({ kind: 'no-message' });
-    expect(row?.note).toMatch(/how PhishLens has been reading this tab/i);
+    expect(row?.note).toMatch(/how ShoutPhish has been reading this tab/i);
     expect(row?.note).toMatch(/open a message first/i);
   });
 

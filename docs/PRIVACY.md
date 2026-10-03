@@ -10,7 +10,7 @@ for.
 
 | Manifest entry | Why it is needed |
 | --- | --- |
-| `"host_permissions": ["https://mail.google.com/*"]` | The content script reads the open message from the page in order to analyse it. This is the only origin PhishLens can run on. |
+| `"host_permissions": ["https://mail.google.com/*"]` | The content script reads the open message from the page in order to analyse it. This is the only origin ShoutPhish can run on. |
 | `"permissions": ["storage"]` | Persists the options-page settings (AI mode, backend URL, model server address and model name, the display toggles, whether AI runs only on flagged mail) and the trust list. No message content is ever written to storage. |
 | `"optional_host_permissions": ["http://localhost/*", "http://127.0.0.1/*", "https://*/*"]` | **Not granted at install.** If you configure your own model server, the options page requests access to that single origin on a click, and revokes it when the address changes. Chrome names the origin in the prompt. |
 
@@ -142,9 +142,9 @@ cannot change the classification of a message that failed a technical check. See
 
 ### Malicious external URLs
 
-PhishLens never dereferences anything found in a message: no `fetch`, no prefetch, no favicon, no DNS, no
+ShoutPhish never dereferences anything found in a message: no `fetch`, no prefetch, no favicon, no DNS, no
 attachment download or inspection. Analysis is purely textual, so a URL in an email cannot become a
-request that leaks the fact the message was opened, and a malicious server never sees PhishLens at all.
+request that leaks the fact the message was opened, and a malicious server never sees ShoutPhish at all.
 
 ### Extension permission abuse
 
@@ -183,7 +183,7 @@ local part, filenames, full URLs and message ids removed. Message bodies are nev
 logged in a release build. There is no telemetry, no analytics, no error reporting, and no update channel
 beyond Chrome's own.
 
-### What PhishLens does not defend against
+### What ShoutPhish does not defend against
 
 It is a reading aid, not a control. It does not stop anyone clicking a link, opening an attachment, or
 replying. It cannot detect a phishing message that is textually indistinguishable from legitimate mail. A

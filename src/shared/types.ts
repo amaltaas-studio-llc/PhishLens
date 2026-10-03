@@ -1,5 +1,5 @@
 /**
- * The shared vocabulary of PhishLens.
+ * The shared vocabulary of ShoutPhish.
  *
  * Nothing in this file may import from `chrome`, the DOM, or Gmail. These types are the contract
  * between the mail adapter (which knows about Gmail) and the analysis engine (which must not).

@@ -68,7 +68,7 @@ export function headline(state: PopupState): Headline {
         label: 'Nothing to check here',
         score: '',
         tone: 'idle',
-        note: 'PhishLens only runs on Gmail. Open a message there and its assessment appears here.',
+        note: 'ShoutPhish only runs on Gmail. Open a message there and its assessment appears here.',
       };
     case 'unreachable':
       // Gmail is open and nothing answered, which happens when the extension is reloaded or updated
@@ -79,7 +79,7 @@ export function headline(state: PopupState): Headline {
         label: 'Not running in this tab',
         score: '',
         tone: 'unknown',
-        note: 'This tab was open before PhishLens started or was updated. Reload it and messages will be checked again.',
+        note: 'This tab was open before ShoutPhish started or was updated. Reload it and messages will be checked again.',
       };
     case 'no-message':
       return {
@@ -87,7 +87,7 @@ export function headline(state: PopupState): Headline {
         label: 'No message open',
         score: '',
         tone: 'idle',
-        note: 'Open a message and PhishLens checks it as it loads.',
+        note: 'Open a message and ShoutPhish checks it as it loads.',
       };
     case 'pending':
       return {
@@ -105,7 +105,7 @@ export function headline(state: PopupState): Headline {
         tone: 'unknown',
         // Says outright that this is not an all-clear. The badge and card carry the same sentence, and
         // this is the surface most likely to be read on its own.
-        note: `PhishLens could not read ${describeParts(state.missing)}, so it has not scored it. That is not a judgement that the message is safe.`,
+        note: `ShoutPhish could not read ${describeParts(state.missing)}, so it has not scored it. That is not a judgement that the message is safe.`,
       };
     case 'scored':
       return {
@@ -195,7 +195,7 @@ export function healthRow(health: TabHealth): HealthRow | null {
     return {
       headline: 'A Gmail change may soon break some checks',
       detail:
-        'Everything is being checked normally today, but Gmail has moved part of its page and PhishLens is reading it a backup way. Copying the report below into an issue gets it fixed before anything stops working. It contains none of your mail.',
+        'Everything is being checked normally today, but Gmail has moved part of its page and ShoutPhish is reading it a backup way. Copying the report below into an issue gets it fixed before anything stops working. It contains none of your mail.',
     };
   }
 
@@ -235,7 +235,7 @@ export function reportRow(state: PopupState): ReportRow | null {
   }
   return {
     label,
-    note: 'Describes how PhishLens has been reading this tab, with none of your mail in it. Open a message first if you want to report a score.',
+    note: 'Describes how ShoutPhish has been reading this tab, with none of your mail in it. Open a message first if you want to report a score.',
   };
 }
 
@@ -334,7 +334,7 @@ function fixFor(status: SemanticStatus, aiMode: AiMode): string | null {
       ? // `unavailable` covers a model not yet downloaded, a switched-off setting and an ineligible
         // device, which Chrome does not distinguish, so the advice names the page that sorts them out.
         'Chrome’s built-in model is not ready: it may need downloading or switching on. Settings links to the setup steps. Technical checks are unaffected.'
-      : 'PhishLens could not reach it. Test the connection to see why.';
+      : 'ShoutPhish could not reach it. Test the connection to see why.';
   }
   if (aiMode === 'server' && (status === 'no-output' || status === 'error')) {
     return 'Test the connection to see what the server reports.';

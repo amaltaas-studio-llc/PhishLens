@@ -1,5 +1,5 @@
 /**
- * The names PhishLens gives things on screen.
+ * The names ShoutPhish gives things on screen.
  *
  * Separate from `format.ts` for one structural reason: this file imports nothing but types, so a surface
  * that needs only the vocabulary (the popup) does not pull in domain parsing and the IANA table behind
@@ -59,4 +59,4 @@ export const UNREADABLE_LABEL = 'Not checked';
 export const UNREADABLE_GLYPH = '?';
 
 export const UNREADABLE_ARIA =
-  'PhishLens could not read this message and has not checked it. Activate for details.';
+  'ShoutPhish could not read this message and has not checked it. Activate for details.';

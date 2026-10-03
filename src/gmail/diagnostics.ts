@@ -3,7 +3,7 @@
  *
  * This is the project's substitute for telemetry. Nothing here phones home (the extension makes no
  * network call of its own volition, see docs/PRIVACY.md), so the only way a broken selector becomes known
- * is that the person in front of it can say something useful about it. "PhishLens stopped working" is
+ * is that the person in front of it can say something useful about it. "ShoutPhish stopped working" is
  * not actionable; a list naming which selector groups matched is, because it points at the exact
  * candidate list in `selectors.ts` that needs a new entry.
  *
@@ -108,7 +108,7 @@ export interface DiagnosticInput {
  */
 export function formatDiagnostic(input: DiagnosticInput): string {
   const lines = [
-    `PhishLens ${input.version}: extraction diagnostic`,
+    `ShoutPhish ${input.version}: extraction diagnostic`,
     `adapter:  ${input.adapter}`,
     `browser:  ${input.browser}`,
     `missing:  ${input.missing.length > 0 ? input.missing.join(', ') : 'nothing'}`,
@@ -180,7 +180,7 @@ export interface ScoringSummary {
   floorPoints: number;
   /**
    * How long the checks and the model took. Durations only: they say how slow this machine and model
-   * are, which is what a "PhishLens is slow" report needs and nothing about the mail.
+   * are, which is what a "ShoutPhish is slow" report needs and nothing about the mail.
    */
   timing: AnalysisTiming | null;
 }
@@ -267,7 +267,7 @@ export function formatHealth(input: HealthInput): string {
       : 'none';
 
   const lines = [
-    `PhishLens ${input.version}: session diagnostic`,
+    `ShoutPhish ${input.version}: session diagnostic`,
     `adapter:     ${input.adapter}`,
     `browser:     ${input.browser}`,
     `messages:    ${String(health.seen)}`,

@@ -153,7 +153,7 @@ export type TabRequest = GetTabStatusRequest | OpenPanelRequest | GetHealthRepor
  *
  * `headlines` carries finding *titles* (the extension's own wording, not message content), so the
  * popup can say what was found without re-deriving anything. The sender and subject are deliberately
- * absent: the popup is about whether PhishLens is working, and copying mail into a second surface buys
+ * absent: the popup is about whether ShoutPhish is working, and copying mail into a second surface buys
  * nothing when the card beside the message already names it.
  */
 export type TabStatus =

@@ -83,7 +83,7 @@ function show(result: AnalysisResult, email: EmailMessage, semantic: SemanticSta
     trust: { kind: 'none' },
   };
   panel.open(view);
-  const root = document.querySelector('#phishlens-panel-host')?.shadowRoot;
+  const root = document.querySelector('#shoutphish-panel-host')?.shadowRoot;
   if (root === null || root === undefined) throw new Error('the card did not render');
   return root;
 }
@@ -182,7 +182,7 @@ describe('the card across repaints', () => {
   }
 
   function rootOf(): ShadowRoot {
-    const root = document.querySelector('#phishlens-panel-host')?.shadowRoot;
+    const root = document.querySelector('#shoutphish-panel-host')?.shadowRoot;
     if (root === null || root === undefined) throw new Error('the card did not render');
     return root;
   }

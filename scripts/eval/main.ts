@@ -77,7 +77,7 @@ function parseArgs(argv: string[]): Options {
   if (options.inputs.length === 0) fail('usage: npm run eval -- [--since date] [--limit n] [--group name] [--rows dir] <path>...');
   if (Number.isNaN(options.since) || !(options.limit > 0)) fail('--since needs a date and --limit a positive number');
   if (options.rows !== undefined) {
-    const repo = process.env['PHISHLENS_REPO_ROOT'];
+    const repo = process.env['SHOUTPHISH_REPO_ROOT'];
     if (repo === undefined) fail('run through `npm run eval`, which locates the repository');
     const relative = path.relative(repo, options.rows);
     if (!relative.startsWith('..') && !path.isAbsolute(relative)) {

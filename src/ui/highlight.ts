@@ -24,9 +24,9 @@ import { normalizeDomain, parseUrl, unwrapRedirects } from '../shared/url.js';
 import { MIN_LOCATABLE_TEXT } from './format.js';
 import { HIGHLIGHT_CSS } from './styles.js';
 
-const HIGHLIGHT_CLASS = 'phishlens-highlight';
-const SUBTLE_CLASS = 'phishlens-highlight-subtle';
-const STYLE_ID = 'phishlens-highlight-style';
+const HIGHLIGHT_CLASS = 'shoutphish-highlight';
+const SUBTLE_CLASS = 'shoutphish-highlight-subtle';
+const STYLE_ID = 'shoutphish-highlight-style';
 
 /**
  * Bounds on one text search, which runs on every hover and focus of a finding.
@@ -45,8 +45,8 @@ export class Highlighter {
   /**
    * Injects the highlight stylesheet into the main document.
    *
-   * This is the only stylesheet PhishLens adds outside a shadow root, and it is necessary because the
-   * highlighted elements are Gmail's. Its selectors are namespaced under `.phishlens-` so they cannot
+   * This is the only stylesheet ShoutPhish adds outside a shadow root, and it is necessary because the
+   * highlighted elements are Gmail's. Its selectors are namespaced under `.shoutphish-` so they cannot
    * match anything Gmail styles.
    */
   #ensureStyle(): void {

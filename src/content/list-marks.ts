@@ -27,7 +27,7 @@ import { logger } from '../shared/logger.js';
 import { el } from '../ui/dom.js';
 
 /** Marks the row was computed for, so a recycled row is re-evaluated rather than trusted. */
-const MARKED_FOR = 'data-phishlens-row';
+const MARKED_FOR = 'data-shoutphish-row';
 /**
  * What the last pass concluded about the row: a severity, or `none`.
  *
@@ -36,8 +36,8 @@ const MARKED_FOR = 'data-phishlens-row';
  * opening a marked message and coming back left the row's key intact with its mark gone: skipped on every
  * later pass, and a warning silently absent from exactly the row a reader had just been told to distrust.
  */
-const MARK_STATE = 'data-phishlens-mark';
-const MARK_CLASS = 'phishlens-row-mark';
+const MARK_STATE = 'data-shoutphish-mark';
+const MARK_CLASS = 'shoutphish-row-mark';
 
 /**
  * Bounds one pass. Gmail renders about 50 rows per page and never thousands, so this is a guard against
@@ -299,9 +299,9 @@ function addMark(row: Element, verdict: TriageVerdict): boolean {
     attrs: {
       // The finding's own wording, as the tooltip. It comes from a message, so it arrives as text and is
       // set as an attribute value, never parsed.
-      title: `PhishLens: ${verdict.title}. This message has not been opened or fully checked.`,
-      'aria-label': `PhishLens warning: ${verdict.title}`,
-      'data-phishlens-severity': verdict.severity,
+      title: `ShoutPhish: ${verdict.title}. This message has not been opened or fully checked.`,
+      'aria-label': `ShoutPhish warning: ${verdict.title}`,
+      'data-shoutphish-severity': verdict.severity,
       role: 'img',
     },
     style: {

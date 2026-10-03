@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The README's badge legend. Pill colours are the ones in src/ui/styles.ts, glyphs the ones in
+  src/ui/labels.ts, so this strip and the badge beside a sender cannot drift apart. The high-risk mark is
+  drawn rather than written: the no-entry character is a colour emoji, and a colour emoji will not take
+  the white the pill needs. Labels are centred in a fixed pill, so a reader's font being slightly wider
+  still lands inside it.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 838 280" width="838" height="280" role="img" aria-labelledby="levels-title levels-desc">
+  <title id="levels-title">What each ShoutPhish badge means</title>
+  <desc id="levels-desc">Low Risk, scores 0 to 24: few or no warning signs. Not a guarantee, so stay as
+    careful as you normally would. Caution, 25 to 49: some details deserve a closer look. Open the badge to
+    see which. Suspicious, 50 to 74: significant warning signs. Check the request through a contact or
+    website you already know. High Risk, 75 to 100: strong warning signs. Do not use the message's links or
+    attachments to follow up. Not checked, no score: ShoutPhish could not read enough of the message to
+    judge it. This is not a sign that it is safe.</desc>
+
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+    .box { fill: #ffffff; stroke: #d0d7de; }
+    .t { fill: #1f2328; font-weight: 600; }
+    .s { fill: #656d76; }
+    .low { fill: #e6f4ea; stroke: #ceead6; }
+    .low-t { fill: #137333; font-weight: 600; }
+    .cau { fill: #fef7e0; stroke: #fde293; }
+    .cau-t { fill: #8a5300; font-weight: 600; }
+    .sus { fill: #fce8e6; stroke: #f9d2cf; }
+    .sus-t { fill: #b3261e; font-weight: 600; }
+    .high { fill: #b3261e; stroke: #8c1d18; }
+    .high-t { fill: #ffffff; font-weight: 600; }
+    .none { fill: #ffffff; stroke: #9aa0a6; stroke-dasharray: 4 3; }
+    .none-t { fill: #5f6368; font-weight: 600; }
+
+    @media (prefers-color-scheme: dark) {
+      .box { fill: #161b22; stroke: #30363d; }
+      .t { fill: #e6edf3; }
+      .s { fill: #9198a1; }
+      .low { fill: #1e3a28; stroke: #2d5a3d; }
+      .low-t { fill: #81c995; }
+      .cau { fill: #3d3122; stroke: #5c4a2e; }
+      .cau-t { fill: #fdd663; }
+      .sus { fill: #452420; stroke: #6b322c; }
+      .sus-t { fill: #f28b82; }
+      .high { stroke: #d93025; }
+      .none { fill: #202124; stroke: #5f6368; }
+      .none-t { fill: #9aa0a6; }
+    }
+  </style>
+
+  <rect class="box" x="0.5" y="0.5" width="837" height="279" rx="14" />
+
+  <g font-size="13">
+    <rect class="low" x="20.5" y="16.5" width="156" height="30" rx="15" />
+    <text class="low-t" x="98.5" y="36" text-anchor="middle">&#10003; Low Risk</text>
+    <text class="t" x="196" y="36">0&#8211;24</text>
+    <text class="s" x="268" y="36">Few or no warning signs. Not a guarantee: stay as careful as you normally would.</text>
+
+    <rect class="cau" x="20.5" y="70.5" width="156" height="30" rx="15" />
+    <text class="cau-t" x="98.5" y="90" text-anchor="middle">! Caution</text>
+    <text class="t" x="196" y="90">25&#8211;49</text>
+    <text class="s" x="268" y="90">Some details deserve a closer look. Open the badge to see which.</text>
+
+    <rect class="sus" x="20.5" y="124.5" width="156" height="30" rx="15" />
+    <text class="sus-t" x="98.5" y="144" text-anchor="middle">&#9888; Suspicious</text>
+    <text class="t" x="196" y="144">50&#8211;74</text>
+    <text class="s" x="268" y="144">Significant warning signs. Check through a contact or website you already know.</text>
+
+    <rect class="high" x="20.5" y="178.5" width="156" height="30" rx="15" />
+    <circle cx="48" cy="193.5" r="7" fill="#ffffff" />
+    <rect x="44" y="192" width="8" height="3" rx="1" fill="#b3261e" />
+    <text class="high-t" x="108" y="198" text-anchor="middle">High Risk</text>
+    <text class="t" x="196" y="198">75&#8211;100</text>
+    <text class="s" x="268" y="198">Strong warning signs. Do not use the message's links or attachments.</text>
+
+    <rect class="none" x="20.5" y="232.5" width="156" height="30" rx="15" />
+    <text class="none-t" x="98.5" y="252" text-anchor="middle">? Not checked</text>
+    <text class="t" x="196" y="252">None</text>
+    <text class="s" x="268" y="252">Not enough of the message could be read. This is not a sign that it is safe.</text>
+  </g>
+</svg>

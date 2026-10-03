@@ -1,17 +1,17 @@
 /**
  * The only sanctioned logging surface in the extension. Two structural guarantees:
  *
- *  1. Every method is a no-op unless `__PHISHLENS_DEV__` is true. esbuild replaces that flag with the
+ *  1. Every method is a no-op unless `__SHOUTPHISH_DEV__` is true. esbuild replaces that flag with the
  *     literal `false` in production, so the calls and their arguments are dropped from the bundle.
  *  2. `scrub()` removes anything resembling message content, so even a dev build cannot print an email
  *     body to the console.
  */
 
-declare const __PHISHLENS_DEV__: boolean;
+declare const __SHOUTPHISH_DEV__: boolean;
 
-const DEV = typeof __PHISHLENS_DEV__ === 'undefined' ? false : __PHISHLENS_DEV__;
+const DEV = typeof __SHOUTPHISH_DEV__ === 'undefined' ? false : __SHOUTPHISH_DEV__;
 
-const PREFIX = '[PhishLens]';
+const PREFIX = '[ShoutPhish]';
 
 /** Anything longer than this is assumed to be message content and is not logged verbatim. */
 const MAX_LOGGABLE_STRING = 120;

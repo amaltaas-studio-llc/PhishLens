@@ -23,7 +23,7 @@ export interface Guidance {
 }
 
 const WITHOUT_IT =
-  'PhishLens works fully without it: every technical check still runs, and the card says the AI was not used.';
+  'ShoutPhish works fully without it: every technical check still runs, and the card says the AI was not used.';
 
 const INTERNALS = 'Chrome’s own status page, chrome://on-device-internals, shows the model’s state in detail.';
 
@@ -32,7 +32,7 @@ export function onDeviceGuidance(state: OnDeviceModelState): Guidance {
     case 'available':
       return {
         tone: 'ready',
-        headline: 'Chrome’s on-device model is ready. PhishLens will use it, and nothing leaves this device.',
+        headline: 'Chrome’s on-device model is ready. ShoutPhish will use it, and nothing leaves this device.',
         steps: [],
       };
     /*
@@ -57,7 +57,7 @@ export function onDeviceGuidance(state: OnDeviceModelState): Guidance {
         headline: 'This device can run Chrome’s on-device model, but it has not been downloaded yet.',
         steps: [
           'The download is several gigabytes and needs an unmetered connection.',
-          'PhishLens never starts it from Gmail, only from this button.',
+          'ShoutPhish never starts it from Gmail, only from this button.',
         ],
         note: WITHOUT_IT,
         action: 'download',

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>PhishLens settings</title>
+    <title>ShoutPhish settings</title>
     <style>
       :root {
         color-scheme: light dark;
@@ -241,9 +241,9 @@
   </head>
   <body>
     <main>
-      <h1>PhishLens</h1>
+      <h1>ShoutPhish</h1>
       <p class="sub">
-        Explainable phishing and social-engineering analysis for Gmail. Advisory only: PhishLens never
+        Explainable phishing and social-engineering analysis for Gmail. Advisory only: ShoutPhish never
         blocks links, downloads, or replies.
       </p>
 
@@ -356,13 +356,13 @@
         <div id="backendField" hidden>
           <label for="backendBaseUrl" class="option-title">Backend base URL</label>
           <p class="hint">
-            Must be <code>https://</code>. PhishLens only ever talks to this backend, never directly to
+            Must be <code>https://</code>. ShoutPhish only ever talks to this backend, never directly to
             a model vendor, and carries no API key.
           </p>
           <input
             type="url"
             id="backendBaseUrl"
-            placeholder="https://phishlens.example.com"
+            placeholder="https://shoutphish.example.com"
             spellcheck="false"
             autocomplete="off"
             aria-describedby="backendError"
@@ -385,7 +385,7 @@
 
       <h2>Trusted senders</h2>
       <p class="hint">
-        Senders you have told PhishLens you get mail from often, from the assessment card. For these,
+        Senders you have told ShoutPhish you get mail from often, from the assessment card. For these,
         findings about a message's <em>wording</em> are weighted down, and only while Gmail can confirm
         the message really came from there. Findings about links, attachments, and who the sender is are
         never affected, and nothing is ever hidden from the card.
@@ -443,7 +443,7 @@
             <td><code>host_permissions: https://mail.google.com/*</code></td>
             <td>
               Read the open message from the page in order to analyse it. This is the only site
-              PhishLens can run on.
+              ShoutPhish can run on.
             </td>
           </tr>
           <tr>
@@ -474,7 +474,7 @@
       </p>
 
       <footer>
-        <span id="version"></span> · <a href="welcome.html">What PhishLens does</a>
+        <span id="version"></span> · <a href="welcome.html">What ShoutPhish does</a>
       </footer>
     </main>
 

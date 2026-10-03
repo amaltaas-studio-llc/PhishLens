@@ -31,10 +31,10 @@ import {
 } from './scoring/aggregate.js';
 import { DEFAULT_SCORING_CONFIG, type ScoringConfig } from './scoring/config.js';
 
-declare const __PHISHLENS_VERSION__: string;
+declare const __SHOUTPHISH_VERSION__: string;
 
 export const ENGINE_VERSION =
-  typeof __PHISHLENS_VERSION__ === 'undefined' ? '0.0.0-dev' : __PHISHLENS_VERSION__;
+  typeof __SHOUTPHISH_VERSION__ === 'undefined' ? '0.0.0-dev' : __SHOUTPHISH_VERSION__;
 
 export interface DeterministicOptions {
   config?: ScoringConfig;
@@ -230,7 +230,7 @@ export function assessmentSignals(result: AnalysisResult): SecuritySignal[] {
  *
  * Not every signal, because the engine also emits observations that exist for transparency and never
  * contributed anything (`authentication.passed` is on nearly every legitimate message), and counting
- * those tells someone with a clean inbox that PhishLens found one thing on mail where it found nothing.
+ * those tells someone with a clean inbox that ShoutPhish found one thing on mail where it found nothing.
  * That is the reassuring surface being wrong, which is the direction this project cares most about.
  *
  * Dampened findings count despite scoring zero: something *was* found and then softened because a

@@ -245,7 +245,7 @@ describe('normalizeModelName', () => {
 
 describe('normalizeBackendUrl', () => {
   it('keeps an https origin and path prefix', () => {
-    expect(normalizeBackendUrl('https://phishlens.example.com')).toBe('https://phishlens.example.com');
+    expect(normalizeBackendUrl('https://shoutphish.example.com')).toBe('https://shoutphish.example.com');
     expect(normalizeBackendUrl('https://example.com/api/v1')).toBe('https://example.com/api/v1');
     expect(normalizeBackendUrl('  https://example.com/  ')).toBe('https://example.com');
   });

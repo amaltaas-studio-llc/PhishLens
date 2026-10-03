@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * PhishLens build.
+ * ShoutPhish build.
  *
  * esbuild is used instead of Vite because the five entry points do not share one output contract (the
  * content script must be IIFE; the worker and the options, popup and welcome pages are ESM), and because
@@ -51,8 +51,8 @@ const common = {
   legalComments: 'none',
   logLevel: 'info',
   define: {
-    __PHISHLENS_DEV__: dev ? 'true' : 'false',
-    __PHISHLENS_VERSION__: JSON.stringify(pkg.version),
+    __SHOUTPHISH_DEV__: dev ? 'true' : 'false',
+    __SHOUTPHISH_VERSION__: JSON.stringify(pkg.version),
   },
 };
 
@@ -131,9 +131,9 @@ if (watch) {
   const contexts = await Promise.all(targets.map((t) => esbuild.context(t)));
   await Promise.all(contexts.map((c) => c.watch()));
   await copyStatic();
-  console.log(`\nPhishLens dev build watching. Load dist/ as an unpacked extension.\n`);
+  console.log(`\nShoutPhish dev build watching. Load dist/ as an unpacked extension.\n`);
 } else {
   await Promise.all(targets.map((t) => esbuild.build(t)));
   await copyStatic();
-  console.log(`\nPhishLens ${pkg.version} built to dist/ (${dev ? 'dev' : 'production'}).\n`);
+  console.log(`\nShoutPhish ${pkg.version} built to dist/ (${dev ? 'dev' : 'production'}).\n`);
 }

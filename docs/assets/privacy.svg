@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The README's privacy summary. One row per promise, in the same panel and indigo as the other README
+  diagrams. The icons are drawn, not emoji, so they stay one colour in both themes. Punctuation is written
+  as character references: an SVG is XML, and one mis-encoded byte replaces the whole image.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 838 342" width="838" height="342" role="img" aria-labelledby="privacy-title privacy-desc">
+  <title id="privacy-title">What ShoutPhish does with your mail</title>
+  <desc id="privacy-desc">Five promises. Nothing is uploaded: messages are analysed inside your browser, and
+    out of the box ShoutPhish makes no network requests. No account, analytics or tracking: there is no
+    ShoutPhish server and nothing that records what you read. No copy of your mail is kept: message content
+    is never saved to disk; results live in memory until you close the tab, and only settings and trusted
+    senders are saved. Nothing in a message is opened: ShoutPhish never visits links, loads images or opens
+    attachments; it reads the text and file names Gmail already shows you. Just two permissions: access to
+    Gmail, and storage for your settings. The optional AI server connection asks separately, for the one
+    address you choose.</desc>
+
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+    .box { fill: #ffffff; stroke: #d0d7de; }
+    .rule { stroke: #e8eaed; }
+    .t { fill: #1f2328; font-weight: 600; }
+    .s { fill: #656d76; }
+    .icon { fill: none; stroke: #ffffff; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+    @media (prefers-color-scheme: dark) {
+      .box { fill: #161b22; stroke: #30363d; }
+      .rule { stroke: #30363d; }
+      .t { fill: #e6edf3; }
+      .s { fill: #9198a1; }
+    }
+  </style>
+
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6366f1" />
+      <stop offset="1" stop-color="#3b1f8c" />
+    </linearGradient>
+  </defs>
+
+  <rect class="box" x="0.5" y="0.5" width="837" height="341" rx="14" />
+
+  <g>
+    <line class="rule" x1="72" y1="68.5" x2="814" y2="68.5" />
+    <line class="rule" x1="72" y1="136.5" x2="814" y2="136.5" />
+    <line class="rule" x1="72" y1="204.5" x2="814" y2="204.5" />
+    <line class="rule" x1="72" y1="272.5" x2="814" y2="272.5" />
+  </g>
+
+  <!-- Nothing is uploaded. A cloud with a bar through it. -->
+  <g transform="translate(0 0)">
+    <rect x="22" y="18" width="32" height="32" rx="8" fill="url(#tile)" />
+    <g class="icon" transform="translate(28 24)">
+      <path d="M5 14.5 h10.5 a3.2 3.2 0 0 0 .3-6.4 A4.3 4.3 0 0 0 7.4 5.6 A3.1 3.1 0 0 0 5 14.5 z" />
+      <path d="M4.5 4.5 L16 16" />
+    </g>
+    <text class="t" x="70" y="32" font-size="15">Nothing is uploaded</text>
+    <text class="s" x="70" y="52" font-size="13">Messages are analysed inside your browser. Out of the box, ShoutPhish makes no network requests at all.</text>
+  </g>
+
+  <!-- No tracking. An eye with a bar through it. -->
+  <g transform="translate(0 68)">
+    <rect x="22" y="18" width="32" height="32" rx="8" fill="url(#tile)" />
+    <g class="icon" transform="translate(28 24)">
+      <path d="M2 10 Q10 4 18 10 Q10 16 2 10 z" />
+      <circle cx="10" cy="10" r="2" />
+      <path d="M4.5 4.5 L16 16" />
+    </g>
+    <text class="t" x="70" y="32" font-size="15">No account, analytics or tracking</text>
+    <text class="s" x="70" y="52" font-size="13">There is no ShoutPhish server, and nothing that records what you read.</text>
+  </g>
+
+  <!-- No copy kept. A page with a bar through it. -->
+  <g transform="translate(0 136)">
+    <rect x="22" y="18" width="32" height="32" rx="8" fill="url(#tile)" />
+    <g class="icon" transform="translate(28 24)">
+      <path d="M6 3.5 h6 l4 4 v9.5 h-10 z" />
+      <path d="M12 3.5 v4 h4" />
+      <path d="M4.5 4.5 L16 16" />
+    </g>
+    <text class="t" x="70" y="32" font-size="15">No copy of your mail is kept</text>
+    <text class="s" x="70" y="52" font-size="13">Nothing is saved to disk. Results stay in memory until you close the tab; only settings and trusted senders are kept.</text>
+  </g>
+
+  <!-- Nothing opened. A link with a bar through it. -->
+  <g transform="translate(0 204)">
+    <rect x="22" y="18" width="32" height="32" rx="8" fill="url(#tile)" />
+    <g class="icon" transform="translate(28 24)">
+      <path d="M3 12.5 a3.2 3.2 0 0 1 0-4.5 L6.5 4.5" />
+      <path d="M17 7.5 a3.2 3.2 0 0 1 0 4.5 L13.5 15.5" />
+      <path d="M3 3 L17 17" />
+    </g>
+    <text class="t" x="70" y="32" font-size="15">Nothing in a message is opened</text>
+    <text class="s" x="70" y="52" font-size="13">Links, images and attachments are never opened. Only the text and file names already on screen are read.</text>
+  </g>
+
+  <!-- Two permissions. A key. -->
+  <g transform="translate(0 272)">
+    <rect x="22" y="18" width="32" height="32" rx="8" fill="url(#tile)" />
+    <g class="icon" transform="translate(28 24)">
+      <circle cx="6.2" cy="10" r="3.3" />
+      <path d="M9.2 10 H17.2" />
+      <path d="M14.4 10 v3" />
+      <path d="M16.6 10 v2.2" />
+    </g>
+    <text class="t" x="70" y="32" font-size="15">Just two permissions</text>
+    <text class="s" x="70" y="52" font-size="13">Access to Gmail, and storage for your settings. An optional AI server asks separately, for the one address you choose.</text>
+  </g>
+</svg>

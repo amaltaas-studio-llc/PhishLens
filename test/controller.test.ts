@@ -158,7 +158,7 @@ function semantic(over: Partial<SemanticAnalysis> = {}): SemanticAnalysis {
 
 function installChrome(): void {
   const runtime = {
-    id: 'phishlens-test',
+    id: 'shoutphish-test',
     onMessage: {
       addListener: (listener: (typeof tabListeners)[number]) => {
         tabListeners.push(listener);
@@ -210,7 +210,7 @@ function writeSettings(next: Settings): void {
 function tabStatus(): TabStatus | null {
   const answers: TabResponse[] = [];
   for (const listener of tabListeners) {
-    listener({ type: 'GET_TAB_STATUS' }, { id: 'phishlens-test' }, (response) => {
+    listener({ type: 'GET_TAB_STATUS' }, { id: 'shoutphish-test' }, (response) => {
       answers.push(response);
     });
   }
@@ -230,7 +230,7 @@ let controller: Controller;
 let adapter: FakeAdapter;
 
 function badgeIsOnScreen(): boolean {
-  return document.querySelector('#phishlens-badge-host') !== null;
+  return document.querySelector('#shoutphish-badge-host') !== null;
 }
 
 beforeEach(async () => {
@@ -343,7 +343,7 @@ describe('when Gmail finishes drawing a message the model is already reading', (
 function healthReport(): string {
   let report = '';
   for (const listener of tabListeners) {
-    listener({ type: 'GET_HEALTH_REPORT' }, { id: 'phishlens-test' }, (response) => {
+    listener({ type: 'GET_HEALTH_REPORT' }, { id: 'shoutphish-test' }, (response) => {
       if (response.ok && response.type === 'HEALTH_REPORT') report = response.report;
     });
   }
@@ -383,9 +383,9 @@ describe('with the default gate on asking the model', () => {
 
   function askButton(): HTMLButtonElement | null {
     for (const listener of tabListeners) {
-      listener({ type: 'OPEN_PANEL' }, { id: 'phishlens-test' }, () => undefined);
+      listener({ type: 'OPEN_PANEL' }, { id: 'shoutphish-test' }, () => undefined);
     }
-    const root = document.querySelector('#phishlens-panel-host')?.shadowRoot ?? null;
+    const root = document.querySelector('#shoutphish-panel-host')?.shadowRoot ?? null;
     return root?.querySelector<HTMLButtonElement>('button.action') ?? null;
   }
 
@@ -505,7 +505,7 @@ describe('when the page is hidden while work is in flight', () => {
     await vi.advanceTimersByTimeAsync(1000);
     await flush();
 
-    expect(document.querySelector('.phishlens-row-mark')).toBeNull();
+    expect(document.querySelector('.shoutphish-row-mark')).toBeNull();
   });
 
   /** The control for the test above: the same write, without the stop, does mark the row. */
@@ -516,7 +516,7 @@ describe('when the page is hidden while work is in flight', () => {
     await vi.advanceTimersByTimeAsync(1000);
     await flush();
 
-    expect(document.querySelector('.phishlens-row-mark')).not.toBeNull();
+    expect(document.querySelector('.shoutphish-row-mark')).not.toBeNull();
   });
 });
 

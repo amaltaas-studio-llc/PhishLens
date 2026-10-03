@@ -1,6 +1,6 @@
 # Architecture
 
-PhishLens is a Chrome MV3 extension that scores the open Gmail message 0–100 for phishing risk and
+ShoutPhish is a Chrome MV3 extension that scores the open Gmail message 0–100 for phishing risk and
 explains every point. Deterministic checks own technical facts; an optional language model may add at
 most 15 points and cannot originate a score.
 

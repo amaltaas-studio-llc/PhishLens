@@ -34,7 +34,7 @@ import { Panel, type PanelView } from '../src/ui/panel.js';
 import { toFixture, type Fixture, type RawFixture } from '../test/fixtures/convert.js';
 
 /** Injected by scripts/harness.mjs, so adding a fixture file needs no change here. */
-declare const __PHISHLENS_FIXTURES__: string;
+declare const __SHOUTPHISH_FIXTURES__: string;
 
 type View = 'full' | 'badges' | 'card' | 'list';
 
@@ -116,7 +116,7 @@ function cannedDiagnostic(missing: readonly MessagePart[]): string {
   });
 }
 
-const fixtures: Fixture[] = (JSON.parse(__PHISHLENS_FIXTURES__) as RawFixture[]).map(toFixture);
+const fixtures: Fixture[] = (JSON.parse(__SHOUTPHISH_FIXTURES__) as RawFixture[]).map(toFixture);
 
 /**
  * A canned verdict, so the AI section renders without a model present.
@@ -463,7 +463,7 @@ async function renderCardOnly(state: HarnessState): Promise<void> {
 
   // The card is built as a child of <body>, as it is in Gmail. Moving the host into the frame leaves
   // the component itself untouched.
-  const host = document.querySelector('#phishlens-panel-host');
+  const host = document.querySelector('#shoutphish-panel-host');
   if (host === null) return;
   frame.append(host);
   flattenForStillImage(host);
@@ -576,7 +576,7 @@ function pick<T extends string>(value: string | null, allowed: readonly T[], fal
  * mysteriously clipped image, so the script asserts the geometry instead of assuming it.
  */
 function reportViewport(): void {
-  document.title = `PhishLens harness ${String(window.innerWidth)}x${String(window.innerHeight)}@${String(window.devicePixelRatio)}`;
+  document.title = `ShoutPhish harness ${String(window.innerWidth)}x${String(window.innerHeight)}@${String(window.devicePixelRatio)}`;
 }
 
 // ---------------------------------------------------------------------------

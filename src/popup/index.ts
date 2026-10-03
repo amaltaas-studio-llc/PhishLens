@@ -2,7 +2,7 @@
  * The toolbar popup.
  *
  * Exists because clicking the extension's icon used to do nothing, which is the moment a user decides an
- * extension is half-finished. It answers the three questions asked at that moment: is PhishLens running
+ * extension is half-finished. It answers the three questions asked at that moment: is ShoutPhish running
  * on this tab, what did it make of the message, and (the one that used to require a DevTools console)
  * is the AI layer actually working.
  *
@@ -25,7 +25,7 @@ import {
   type PopupState,
 } from './present.js';
 
-declare const __PHISHLENS_VERSION__: string;
+declare const __SHOUTPHISH_VERSION__: string;
 
 /** The one site the content script runs on, and so the only tab that can have an answer. */
 const GMAIL_ORIGIN = 'https://mail.google.com/';
@@ -78,7 +78,7 @@ class Popup {
 
   async init(): Promise<void> {
     this.#version.textContent =
-      typeof __PHISHLENS_VERSION__ === 'undefined' ? 'dev build' : `v${__PHISHLENS_VERSION__}`;
+      typeof __SHOUTPHISH_VERSION__ === 'undefined' ? 'dev build' : `v${__SHOUTPHISH_VERSION__}`;
 
     this.#settings.addEventListener('click', () => {
       // Closed only once the tab exists: a popup that closes first can take the pending request with it.
@@ -239,7 +239,7 @@ class Popup {
     this.#test.disabled = false;
 
     if (response === null) {
-      this.#testResult.textContent = 'No answer from PhishLens itself. Try reopening this popup.';
+      this.#testResult.textContent = 'No answer from ShoutPhish itself. Try reopening this popup.';
       return;
     }
     if (!response.ok) {

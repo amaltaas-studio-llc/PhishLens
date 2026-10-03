@@ -76,7 +76,7 @@ async function readSettings(): Promise<Settings> {
 async function writeSettings(patch: Partial<Settings>): Promise<Settings> {
   // Storage has no atomic merge: the read and write must share a browser-managed lock.
   // A module-level queue would disappear when MV3 terminates this worker.
-  return navigator.locks.request('phishlens-settings', async () => {
+  return navigator.locks.request('shoutphish-settings', async () => {
     const current = await readSettings();
     const next = normalizeSettings({ ...current, ...patch });
     await chrome.storage.sync.set({ [STORAGE_KEY]: next });
@@ -113,7 +113,7 @@ async function hasHostAccess(baseUrl: string): Promise<boolean> {
   }
 }
 
-const NOT_GRANTED = 'access to this address has not been granted; press Connect in PhishLens settings';
+const NOT_GRANTED = 'access to this address has not been granted; press Connect in ShoutPhish settings';
 
 /**
  * The single egress point.
@@ -344,7 +344,7 @@ async function handle(
       // a tab, and the page's URL for a content script. `sender.tab` cannot tell the two apart.
       const fromExtensionPage = sender.url?.startsWith(chrome.runtime.getURL('')) === true;
       if (!fromExtensionPage && Object.keys(patch).some((key) => !TAB_WRITABLE_SETTINGS.has(key))) {
-        return { ok: false, error: 'that setting can only be changed from PhishLens settings' };
+        return { ok: false, error: 'that setting can only be changed from ShoutPhish settings' };
       }
       return { ok: true, type: 'SETTINGS', settings: await writeSettings(request.patch) };
     }
@@ -382,7 +382,7 @@ async function setToolbarBadge(
     return { ok: false, error: 'invalid badge' };
   }
   // A paint spans several async API calls; keep each tab's text, title and colours together.
-  return navigator.locks.request(`phishlens-toolbar-${String(tabId)}`, async () => {
+  return navigator.locks.request(`shoutphish-toolbar-${String(tabId)}`, async () => {
     try {
       await chrome.action.setBadgeText({ tabId, text: request.text });
       await chrome.action.setTitle({ tabId, title: request.title });

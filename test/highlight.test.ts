@@ -103,7 +103,7 @@ describe('the highlighter', () => {
     );
 
     expect(shown).toBe(true);
-    expect(document.querySelector('#link')?.classList.contains('phishlens-highlight')).toBe(true);
+    expect(document.querySelector('#link')?.classList.contains('shoutphish-highlight')).toBe(true);
     highlighter.dispose();
     expect(document.querySelector('#link')?.hasAttribute('class')).toBe(false);
   });

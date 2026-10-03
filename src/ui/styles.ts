@@ -313,7 +313,7 @@ li.finding:focus-visible { outline: 2px solid #1a73e8; outline-offset: -2px; }
 /*
  * Evidence, in two shapes. A measured value (a domain, where a link goes, a filename) is code: exact,
  * monospaced, breakable anywhere, and never mistaken for a sentence. Words from the email are a
- * quotation, ruled in the category's colour, so the sender's voice is never mistaken for PhishLens's.
+ * quotation, ruled in the category's colour, so the sender's voice is never mistaken for ShoutPhish's.
  */
 .evidence { margin: 8px 0 0; display: grid; gap: 3px; }
 .evidence-label { font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #80868b; }
@@ -375,8 +375,8 @@ li.finding:focus-visible { outline: 2px solid #1a73e8; outline-offset: -2px; }
  * label is what actually carries the meaning, so nothing is lost when motion is not wanted.
  */
 @media (prefers-reduced-motion: no-preference) {
-  .spinner { animation: phishlens-spin 800ms linear infinite; }
-  @keyframes phishlens-spin { to { transform: rotate(360deg); } }
+  .spinner { animation: shoutphish-spin 800ms linear infinite; }
+  @keyframes shoutphish-spin { to { transform: rotate(360deg); } }
 }
 
 .action {
@@ -500,8 +500,8 @@ li.row.floor { grid-template-columns: 8px 1fr auto; }
  * animation does not replay and the scroll position is kept.
  */
 @media (prefers-reduced-motion: no-preference) {
-  .panel { animation: phishlens-rise 140ms cubic-bezier(0.2, 0, 0, 1); }
-  @keyframes phishlens-rise {
+  .panel { animation: shoutphish-rise 140ms cubic-bezier(0.2, 0, 0, 1); }
+  @keyframes shoutphish-rise {
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: none; }
   }
@@ -581,20 +581,20 @@ li.row.floor { grid-template-columns: 8px 1fr auto; }
  * own link styles are specific, and losing the highlight would make the feature silently useless.
  */
 export const HIGHLIGHT_CSS = `
-.phishlens-highlight {
+.shoutphish-highlight {
   outline: 2px solid #ea4335 !important;
   outline-offset: 2px !important;
   background-color: rgb(234 67 53 / 12%) !important;
   border-radius: 2px !important;
   scroll-margin: 120px;
 }
-.phishlens-highlight-subtle {
+.shoutphish-highlight-subtle {
   outline: 2px dashed #f9ab00 !important;
   outline-offset: 2px !important;
   scroll-margin: 120px;
 }
 @media (prefers-reduced-motion: no-preference) {
-  .phishlens-highlight, .phishlens-highlight-subtle {
+  .shoutphish-highlight, .shoutphish-highlight-subtle {
     transition: outline-color 120ms ease, background-color 120ms ease;
   }
 }

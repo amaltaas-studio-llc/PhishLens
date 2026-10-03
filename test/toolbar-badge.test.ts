@@ -37,7 +37,7 @@ describe('toolbarBadgeAppearance', () => {
     const low = toolbarBadgeAppearance(scored(12, 'low'), showLow);
     expect(low.text).toBe('12');
     expect(low.background).toBe('#137333');
-    expect(low.title).toBe('PhishLens: Low Risk 12/100');
+    expect(low.title).toBe('ShoutPhish: Low Risk 12/100');
 
     const caution = toolbarBadgeAppearance(scored(30, 'caution'), showLow);
     expect(caution.background).toBe('#e37400');
@@ -48,7 +48,7 @@ describe('toolbarBadgeAppearance', () => {
     const high = toolbarBadgeAppearance(scored(80, 'high-risk'), showLow);
     expect(high.text).toBe('80');
     expect(high.background).toBe('#b3261e');
-    expect(high.title).toBe('PhishLens: High Risk 80/100');
+    expect(high.title).toBe('ShoutPhish: High Risk 80/100');
   });
 
   /** Same rule as the in-mail badge: hiding low risk must not leave a green "12" on the toolbar. */

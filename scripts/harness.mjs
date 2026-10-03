@@ -34,9 +34,9 @@ const context = await esbuild.context({
   sourcemap: 'inline',
   logLevel: 'info',
   define: {
-    __PHISHLENS_DEV__: 'true',
-    __PHISHLENS_VERSION__: JSON.stringify('harness'),
-    __PHISHLENS_FIXTURES__: JSON.stringify(JSON.stringify(fixtures)),
+    __SHOUTPHISH_DEV__: 'true',
+    __SHOUTPHISH_VERSION__: JSON.stringify('harness'),
+    __SHOUTPHISH_FIXTURES__: JSON.stringify(JSON.stringify(fixtures)),
   },
 });
 
@@ -51,6 +51,6 @@ const server = await context.serve({
 });
 
 const url = `http://${server.hosts[0] ?? 'localhost'}:${String(server.port)}`;
-console.log(`\nPhishLens UI harness on ${url}`);
+console.log(`\nShoutPhish UI harness on ${url}`);
 console.log(`${fixtures.length} fixtures. Every control is a query parameter:`);
 console.log(`  ${url}/?fixture=microsoft-phish&card=1&bare=1\n`);

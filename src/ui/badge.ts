@@ -18,7 +18,7 @@ import {
   UNREADABLE_LABEL,
 } from './labels.js';
 
-const HOST_ID = 'phishlens-badge-host';
+const HOST_ID = 'shoutphish-badge-host';
 
 export interface BadgeCallbacks {
   onActivate: () => void;
@@ -72,7 +72,7 @@ export class Badge {
     const button = this.#button;
     if (button === null) return;
     this.#render(button, 'pending', 'Checking…', '');
-    button.setAttribute('aria-label', 'PhishLens is analysing this message.');
+    button.setAttribute('aria-label', 'ShoutPhish is analysing this message.');
     button.disabled = true;
   }
 

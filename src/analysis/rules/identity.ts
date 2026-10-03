@@ -132,7 +132,7 @@ function unverifiedBrandDomain(context: AnalysisContext): SecuritySignal[] {
       severity: 'medium',
       score: 18,
       title: `Cannot confirm ${context.senderRegistrable} belongs to ${brand.label}`,
-      description: `The message was sent from ${context.senderRegistrable}, which carries ${brand.label}'s name under a domain ending PhishLens does not know ${brand.label} to use. Large organisations run the same name in every market they sell in, so this may be genuine, and a domain carrying a brand's name can equally have been registered by somebody else. Compare it against the address ${brand.label} mail normally arrives from before acting on anything in this message.`,
+      description: `The message was sent from ${context.senderRegistrable}, which carries ${brand.label}'s name under a domain ending ShoutPhish does not know ${brand.label} to use. Large organisations run the same name in every market they sell in, so this may be genuine, and a domain carrying a brand's name can equally have been registered by somebody else. Compare it against the address ${brand.label} mail normally arrives from before acting on anything in this message.`,
       evidence: { value: context.senderRegistrable },
     }),
   ];

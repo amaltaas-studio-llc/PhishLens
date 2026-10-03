@@ -13,7 +13,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const outfile = path.join(root, 'node_modules', '.cache', 'phishlens-eval', 'main.mjs');
+const outfile = path.join(root, 'node_modules', '.cache', 'shoutphish-eval', 'main.mjs');
 
 await esbuild.build({
   entryPoints: [path.join(root, 'scripts', 'eval', 'main.ts')],
@@ -25,10 +25,10 @@ await esbuild.build({
   packages: 'external',
   logLevel: 'warning',
   define: {
-    __PHISHLENS_DEV__: 'false',
-    __PHISHLENS_VERSION__: JSON.stringify('eval'),
+    __SHOUTPHISH_DEV__: 'false',
+    __SHOUTPHISH_VERSION__: JSON.stringify('eval'),
   },
 });
 
-process.env.PHISHLENS_REPO_ROOT = root;
+process.env.SHOUTPHISH_REPO_ROOT = root;
 await import(pathToFileURL(outfile).href);
