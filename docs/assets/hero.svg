@@ -13,7 +13,8 @@
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 400" width="1280" height="400" role="img" aria-labelledby="hero-title hero-desc">
   <title id="hero-title">ShoutPhish: a second look before you click</title>
-  <desc id="hero-desc">The ShoutPhish banner. The logo, a magnifying lens scanning a fish, sits beside the
+  <desc id="hero-desc">The ShoutPhish banner. The logo, a magnifying lens scanning a fish with two signal waves
+    rising from it, sits beside the
     tagline. On the right a lens magnifies the letters r and n in a sender address pretending to be
     Microsoft, and a red High Risk badge scores the message 76 out of 100.</desc>
 
@@ -152,7 +153,7 @@
   <!--
     The extension icon, drawn in the space scripts/gen-icons.mjs uses: the tile spans -1..1 with y down,
     scaled so it is 80px here. Every number below is one of the generator's constants (LENS, HANDLE,
-    FISH, SCAN_Y) or follows from one, at its full detail level, so the two can be compared shape by
+    FISH, SCAN_Y, WAVES) or follows from one, at its full detail level, so the two can be compared shape by
     shape. Paint order follows shade(): the handle covers the rim where they meet.
   -->
   <g transform="translate(108 128) scale(41.6667)">
@@ -162,6 +163,11 @@
     <g filter="url(#tile-shadow)" opacity="0.45">
       <circle cx="-0.09" cy="-0.07" r="0.56" fill="#1e1b4b" />
       <path d="M0.34 0.36 L0.67 0.69" stroke="#1e1b4b" stroke-width="0.24" stroke-linecap="round" />
+    </g>
+
+    <g fill="none" stroke="#ffffff" stroke-width="0.075" stroke-linecap="round">
+      <path d="M0.1416 -0.7369 A0.66 0.66 0 0 1 0.4571 -0.4211" />
+      <path d="M0.2013 -0.8635 A0.8 0.8 0 0 1 0.5838 -0.4808" stroke-opacity="0.65" />
     </g>
 
     <circle cx="-0.14" cy="-0.14" r="0.495" fill="none" stroke="url(#rim)" stroke-width="0.13" />
@@ -215,6 +221,11 @@
   <circle cx="752" cy="209" r="9" fill="#ffffff" />
   <rect x="747" y="207" width="10" height="4" rx="1" fill="#b42318" />
   <text class="pill-t" x="770" y="215" font-size="17" textLength="138">High Risk &#183; 76/100</text>
+  <!-- The logo's two waves, coming off the badge: the one place the extension raises its voice. -->
+  <g fill="none" stroke="#b42318" stroke-width="3" stroke-linecap="round">
+    <path d="M927.9 192.9 A28 28 0 0 1 927.9 225.1" />
+    <path d="M936.1 187.2 A38 38 0 0 1 936.1 230.8" stroke-opacity="0.55" />
+  </g>
 
   <rect class="line" x="728" y="250" width="300" height="9" rx="4.5" />
   <rect class="line" x="728" y="270" width="250" height="9" rx="4.5" />

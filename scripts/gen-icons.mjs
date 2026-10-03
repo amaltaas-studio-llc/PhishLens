@@ -2,7 +2,9 @@
 /**
  * Generates the extension's PNG icons from code, so the pixels that ship are reviewable as source rather
  * than taken on trust. Draws a magnifying lens scanning a fish on an indigo tile: the lens is what the
- * extension does, the fish is what it is looking for.
+ * extension does, the fish is what it is looking for, and the two waves off the lens are it speaking up.
+ * Waves rather than an exclamation mark or a speech bubble with one in it, which would read as a warning
+ * on a message nobody has scored.
  *
  * Indigo rather than green, amber or red because those three are the risk bands; a brand colour that
  * resembled one would make the toolbar icon read as a verdict before any message was scored.
@@ -109,11 +111,24 @@ const HANDLE = { ax: 0.29, ay: 0.29, bx: 0.62, by: 0.62, r: 0.12 };
 // The fish body is a vesica, the overlap of two circles, which gives the pointed nose and tail root.
 const FISH = { x: -0.22, y: -0.11, r: 0.27, d: 0.15, scale: 1.25 };
 const SCAN_Y = -0.08;
+// Two arcs about the lens centre, opening up and right into the tile's one empty corner. Angles are in
+// radians with y down, so negative is above the lens.
+const WAVES = { a0: -1.13, a1: -0.44, w: 0.075, radii: [0.66, 0.8] };
+
+/** Distance to an arc of radius r about the lens centre between angles a0 and a1, with round ends. */
+function arc(x, y, r, a0, a1) {
+  const dx = x - LENS.x;
+  const dy = y - LENS.y;
+  const a = Math.atan2(dy, dx);
+  if (a >= a0 && a <= a1) return Math.abs(Math.hypot(dx, dy) - r);
+  const end = (t) => Math.hypot(dx - r * Math.cos(t), dy - r * Math.sin(t));
+  return Math.min(end(a0), end(a1));
+}
 
 /**
  * The colour at one point of the icon, or null outside the tile. `detail` drops features that would
- * smear into noise at small sizes: 1 is the lens, shadow and fish (16 and 32px), 2 adds the eye, gill,
- * scan line and glint.
+ * smear into noise at small sizes: 0 is the lens, shadow and fish (16px), 1 adds the waves (32px), 2
+ * adds the eye, gill, scan line and glint.
  */
 function shade(x, y, detail) {
   if (sdRoundRect(x, y, 0.96, 0.96, 0.4) > 0) return null;
@@ -124,10 +139,13 @@ function shade(x, y, detail) {
   const grip = segment(x, y, HANDLE.ax, HANDLE.ay, HANDLE.bx, HANDLE.by);
 
   // A soft shadow below and right of the lens lifts it off the tile.
-  if (detail > 0) {
-    const sl = Math.hypot(x - LENS.x - 0.05, y - LENS.y - 0.07) - LENS.outer;
-    const sh = segment(x - 0.05, y - 0.07, HANDLE.ax, HANDLE.ay, HANDLE.bx, HANDLE.by).d - HANDLE.r;
-    c = mix(c, INK, 0.45 * (1 - clamp01(Math.min(sl, sh) / 0.09 + 0.5)));
+  const sl = Math.hypot(x - LENS.x - 0.05, y - LENS.y - 0.07) - LENS.outer;
+  const sh = segment(x - 0.05, y - 0.07, HANDLE.ax, HANDLE.ay, HANDLE.bx, HANDLE.by).d - HANDLE.r;
+  c = mix(c, INK, 0.45 * (1 - clamp01(Math.min(sl, sh) / 0.09 + 0.5)));
+
+  // The outer wave is fainter, so the pair reads as a signal fading with distance rather than two rings.
+  for (const [i, r] of WAVES.radii.entries()) {
+    if (detail >= 1 && arc(x, y, r, WAVES.a0, WAVES.a1) <= WAVES.w / 2) return mix(RIM_LIGHT, c, i * 0.35);
   }
 
   if (grip.d <= HANDLE.r && dl > LENS.inner) {
@@ -143,22 +161,20 @@ function shade(x, y, detail) {
 
   c = mix(GLASS_CENTRE, GLASS_EDGE, clamp01(dl / LENS.inner) ** 1.5);
 
-  if (detail >= 1) {
-    const fx = (x - FISH.x) / FISH.scale;
-    const fy = (y - FISH.y) / FISH.scale;
-    const halfH = FISH.r - FISH.d;
-    const body = Math.hypot(fx, fy - FISH.d) <= FISH.r && Math.hypot(fx, fy + FISH.d) <= FISH.r;
-    const tail = inTriangle(fx, fy, [0.15, 0], [0.31, -0.13], [0.31, 0.13]);
-    const fin = inTriangle(fx, fy, [-0.06, -halfH + 0.02], [0.06, -halfH - 0.09], [0.1, -halfH + 0.04]);
-    if (body || tail || fin) {
-      const depth = clamp01((fy + halfH) / (2 * halfH)) * 0.85 + (tail || fin ? 0.15 : 0);
-      c = mix(FISH_LIGHT, FISH_DARK, depth);
-      if (detail >= 2) {
-        const gill = Math.hypot(fx + 0.02, fy) - 0.1;
-        if (Math.abs(gill) < 0.012 && fx < -0.06) c = mix(c, FISH_DARK, 0.7);
-        const eye = Math.hypot(fx + 0.15, fy + 0.025);
-        if (eye < 0.045) c = eye < 0.024 ? INK : WHITE;
-      }
+  const fx = (x - FISH.x) / FISH.scale;
+  const fy = (y - FISH.y) / FISH.scale;
+  const halfH = FISH.r - FISH.d;
+  const body = Math.hypot(fx, fy - FISH.d) <= FISH.r && Math.hypot(fx, fy + FISH.d) <= FISH.r;
+  const tail = inTriangle(fx, fy, [0.15, 0], [0.31, -0.13], [0.31, 0.13]);
+  const fin = inTriangle(fx, fy, [-0.06, -halfH + 0.02], [0.06, -halfH - 0.09], [0.1, -halfH + 0.04]);
+  if (body || tail || fin) {
+    const depth = clamp01((fy + halfH) / (2 * halfH)) * 0.85 + (tail || fin ? 0.15 : 0);
+    c = mix(FISH_LIGHT, FISH_DARK, depth);
+    if (detail >= 2) {
+      const gill = Math.hypot(fx + 0.02, fy) - 0.1;
+      if (Math.abs(gill) < 0.012 && fx < -0.06) c = mix(c, FISH_DARK, 0.7);
+      const eye = Math.hypot(fx + 0.15, fy + 0.025);
+      if (eye < 0.045) c = eye < 0.024 ? INK : WHITE;
     }
   }
 
@@ -175,7 +191,7 @@ function shade(x, y, detail) {
 
 function render(size) {
   const pixels = Buffer.alloc(size * size * 4);
-  const detail = size <= 32 ? 1 : 2;
+  const detail = size <= 16 ? 0 : size <= 32 ? 1 : 2;
   // The Web Store asks for 96px of artwork inside a 128px icon; the toolbar sizes fill their square.
   const extent = size === 128 ? 0.75 : 1;
   const n = 4;

@@ -1,6 +1,6 @@
 <div align="center">
 
-<img width="100%" alt="ShoutPhish: a second look before you click. The logo, a lens scanning a fish, beside a magnifying lens that picks out the letters r and n in a sender address pretending to be Microsoft, next to a red High Risk badge scoring 76 out of 100." src="docs/assets/hero.svg">
+<img width="100%" alt="ShoutPhish: a second look before you click. The logo, a lens scanning a fish with signal waves rising from it, beside a magnifying lens that picks out the letters r and n in a sender address pretending to be Microsoft, next to a red High Risk badge scoring 76 out of 100." src="docs/assets/hero.svg">
 
 <br>
 
