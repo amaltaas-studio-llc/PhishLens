@@ -17,10 +17,17 @@ import { el, requireElement } from '../ui/dom.js';
 import {
   ACTION_LABELS,
   AI_SETTINGS_URL,
+  browserFamily,
   onDeviceGuidance,
   UPDATE_CHROME_URL,
   type GuidanceAction,
 } from './guidance.js';
+
+/** Client hints are not in TypeScript's DOM library yet, and are absent outside Chromium. */
+interface ClientHints {
+  userAgentData?: { brands?: readonly { brand: string }[] };
+}
+const BROWSER = browserFamily((navigator as Navigator & ClientHints).userAgentData?.brands);
 
 /** Chrome raises no event for a download this page did not start, so one in progress is polled. */
 const DOWNLOAD_POLL_MS = 5000;
@@ -107,7 +114,7 @@ class WelcomePage {
   }
 
   #render(state: OnDeviceModelState): void {
-    const guidance = onDeviceGuidance(state);
+    const guidance = onDeviceGuidance(state, BROWSER);
     const numbered = guidance.action === 'open-ai-settings' || guidance.action === 'update-chrome';
     const parts: Node[] = [el('p', { class: 'check-headline', text: guidance.headline })];
     if (guidance.steps.length > 0) {
@@ -147,7 +154,7 @@ class WelcomePage {
     clearTimeout(this.#poll);
     const run = ++this.#tracking;
     this.#status.textContent = '';
-    this.#progress = 'Waiting for Chrome to report progress…';
+    this.#progress = 'Waiting for the browser to report progress…';
     this.#silentPolls = 0;
     this.#render(state);
     this.#watch = setInterval(() => void this.#watchDownload(run, state), DOWNLOAD_POLL_MS);
@@ -157,7 +164,7 @@ class WelcomePage {
       this.#silentPolls = 0;
       this.#progress =
         fraction >= 1
-          ? 'Downloaded. Chrome is now unpacking and loading the model, which can take a few minutes.'
+          ? 'Downloaded. The browser is now unpacking and loading the model, which can take a few minutes.'
           : `Downloading… ${String(Math.round(Math.max(0, fraction) * 100))}%`;
       if (this.#mode === 'local') this.#render(state);
     });
@@ -185,8 +192,8 @@ class WelcomePage {
       this.#status.textContent =
         outcome.reason === 'unavailable'
           ? // Chrome reports a switched-off setting, a policy block and an ineligible device alike.
-            'Chrome says its model cannot run right now. The setting may be off, blocked by policy, or this device may not qualify; see below.'
-          : 'Chrome did not start the download. Check the requirements below, then try again.';
+            'The browser says its model cannot run right now. The setting may be off, blocked by policy, or this device may not qualify; see below.'
+          : 'The browser did not start the download. Check the requirements below, then try again.';
     }
     void this.#refresh();
   }

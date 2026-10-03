@@ -331,9 +331,10 @@ export function aiRow(settings: Settings, state: PopupState): AiRow {
 function fixFor(status: SemanticStatus, aiMode: AiMode): string | null {
   if (status === 'unavailable') {
     return aiMode === 'local'
-      ? // `unavailable` covers a model not yet downloaded, a switched-off setting and an ineligible
-        // device, which Chrome does not distinguish, so the advice names the page that sorts them out.
-        'Chrome’s built-in model is not ready: it may need downloading or switching on. Settings links to the setup steps. Technical checks are unaffected.'
+      ? // `unavailable` covers a model not yet downloaded, a switched-off setting, an ineligible device
+        // and a browser with no model at all, which the browser does not distinguish, so the advice
+        // names the page that sorts them out.
+        'The browser’s built-in model is not ready: it may need downloading or switching on, or this browser may not have one. Settings links to the setup steps. Technical checks are unaffected.'
       : 'ShoutPhish could not reach it. Test the connection to see why.';
   }
   if (aiMode === 'server' && (status === 'no-output' || status === 'error')) {

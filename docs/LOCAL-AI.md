@@ -52,6 +52,10 @@ between builds; the code probes shapes and fails closed to “unavailable.”
   ([Google’s help](https://support.google.com/chrome/answer/16961953)).
 - Opening mail never starts a download. The welcome page can, **on a click**, after you choose the local model.
 - `downloadable` / `downloading` count as unavailable for analysis until ready.
+- Other Chromium browsers load the same build. Stable Edge offers extensions no Prompt API today, so the
+  probe reports `unsupported` there, and the welcome page says so without sending the reader to Chrome's
+  settings, which could not fix it (`browserFamily` in `src/welcome/guidance.ts`). A browser that ships the
+  same `LanguageModel` global is used without a code change.
 
 ### When there is no assessment
 

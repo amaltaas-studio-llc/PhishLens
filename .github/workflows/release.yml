@@ -101,10 +101,10 @@ jobs:
           cat >> release/notes.md <<'NOTES'
           ### Install
 
-          ShoutPhish is not on the Chrome Web Store. To install this build:
+          ShoutPhish is not on the Chrome Web Store or Edge Add-ons. To install this build in Chrome or Edge:
 
           1. Download `shoutphish-${{ steps.meta.outputs.version }}.zip` below and unzip it.
-          2. Open `chrome://extensions` and turn on **Developer mode**.
+          2. Open `chrome://extensions` (or `edge://extensions` in Edge) and turn on **Developer mode**.
           3. Choose **Load unpacked** and select the unzipped folder.
           4. Open a message in Gmail. The risk score appears beside the sender's address.
 
