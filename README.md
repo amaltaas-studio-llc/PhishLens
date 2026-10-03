@@ -263,9 +263,13 @@ confirm this. [Full privacy details →](docs/PRIVACY.md)
 
 <br>
 
-The checks run on your own computer with no waiting on a server, and the bottom of the card shows exactly
-how long they took. The optional AI takes longer, which is why it is only consulted when a check has
-already found something.
+No. ShoutPhish starts only after Gmail has finished loading, and it looks at an email after Gmail has
+already shown it, so opening a message never waits for it. The score simply appears beside the message a
+moment later.
+
+The checks run on your own computer, with nothing sent to a server, and the bottom of the card shows
+exactly how long they took. The optional AI is slower, so its reading is added afterwards without holding
+anything up. By default it is only asked when a check has already found something.
 
 </details>
 
