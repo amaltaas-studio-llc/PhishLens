@@ -20,10 +20,19 @@ import { isModelServerConfigured } from '../shared/settings.js';
 import { formatList } from '../shared/text.js';
 
 /**
- * `not-gmail` and `unreachable` are the popup's own states, not the tab's: no content script answered,
- * for the two reasons that mean different things to a user. Every other state comes from the tab.
+ * `not-gmail`, `no-gmail-access` and `unreachable` are the popup's own states, not the tab's: no
+ * content script answered, for three reasons that mean different things to a user. Every other state
+ * comes from the tab.
+ *
+ * `no-gmail-access` exists because the user can withhold the Gmail host permission (Firefox asks for it
+ * separately, and Chrome's site-access menu can restrict it). Without it the popup cannot even read the
+ * tab's address, so it would otherwise say "only runs on Gmail" to someone looking at Gmail.
  */
-export type PopupState = TabStatus | { kind: 'not-gmail' } | { kind: 'unreachable' };
+export type PopupState =
+  | TabStatus
+  | { kind: 'not-gmail' }
+  | { kind: 'no-gmail-access' }
+  | { kind: 'unreachable' };
 
 /** Drives the chip's colour. `idle` is "nothing to report", `unknown` is "could not tell". */
 export type Tone = 'low' | 'caution' | 'suspicious' | 'high-risk' | 'unknown' | 'idle';
@@ -69,6 +78,14 @@ export function headline(state: PopupState): Headline {
         score: '',
         tone: 'idle',
         note: 'ShoutPhish only runs on Gmail. Open a message there and its assessment appears here.',
+      };
+    case 'no-gmail-access':
+      return {
+        glyph: UNREADABLE_GLYPH,
+        label: 'No access to Gmail',
+        score: '',
+        tone: 'unknown',
+        note: 'ShoutPhish has not been allowed to read Gmail, so it checks nothing there. Allow access, then reload Gmail.',
       };
     case 'unreachable':
       // Gmail is open and nothing answered, which happens when the extension is reloaded or updated
@@ -224,7 +241,9 @@ export interface ReportRow {
  * cannot tell whether their mail is in it has no way to decide whether to attach it to a public issue.
  */
 export function reportRow(state: PopupState): ReportRow | null {
-  if (state.kind === 'not-gmail' || state.kind === 'unreachable') return null;
+  if (state.kind === 'not-gmail' || state.kind === 'no-gmail-access' || state.kind === 'unreachable') {
+    return null;
+  }
 
   const label = 'Copy a diagnostic report';
   if (state.kind === 'scored') {

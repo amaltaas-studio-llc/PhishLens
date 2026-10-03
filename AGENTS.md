@@ -6,7 +6,7 @@ agents get wrong.
 
 ## What this is
 
-A Chrome Manifest V3 extension that scores Gmail messages 0–100 for phishing risk and explains every point
+A Manifest V3 extension for Chromium browsers and Firefox that scores Gmail messages 0–100 for phishing risk and explains every point
 of that score. Two properties matter more than any feature:
 
 1. **It is explainable.** A finding a user cannot check is worse than no finding.
@@ -21,7 +21,7 @@ are why the obvious alternative was rejected.
 ## Definition of done
 
 ```bash
-npm run verify   # lint, typecheck, test, build, check:dist: all five, every time
+npm run verify   # lint, typecheck, test, build (Chromium and Firefox), check:dist: every time
 ```
 
 The build and the dist check are in there because a green test run says nothing about whether the thing

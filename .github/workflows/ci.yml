@@ -67,7 +67,7 @@ jobs:
       - run: npm ci
 
       - name: Build
-        run: npm run build
+        run: npm run build && npm run build:firefox
 
       - name: Read version
         id: meta
@@ -81,10 +81,22 @@ jobs:
       - name: Check the build is loadable
         run: npm run check:dist
 
+      # Mozilla's validator, the same rules addons.mozilla.org applies on submission. Warnings fail too:
+      # each one so far has been a real gap, such as a minimum version that predates a declared feature.
+      - name: Lint the Firefox build
+        run: npm run lint:firefox
+
       # Downloading this artifact gives you a zip with manifest.json at its root: unzip it and load it
       # with "Load unpacked", or upload the zip itself to the Chrome Web Store dashboard.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: shoutphish-${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.sha }}
           path: dist/
+          if-no-files-found: error
+
+      # Unsigned, so release Firefox loads it only as a temporary add-on from about:debugging.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: shoutphish-firefox-${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.sha }}
+          path: dist-firefox/
           if-no-files-found: error

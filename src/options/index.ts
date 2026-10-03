@@ -15,6 +15,9 @@
  * per-address, on a click, and handed back when the address changes, so a default install keeps the two
  * permissions the README advertises.
  */
+import { onDeviceModelState, type OnDeviceModelState } from '../analysis/llm/on-device.js';
+import { egressPermissions } from '../shared/egress-permissions.js';
+import { onDeviceChoice } from '../shared/on-device-choice.js';
 import { logger } from '../shared/logger.js';
 import { requestSettings, sendMessage } from '../shared/messaging.js';
 import {
@@ -25,8 +28,9 @@ import {
   normalizeModelBaseUrl,
   originPattern,
 } from '../shared/settings.js';
+import { BUILD_TARGET } from '../shared/target.js';
 import { withoutTrustedSender } from '../shared/trust.js';
-import type { Settings } from '../shared/types.js';
+import type { AiMode, Settings } from '../shared/types.js';
 import { el, requireElement } from '../ui/dom.js';
 
 declare const __SHOUTPHISH_VERSION__: string;
@@ -55,6 +59,11 @@ class OptionsPage {
   readonly #highlightEnabled = requireElement('highlightEnabled', HTMLInputElement);
   readonly #status = requireElement('status', HTMLDivElement);
   readonly #version = requireElement('version', HTMLSpanElement);
+  readonly #localInput = this.#modeInputs.find((input) => input.value === 'local') ?? null;
+  readonly #localRecommended = requireElement('localRecommended', HTMLSpanElement);
+  readonly #localUnavailable = requireElement('localUnavailable', HTMLSpanElement);
+  /** `null` until probed, so the option stays as authored rather than flickering to disabled and back. */
+  #onDeviceState: OnDeviceModelState | null = null;
 
   #statusTimer: ReturnType<typeof setTimeout> | null = null;
   /** Kept so a changed address hands back the access granted to the previous one. */
@@ -65,7 +74,8 @@ class OptionsPage {
   async init(): Promise<void> {
     this.#version.textContent = `Version ${typeof __SHOUTPHISH_VERSION__ === 'undefined' ? 'dev' : __SHOUTPHISH_VERSION__}`;
 
-    const settings = await requestSettings();
+    const [settings, onDeviceState] = await Promise.all([requestSettings(), onDeviceModelState()]);
+    this.#onDeviceState = onDeviceState;
     // Access is checked before the first paint, since whether it is held is part of what the page has to
     // report: a configured address without a grant looks finished and silently fails.
     await this.#syncGrantedPattern(settings);
@@ -140,6 +150,16 @@ class OptionsPage {
         : '';
     this.#renderServerState(settings);
     this.#renderTrusted(settings.trustedSenders);
+    this.#renderOnDevice(settings.aiMode);
+  }
+
+  #renderOnDevice(mode: AiMode): void {
+    if (this.#onDeviceState === null) return;
+    const choice = onDeviceChoice(this.#onDeviceState, mode);
+    if (this.#localInput !== null) this.#localInput.disabled = !choice.selectable;
+    this.#localRecommended.hidden = !choice.selectable;
+    this.#localUnavailable.textContent = choice.note ?? '';
+    this.#localUnavailable.hidden = choice.note === null;
   }
 
   /**
@@ -245,23 +265,24 @@ class OptionsPage {
 
     this.#connect.disabled = true;
     try {
-      // Chrome rejects rather than returns false for a pattern it cannot parse. Ports are fine and
+      // Browsers reject rather than return false for a pattern they cannot parse. Ports are fine and
       // `[::1]` is the doubtful case, so the address is named: without this the button would appear to
-      // do nothing at all, which is the worst way for a permission step to fail.
+      // do nothing at all, which is the worst way for a permission step to fail. On Firefox this one
+      // prompt also asks to send message text outside the browser; see `egressPermissions`.
       const granted = await chrome.permissions
-        .request({ origins: [pattern] })
+        .request(egressPermissions(pattern, BUILD_TARGET))
         .catch((error: unknown) => {
           logger.debug('permission request rejected', error);
           return null;
         });
 
       if (granted === null) {
-        this.#serverError.textContent = `Chrome would not accept ${pattern} as an address to grant access to. Try the hostname form, for example http://127.0.0.1:11434/v1.`;
+        this.#serverError.textContent = `The browser would not accept ${pattern} as an address to grant access to. Try the hostname form, for example http://127.0.0.1:11434/v1.`;
         return;
       }
       if (!granted) {
         this.#serverError.textContent =
-          'Access to that address was declined, so ShoutPhish cannot reach the server.';
+          'Access was declined, so ShoutPhish will not send anything to the server.';
         return;
       }
       this.#grantedPattern = pattern;
@@ -312,7 +333,7 @@ class OptionsPage {
     const pattern = originPattern(settings.modelBaseUrl);
     if (pattern === null) return;
     try {
-      const held = await chrome.permissions.contains({ origins: [pattern] });
+      const held = await chrome.permissions.contains(egressPermissions(pattern, BUILD_TARGET));
       if (held) this.#grantedPattern = pattern;
     } catch {
       // An unsupported or rejected query is not worth surfacing: Connect will ask again.
@@ -331,9 +352,9 @@ class OptionsPage {
 
 async function revokeOrigin(pattern: string): Promise<void> {
   try {
-    await chrome.permissions.remove({ origins: [pattern] });
+    await chrome.permissions.remove(egressPermissions(pattern, BUILD_TARGET));
   } catch {
-    // Chrome refuses to remove a permission it did not grant, which is the harmless case.
+    // A browser refuses to remove a permission it did not grant, which is the harmless case.
   }
 }
 

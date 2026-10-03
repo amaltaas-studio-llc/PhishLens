@@ -29,6 +29,17 @@ declare const __SHOUTPHISH_VERSION__: string;
 
 /** The one site the content script runs on, and so the only tab that can have an answer. */
 const GMAIL_ORIGIN = 'https://mail.google.com/';
+const GMAIL_ACCESS = { origins: [`${GMAIL_ORIGIN}*`] };
+
+/** A failed query is treated as access held, so a broken API never claims a working install is blocked. */
+async function hasGmailAccess(): Promise<boolean> {
+  try {
+    return await chrome.permissions.contains(GMAIL_ACCESS);
+  } catch (error) {
+    logger.debug('could not check Gmail access', error);
+    return true;
+  }
+}
 
 /**
  * The active tab's id, if it is a Gmail tab.
@@ -57,6 +68,7 @@ class Popup {
   readonly #findings = requireElement('findings', HTMLUListElement);
   readonly #more = requireElement('more', HTMLParagraphElement);
   readonly #openCard = requireElement('openCard', HTMLButtonElement);
+  readonly #grantGmail = requireElement('grantGmail', HTMLButtonElement);
   readonly #aiLabel = requireElement('aiLabel', HTMLSpanElement);
   readonly #aiDetail = requireElement('aiDetail', HTMLSpanElement);
   readonly #aiFix = requireElement('aiFix', HTMLParagraphElement);
@@ -96,6 +108,22 @@ class Popup {
       });
     });
 
+    // Requested before any `await`: the permission prompt needs the click's user activation, which
+    // Firefox drops at the first suspension.
+    this.#grantGmail.addEventListener('click', () => {
+      void chrome.permissions
+        .request(GMAIL_ACCESS)
+        .then((granted) => {
+          this.#note.textContent = granted
+            ? 'Access allowed. Reload Gmail and messages will be checked.'
+            : 'Access was not allowed, so ShoutPhish still checks nothing in Gmail.';
+          this.#grantGmail.hidden = granted;
+        })
+        .catch((error: unknown) => {
+          logger.debug('Gmail access request failed', error);
+        });
+    });
+
     this.#test.addEventListener('click', () => {
       void this.#testConnection();
     });
@@ -119,7 +147,9 @@ class Popup {
   async #readState(): Promise<{ state: PopupState; health: TabHealth | null }> {
     const tabId = await gmailTabId();
     this.#tabId = tabId;
-    if (tabId === null) return { state: { kind: 'not-gmail' }, health: null };
+    if (tabId === null) {
+      return { state: { kind: (await hasGmailAccess()) ? 'not-gmail' : 'no-gmail-access' }, health: null };
+    }
 
     const response = await sendTabMessage(tabId, { type: 'GET_TAB_STATUS' });
     if (response === null || !response.ok || response.type !== 'TAB_STATUS') {
@@ -144,6 +174,7 @@ class Popup {
     const cardLabel = cardButtonLabel(state);
     this.#openCard.textContent = cardLabel ?? '';
     this.#openCard.hidden = cardLabel === null;
+    this.#grantGmail.hidden = state.kind !== 'no-gmail-access';
 
     const ai = aiRow(settings, state);
     this.#aiLabel.textContent = ai.label;

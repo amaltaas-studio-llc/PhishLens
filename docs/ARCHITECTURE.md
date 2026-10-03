@@ -56,7 +56,8 @@ The content script holds analysis state and the model session because MV3 worker
 | Badge / card | `src/ui/` |
 | Toolbar icon score | `src/shared/toolbar-badge.ts` (appearance); painted in `background/` |
 | On-device or server model | `src/analysis/llm/` |
-| Permissions / egress | `src/background/`, `src/manifest.json` |
+| Permissions / egress | `src/background/`, `src/manifest.json`, `src/shared/egress-permissions.ts` |
+| Firefox-only manifest keys | `src/manifest.firefox.json` (merged into `dist-firefox/` at build) |
 | Build / verify | `scripts/build.mjs`, [DEVELOPMENT.md](DEVELOPMENT.md) |
 
 ## Design decisions
@@ -74,6 +75,7 @@ The content script holds analysis state and the model session because MV3 worker
 | [0009](adr/0009-model-server-and-inert-cloud.md) | Optional local server; cloud inert |
 | [0010](adr/0010-hostile-input-posture.md) | Nothing from a message is fetched |
 | [0011](adr/0011-ci-harness-no-dist-in-repo.md) | verify includes dist; no committed dist/ |
+| [0012](adr/0012-one-source-per-browser-manifests.md) | One source; per-browser manifests at build time |
 
 Full index: [adr/README.md](adr/README.md).
 

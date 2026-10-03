@@ -11,6 +11,7 @@ import {
   type OnDeviceModelState,
 } from '../analysis/llm/on-device.js';
 import { requestSettings, sendMessage } from '../shared/messaging.js';
+import { onDeviceChoice } from '../shared/on-device-choice.js';
 import { isAiMode } from '../shared/settings.js';
 import type { AiMode } from '../shared/types.js';
 import { el, requireElement } from '../ui/dom.js';
@@ -43,6 +44,8 @@ class WelcomePage {
   readonly #modeInputs = [...document.querySelectorAll<HTMLInputElement>('input[name="aiMode"]')];
   readonly #check = requireElement('local-check', HTMLDivElement);
   readonly #status = requireElement('mode-status', HTMLParagraphElement);
+  readonly #localInput = this.#modeInputs.find((input) => input.value === 'local') ?? null;
+  readonly #localUnavailable = requireElement('local-unavailable', HTMLSpanElement);
   #mode: AiMode = 'off';
   #poll: ReturnType<typeof setTimeout> | undefined;
   /** Progress text while this page's own download runs; the probe would only say "downloading". */
@@ -81,7 +84,18 @@ class WelcomePage {
       mode === 'server' || mode === 'cloud'
         ? 'A different AI option is chosen in Settings, which is where it can be changed.'
         : '';
+    void this.#renderChoice(mode);
     void this.#refresh();
+  }
+
+  async #renderChoice(mode: AiMode): Promise<void> {
+    const choice = onDeviceChoice(await onDeviceModelState(), mode);
+    if (mode !== this.#mode) return;
+    if (this.#localInput !== null) this.#localInput.disabled = !choice.selectable;
+    // With `local` chosen, the check panel below already explains an unsupported browser.
+    const note = mode === 'local' ? null : choice.note;
+    this.#localUnavailable.textContent = note ?? '';
+    this.#localUnavailable.hidden = note === null;
   }
 
   async #refresh(): Promise<void> {

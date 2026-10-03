@@ -104,6 +104,17 @@
         color: var(--muted);
         font-size: 13px;
       }
+      .option:has(input:disabled) {
+        cursor: not-allowed;
+      }
+      .option:has(input:disabled) > span > :not(.option-unavailable) {
+        opacity: 0.55;
+      }
+      .option-unavailable {
+        display: block;
+        margin-top: 6px;
+        font-size: 13px;
+      }
       label.inline {
         display: flex;
         gap: 10px;
@@ -259,12 +270,15 @@
         <label class="option">
           <input type="radio" name="aiMode" value="local" />
           <span>
-            <span class="option-title">On-device only (recommended)</span><br />
+            <span class="option-title"
+              >On-device only<span id="localRecommended"> (recommended)</span></span
+            ><br />
             <span class="option-desc">
               Uses the browser's built-in model, where it has one; Google Chrome does, on devices that
               qualify. Message content never leaves the machine. If no on-device model is available,
               analysis continues without it.
             </span>
+            <span class="option-unavailable" id="localUnavailable" hidden></span>
           </span>
         </label>
 

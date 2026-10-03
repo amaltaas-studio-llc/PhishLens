@@ -56,6 +56,10 @@ between builds; the code probes shapes and fails closed to “unavailable.”
   probe reports `unsupported` there, and the welcome page says so without sending the reader to Chrome's
   settings, which could not fix it (`browserFamily` in `src/welcome/guidance.ts`). A browser that ships the
   same `LanguageModel` global is used without a code change.
+- Where the probe reports `unsupported` (Edge, Firefox), the welcome and options pages grey the choice out
+  with the reason beside it (`onDeviceChoice` in `src/shared/on-device-choice.ts`). The gate is the probe,
+  not the browser's name, so it lifts by itself wherever a model appears. A mode already set to on-device
+  is left as it is and labelled as doing nothing here, rather than rewritten behind the reader's back.
 
 ### When there is no assessment
 

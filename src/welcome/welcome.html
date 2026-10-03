@@ -214,6 +214,18 @@
         color: var(--muted);
         font-size: 14px;
       }
+      .choice:has(input:disabled) {
+        cursor: not-allowed;
+      }
+      .choice:has(input:disabled) > span > :not(.choice-unavailable) {
+        opacity: 0.55;
+      }
+      /* Not `display: block` outright: an author `display` beats the `hidden` attribute. */
+      .choice-unavailable:not([hidden]) {
+        display: block;
+        margin-top: 6px;
+        font-size: 14px;
+      }
       .check {
         padding: 14px 16px;
         border: 1px solid var(--line);
@@ -361,6 +373,7 @@
               Uses the model built into your browser, if it has one. Google Chrome does, on devices that
               qualify. Message content never leaves the machine.
             </span>
+            <span class="choice-unavailable" id="local-unavailable" hidden></span>
           </span>
         </label>
       </fieldset>

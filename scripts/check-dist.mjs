@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
- * Checks that dist/ is something Chrome will actually load.
+ * Checks that dist/ is something Chrome will actually load, or with `--target=firefox`, that
+ * dist-firefox/ is something Firefox will.
  *
- * Every failure here is one that is invisible until a person unzips the download and Chrome refuses it,
- * or accepts it and silently does nothing. That is the worst place to find out, so the same check runs in
- * CI, in the release workflow before publishing, and locally via `npm run check:dist`.
+ * Every failure here is one that is invisible until a person unzips the download and the browser refuses
+ * it, or accepts it and silently does nothing. That is the worst place to find out, so the same check runs
+ * in CI, in the release workflow before publishing, and locally via `npm run check:dist`.
  *
  * The file list is read out of the manifest rather than hardcoded. A hardcoded list only checks the files
  * someone remembered to add to it, which means the guard stops covering the manifest the moment the
@@ -15,7 +16,9 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const dist = path.join(root, 'dist');
+const firefox = process.argv.slice(2).includes('--target=firefox');
+const dist = path.join(root, firefox ? 'dist-firefox' : 'dist');
+const distName = path.basename(dist);
 
 const problems = [];
 const fail = (message) => problems.push(message);
@@ -34,7 +37,9 @@ async function readJson(p) {
 }
 
 if (!(await exists(path.join(dist, 'manifest.json')))) {
-  console.error('dist/manifest.json is missing. Run `npm run build` first.');
+  console.error(
+    `${distName}/manifest.json is missing. Run \`npm run ${firefox ? 'build:firefox' : 'build'}\` first.`,
+  );
   process.exit(1);
 }
 
@@ -87,6 +92,29 @@ if (!sameList(manifest.host_permissions, EXPECTED_HOST_PERMISSIONS)) {
   );
 }
 
+/*
+ * Firefox: an event page rather than a service worker, and the keys that only Firefox reads, compared
+ * whole against the overlay they came from. The data declaration is shown to users at install, so like
+ * the permission list above it is a promise, and a build that drifts from it fails here.
+ */
+if (firefox) {
+  const overlay = await readJson(path.join(root, 'src/manifest.firefox.json'));
+  if (manifest.background?.service_worker !== undefined) {
+    fail('background.service_worker is set; Firefox runs background.scripts as an event page instead');
+  }
+  if (!Array.isArray(manifest.background?.scripts) || manifest.background.scripts.length === 0) {
+    fail('background.scripts is missing, so Firefox would start no background script');
+  }
+  if (JSON.stringify(manifest.browser_specific_settings) !== JSON.stringify(overlay.browser_specific_settings)) {
+    fail('browser_specific_settings does not match src/manifest.firefox.json');
+  }
+  if ('minimum_chrome_version' in manifest) {
+    fail('minimum_chrome_version is set; it means nothing to Firefox, which warns about it');
+  }
+} else if (manifest.browser_specific_settings !== undefined) {
+  fail('browser_specific_settings is set in the Chromium build');
+}
+
 /** Every path the manifest points at, with the field that named it, for an error a reader can act on. */
 function referencedPaths(m) {
   const found = [];
@@ -95,6 +123,7 @@ function referencedPaths(m) {
   };
 
   add(m.background?.service_worker, 'background.service_worker');
+  for (const file of m.background?.scripts ?? []) add(file, 'background.scripts');
   add(m.options_ui?.page, 'options_ui.page');
   add(m.options_page, 'options_page');
   add(m.action?.default_popup, 'action.default_popup');
@@ -124,7 +153,7 @@ function referencedPaths(m) {
 const referenced = referencedPaths(manifest);
 for (const { file, field } of referenced) {
   if (!(await exists(path.join(dist, file)))) {
-    fail(`${field} names ${file}, which is not in dist/`);
+    fail(`${field} names ${file}, which is not in ${distName}/`);
   }
 }
 
@@ -142,7 +171,7 @@ for (const page of (await readdir(dist)).filter((f) => f.endsWith('.html'))) {
     if (/^[a-z]+:|^\/\//i.test(src)) {
       fail(`${page} loads a remote script (${src}), which the CSP forbids`);
     } else if (!(await exists(path.join(dist, src.replace(/^\.?\//, ''))))) {
-      fail(`${page} loads ${src}, which is not in dist/`);
+      fail(`${page} loads ${src}, which is not in ${distName}/`);
     }
   }
   // An inline <script> would be blocked by the extension CSP, silently, at runtime.
@@ -185,6 +214,6 @@ if (problems.length > 0) {
 }
 
 console.log(
-  `dist/ looks loadable: manifest v${manifest.manifest_version}, version ${manifest.version}, ` +
+  `${distName}/ looks loadable: manifest v${manifest.manifest_version}, version ${manifest.version}, ` +
     `${referenced.length} referenced files present, ${bundles.length} bundles clean.`,
 );

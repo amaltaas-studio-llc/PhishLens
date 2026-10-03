@@ -41,7 +41,7 @@ const DATE_NOW = {
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'harness/.build/**', 'coverage/**', 'node_modules/**'],
+    ignores: ['dist/**', 'dist-firefox/**', 'harness/.build/**', 'coverage/**', 'node_modules/**'],
   },
 
   // Type-aware linting for everything TypeScript.

@@ -2,7 +2,7 @@
   "name": "shoutphish",
   "version": "0.14.0",
   "private": true,
-  "description": "Explainable phishing, malware and social-engineering risk analysis for Gmail, as a Chrome extension.",
+  "description": "Explainable phishing, malware and social-engineering risk analysis for Gmail, as a browser extension.",
   "license": "MIT",
   "author": "Amaltaas Studio LLC",
   "type": "module",
@@ -12,20 +12,22 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "build:dev": "node scripts/build.mjs --dev",
+    "build:firefox": "node scripts/build.mjs --target=firefox",
     "dev": "node scripts/build.mjs --dev --watch",
     "harness": "node scripts/harness.mjs",
     "screenshots": "node scripts/screenshots.mjs",
     "clean": "node scripts/build.mjs --clean-only",
-    "check:dist": "node scripts/check-dist.mjs",
+    "check:dist": "node scripts/check-dist.mjs && node scripts/check-dist.mjs --target=firefox",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "lint:firefox": "web-ext lint --source-dir dist-firefox --warnings-as-errors",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "eval": "node scripts/eval.mjs",
     "eval:prompts": "node scripts/export-semantic-eval.mjs",
-    "verify": "npm run lint && npm run typecheck && npm run test && npm run build && npm run check:dist"
+    "verify": "npm run lint && npm run typecheck && npm run test && npm run build && npm run build:firefox && npm run check:dist"
   },
   "devDependencies": {
     "@types/chrome": "^0.3.4",
@@ -36,6 +38,7 @@
     "jsdom": "^30.1.1",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.71.0",
-    "vitest": "^5.0.2"
+    "vitest": "^5.0.2",
+    "web-ext": "^10.7.0"
   }
 }

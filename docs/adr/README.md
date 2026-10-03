@@ -17,6 +17,7 @@ are about to change the decision they describe; day-to-day work starts from
 | [0009](0009-model-server-and-inert-cloud.md) | Optional local model server; cloud designed but not shipped |
 | [0010](0010-hostile-input-posture.md) | Nothing from a message is fetched or executed |
 | [0011](0011-ci-harness-no-dist-in-repo.md) | verify includes build and dist check; no committed dist/ |
+| [0012](0012-one-source-per-browser-manifests.md) | One source tree; a manifest per browser family, chosen at build time |
 
 Each file uses the same shape: **Status**, **Context**, **Decision**, **Consequences**,
 **Rejected alternatives**.

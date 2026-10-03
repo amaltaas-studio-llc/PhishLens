@@ -3,6 +3,7 @@ node_modules/
 
 # Build output. Produced by `npm run build`; the unpacked extension is loaded from here.
 dist/
+dist-firefox/
 
 # Test and tooling output
 coverage/

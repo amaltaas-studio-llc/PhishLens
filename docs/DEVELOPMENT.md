@@ -2,14 +2,23 @@
 
 ## Requirements
 
-Node.js **≥ 22.13.0** (declared in `package.json` `engines` and tested in CI) and Chrome **≥ 120**.
+Node.js **≥ 22.13.0** (declared in `package.json` `engines` and tested in CI), and Chrome or Edge
+**≥ 120** or Firefox **≥ 140**.
 
 ```bash
 npm install
-npm run build        # production build into dist/
+npm run build          # Chromium build into dist/
+npm run build:firefox  # Firefox build into dist-firefox/
 ```
 
-Then load it: `chrome://extensions` → **Developer mode** → **Load unpacked** → select `dist/`.
+Then load it:
+
+- Chrome or Edge: `chrome://extensions` (or `edge://extensions`) → **Developer mode** → **Load unpacked**
+  → select `dist/`.
+- Firefox: `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on** → select
+  `dist-firefox/manifest.json`. It lasts until Firefox restarts: release Firefox keeps only signed
+  extensions. Both builds come from the same sources; see
+  [adr/0012](adr/0012-one-source-per-browser-manifests.md) for what differs.
 
 ## Commands
 
@@ -17,6 +26,8 @@ Then load it: `chrome://extensions` → **Developer mode** → **Load unpacked**
 npm run dev          # esbuild watch; reload the extension in Chrome to pick up changes
 npm run build        # production build to dist/
 npm run build:dev    # unminified, inline sourcemaps, debug logging enabled
+npm run build:firefox  # production build to dist-firefox/
+npm run lint:firefox # Mozilla's web-ext lint on dist-firefox/, the check addons.mozilla.org runs
 npm run clean        # remove dist/
 
 npm run harness      # UI harness on http://127.0.0.1:5199 (see below)
@@ -162,6 +173,7 @@ version as `vitest`.
 | `test/popup.test.ts` | The popup's wording for every state (in particular that "nothing was found" and "nothing was checked" never share a phrasing) and the health line for each shape of extraction failure. |
 | `test/toolbar-badge.test.ts` | Toolbar icon badge text and colours for each tab status, including `showBadgeWhenLow` and the unreadable `?`. |
 | `test/welcome.test.ts` | The welcome page's guidance for each on-device model state: the `chrome://settings/system` steps when the model is unavailable, an update when Chrome has no Prompt API, a download only from a button, and that every state says the checks work without the model. In any other browser (Edge, Brave, Opera), no state names a Chrome page or offers a Chrome button, and the browser is told apart by its client-hint brand, never the user-agent string. |
+| `test/on-device-choice.test.ts` | When the welcome and options pages grey out the on-device choice: only where the browser has no Prompt API at all, never for a state a setting or download can fix, always with a reason, and with its own wording when the choice is already selected. |
 | `test/gmail-dom.test.ts` | The adapter against Gmail-shaped markup: sender, subject, body, links and attachment chips read out of a rendered page, authentication read from the details table, a warning banner distinguished from an unrelated live region, an unreadable sender reported as unread rather than empty, and which message is chosen when the candidate selectors disagree about which element is a message. Needs a DOM. |
 | `test/observer-dom.test.ts` | The observer and adapter over a real `MutationObserver`: in-place collapse and evidence changes, visibility before the first readable extraction, nested message IDs, heading-only navigation, and debounce-first reconciliation. Needs a DOM. |
 | `test/list-marks.test.ts` | The list marker against inbox-shaped rows: that ordinary mail is left alone, that a recycled row is re-evaluated rather than trusted, that rows already on screen are re-triaged once Gmail exposes the signed-in address (which arrives after they do, and without which the check for a domain imitating the reader's own cannot run), that a mark Gmail discards when it redraws a row as read comes back, and that marking survives Gmail replacing the region being watched. Needs a DOM. |
@@ -218,7 +230,10 @@ sourcemap reference or HTML sink in any bundle, or a permission the README and `
 advertise. The file list is read out of the manifest rather than hardcoded, so adding a reference to the
 manifest extends the check automatically; the permission list is hardcoded on purpose, so that changing it
 fails until the documents promising it are updated too. Run it locally after `npm run build` if you are
-touching the build.
+touching the build. It checks both packages; for `dist-firefox/` it also pins `browser_specific_settings`
+(the extension ID and the data-collection declaration Firefox shows at install) to
+`src/manifest.firefox.json`. CI then runs `npm run lint:firefox`, Mozilla's own validator, which knows
+Firefox's rules better than any check written here.
 
 The build and the dist check run once, on the current LTS: the bundle is the same bytes whichever Node
 produced it, and the floor is already exercised by lint, typecheck and test.
@@ -272,7 +287,7 @@ no longer runs the next time the floor moves. Add an aggregate job with a stable
 
 ## Conventions
 
-- `npm run verify` must pass before a commit (lint, typecheck, test, build, `check:dist`).
+- `npm run verify` must pass before a commit (lint, typecheck, test, both builds, `check:dist`).
 - Scoring numbers live in `src/analysis/scoring/config.ts`; Gmail selectors in `src/gmail/selectors.ts`.
 - New detection behaviour needs a fixture asserted in both directions.
 - Commit messages are a short subject and at most three lines of why; longer reasoning goes in the code,

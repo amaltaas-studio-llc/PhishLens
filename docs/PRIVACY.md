@@ -31,6 +31,17 @@ Extension pages run under `script-src 'self'; object-src 'none'; base-uri 'none'
 
 If a future feature seems to need something broader, that is a signal to reconsider the feature.
 
+**On Firefox**, the same permissions apply, plus Firefox's data-collection declaration, shown before
+install (`src/manifest.firefox.json`):
+
+| Declaration | Meaning |
+| --- | --- |
+| `"required": ["none"]` | A default install transmits no data. Firefox says so on the install prompt. |
+| `"optional": ["personalCommunications"]` | **Not granted at install.** Asked for on the same Connect click as a model server's address, because the server receives message text, and Mozilla counts anything handled outside the browser as transmission, even a process on your own machine. The worker checks this consent and the address grant together before every request, and both are revoked together when the address changes. |
+
+Firefox also lets you withhold Gmail access itself. The popup then says that ShoutPhish checks nothing,
+and offers to ask again; it never reads that as nothing to check.
+
 ## Where data lives
 
 **Extracted from Gmail**: sender name and address, Reply-To, subject, visible body text (truncated,

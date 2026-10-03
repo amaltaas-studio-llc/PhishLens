@@ -38,6 +38,8 @@ import {
   normalizeSettings,
   originPattern,
 } from '../shared/settings.js';
+import { egressPermissions } from '../shared/egress-permissions.js';
+import { BUILD_TARGET } from '../shared/target.js';
 import { truncate } from '../shared/text.js';
 import type { Settings } from '../shared/types.js';
 import { parseSemanticAnalysis } from '../analysis/llm/parse.js';
@@ -106,7 +108,7 @@ async function hasHostAccess(baseUrl: string): Promise<boolean> {
   const pattern = originPattern(baseUrl);
   if (pattern === null) return false;
   try {
-    return await chrome.permissions.contains({ origins: [pattern] });
+    return await chrome.permissions.contains(egressPermissions(pattern, BUILD_TARGET));
   } catch (error) {
     logger.debug('host permission check failed', error);
     return false;

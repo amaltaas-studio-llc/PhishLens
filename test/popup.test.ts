@@ -76,6 +76,21 @@ describe('headline', () => {
     expect(headline({ kind: 'unreachable' }).note).toMatch(/reload/i);
   });
 
+  /**
+   * Without the Gmail permission the popup cannot read the tab's address, so this is the state a user
+   * looking at Gmail actually sees. It must say nothing is checked, never that there is nothing to check.
+   */
+  it('tells a user who withheld Gmail access that nothing is being checked', () => {
+    const head = headline({ kind: 'no-gmail-access' });
+    expect(head.tone).toBe('unknown');
+    expect(head.score).toBe('');
+    expect(head.note).toMatch(/checks nothing/i);
+    expect(head.note).toMatch(/allow access/i);
+    expect(head.label).not.toBe(headline({ kind: 'not-gmail' }).label);
+    expect(cardButtonLabel({ kind: 'no-gmail-access' })).toBeNull();
+    expect(findingsLine({ kind: 'no-gmail-access' })).toBeNull();
+  });
+
   it('offers no verdict glyph where there is no verdict', () => {
     for (const kind of ['not-gmail', 'no-message', 'pending'] as const) {
       expect(headline({ kind }).glyph).toBe('');
@@ -267,7 +282,11 @@ describe('reportRow', () => {
     expect(row?.note).toMatch(/open a message first/i);
   });
 
-  it.each([{ kind: 'not-gmail' } as const, { kind: 'unreachable' } as const])(
+  it.each([
+    { kind: 'not-gmail' } as const,
+    { kind: 'no-gmail-access' } as const,
+    { kind: 'unreachable' } as const,
+  ])(
     'offers nothing for $kind, where a report would describe nothing',
     (state) => {
       expect(reportRow(state)).toBeNull();
