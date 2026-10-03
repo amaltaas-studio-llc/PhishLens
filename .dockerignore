@@ -1,0 +1,7 @@
+.git
+node_modules
+dist
+dist-firefox
+harness/.build
+smoke-output
+coverage

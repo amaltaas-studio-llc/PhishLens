@@ -130,7 +130,12 @@ npm run screenshots  # regenerates docs/assets/ from that page
 ```
 
 Every state is a URL (`?fixture=…&semantic=…&view=…&card=1`), including each `SemanticStatus` and both
-colour schemes. If you change the badge or card, regenerate the screenshots in the same commit so the README
+colour schemes.
+
+`npm run smoke:browsers` (or `npm run smoke:docker`, which needs only Docker) loads the harness and the
+built extension into real browsers and checks layout, page errors and the on-device choice. It is not
+part of `verify`, because it needs browsers, but CI runs it; run it after changing the card, the badge, or
+an extension page. Its checks are geometry and structure, never pixels: do not add a screenshot baseline. If you change the badge or card, regenerate the screenshots in the same commit so the README
 does not drift.
 
 ## Comments and documentation

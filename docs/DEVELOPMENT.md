@@ -43,6 +43,9 @@ npm run test:watch
 npm run test:coverage
 
 npm run verify       # lint, typecheck, test, build, dist check: the gate before committing
+
+npm run smoke:browsers  # load the extension and harness in every installed browser (see "Browser smoke test")
+npm run smoke:docker    # the same in Chromium and Firefox ESR in a container; needs only Docker
 ```
 
 The icons are drawn by code: every build reruns `scripts/gen-icons.mjs` into `assets/icons/` and copies
@@ -194,6 +197,45 @@ in production while passing in CI.
 Fixture philosophy and the both-directions assertion are described in
 [DETECTION.md](DETECTION.md#the-score) and [AGENTS.md](../AGENTS.md).
 
+### Browser smoke test
+
+Vitest runs in Node with jsdom, which has no layout and no extension runtime, so two kinds of breakage pass
+it: a card that renders wider than its frame in one engine, and an extension page that throws on load in
+one browser. `scripts/browser-smoke.mjs` loads the real thing into real browsers and checks both:
+
+- **The harness**, over every fixture, every semantic state, the "not checked" card, and the badge and list
+  views: the badge is visible, the card fits the viewport, nothing in it is wider than the card or clipped
+  by its container, the badge and card agree on the score, the "not a judgement that the message is safe"
+  sentence is on the unreadable card, and nothing logs an error.
+- **The extension**, loaded unpacked: the background starts, the welcome page opens on install, and the
+  welcome, options and popup pages load without errors. The on-device choice is offered exactly where
+  the browser has a Prompt API, and the options page shows the right version.
+
+```bash
+npm run smoke:browsers                           # every supported browser installed here
+npm run smoke:browsers -- --browsers=edge,firefox
+CHROME_PATH=/opt/chrome/chrome npm run smoke:browsers -- --browsers=chrome
+npm run smoke:docker                             # nothing installed but Docker
+```
+
+Supported names are `chrome`, `edge`, `chromium` and `firefox`. A named browser that cannot be found fails
+the run; without `--browsers`, missing ones are skipped with a note. Chromium browsers are driven over the
+DevTools protocol on a pipe, which is the one way left to load an unpacked extension into branded Chrome
+(137 and later ignore `--load-extension`); Firefox over WebDriver BiDi, which installs it as a temporary
+add-on. Neither needs a dependency: Playwright and Puppeteer are left out for the reason in
+`scripts/screenshots.mjs`, and Playwright's Firefox and WebKit cannot load extensions at all.
+
+The checks are about structure and geometry, never pixels. Fonts render differently on every operating
+system, so a pixel baseline only matches the machine that recorded it. Screenshots of each browser's
+pages still go to `smoke-output/`, with `report.json`, for a person to look at. Firefox refuses to capture
+its own extension pages over BiDi, so it contributes harness screenshots only.
+
+`smoke:docker` builds `scripts/browser-smoke.Dockerfile` (Debian's Chromium and Firefox ESR on Node 24) and
+runs the suite inside it, with `smoke-output/` mounted back to the host. The first run downloads the
+browsers into the image; later runs reuse it.
+
+Safari is not covered: it runs only on macOS, and ShoutPhish does not support it yet.
+
 ### Measuring against real mail
 
 Fixtures prove a rule does what it was written to do; only a corpus says what it does to mail nobody wrote
@@ -237,6 +279,11 @@ Firefox's rules better than any check written here.
 
 The build and the dist check run once, on the current LTS: the bundle is the same bytes whichever Node
 produced it, and the floor is already exercised by lint, typecheck and test.
+
+A separate job runs the [browser smoke test](#browser-smoke-test) against the stable Chrome, Edge and
+Firefox the Ubuntu runner image already ships, so nothing is downloaded. The browsers are named
+explicitly, so one that disappears from a future image fails the job rather than being skipped. The
+screenshots are uploaded as an artifact even when a check fails, since that is when they are wanted.
 
 Every job checks out with `persist-credentials: false`, because `npm ci` runs dev-dependency install
 scripts and nothing after the checkout needs to act as this repository. Third-party actions are pinned to a

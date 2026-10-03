@@ -22,6 +22,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "lint:firefox": "web-ext lint --source-dir dist-firefox --warnings-as-errors",
+    "smoke:browsers": "npm run build && npm run build:firefox && node scripts/browser-smoke.mjs",
+    "smoke:docker": "node scripts/browser-smoke.mjs --docker",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
