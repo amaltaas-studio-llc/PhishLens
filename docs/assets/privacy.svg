@@ -79,7 +79,7 @@
       <path d="M4.5 4.5 L16 16" />
     </g>
     <text class="t" x="70" y="32" font-size="15">No copy of your mail is kept</text>
-    <text class="s" x="70" y="52" font-size="13">Nothing is saved to disk. Results stay in memory until you close the tab; only settings and trusted senders are kept.</text>
+    <text class="s" x="70" y="52" font-size="13">Message content is never saved to disk. Results stay in memory; only settings and trusted senders are kept.</text>
   </g>
 
   <!-- Nothing opened. A link with a bar through it. -->
