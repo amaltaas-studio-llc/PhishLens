@@ -55,7 +55,7 @@ export default tseslint.config(
       },
     },
     rules: {
-      // --- Explicitly required by the project brief -------------------------
+      // --- Type safety -----------------------------------------------------
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unsafe-assignment': 'error',
       '@typescript-eslint/no-unsafe-member-access': 'error',

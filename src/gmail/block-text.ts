@@ -3,9 +3,9 @@
  *
  * `textContent` concatenates text nodes exactly, so two table cells or two `<div>`s a reader sees on
  * separate lines come back as one word: a footer of "Privacy policy" beside "Unsubscribe" reads
- * `policyunsubscribe`. Every rule anchored on a word boundary then misses the word, and in the case that
- * found this, a newsletter's unsubscribe line was invisible to the bulk-mail test whose job is to stop
- * marketing wording being read as a scam.
+ * `policyunsubscribe`. Every rule anchored on a word boundary then misses the word, and a newsletter's
+ * unsubscribe line becomes invisible to the bulk-mail test whose job is to stop marketing wording being
+ * read as a scam.
  *
  * The list is HTML's block-level and line-breaking elements, not Gmail markup, which is why it is here
  * rather than in `selectors.ts`. `display` set by CSS is not consulted, for the reason the hidden-text scan
@@ -19,7 +19,7 @@ export const BLOCK_BOUNDARY =
 
 /**
  * Past this many elements the remaining ones are left fused. The cost is words a rule may miss, which is
- * where every message stood before breaks were inserted at all.
+ * no worse than reading `textContent` with no breaks inserted at all.
  */
 const MAX_BOUNDARIES = 20_000;
 

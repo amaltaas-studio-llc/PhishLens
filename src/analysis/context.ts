@@ -81,7 +81,7 @@ export interface LinkAnalysis {
    *
    * The reason host rules iterate this rather than reading `hostname`. Unwrapping a redirect *adds* a
    * host to examine; it does not replace the one in the href, which is the server the reader's click
-   * actually reaches. Judging only the unwrapped target let `paypa1.com/invoice?next=https://paypal.com/`
+   * actually reaches. Judging only the unwrapped target would let `paypa1.com/invoice?next=https://paypal.com/`
    * pass every host rule, since the parameter named a destination nobody would question. The parameter
    * is whatever the attacker typed, and the entry host is the one thing they cannot dress up. Empty for
    * a non-web href.
@@ -252,7 +252,7 @@ export interface AnalysisContext {
    * Restricted to claims found in the display name, the sender's local part, or the subject. A brand
    * named only in the body is deliberately excluded: a coffee shop's newsletter linking to its
    * Instagram, or an invoice saying "pay by card or PayPal", mentions a brand without claiming to be
-   * it, and treating that as an identity claim produced false positives across every rule that
+   * it, and treating that as an identity claim would produce false positives across every rule that
    * consumes this field.
    */
   primaryClaim: BrandClaim | undefined;
@@ -540,8 +540,8 @@ const MAX_KEYWORD_OCCURRENCES = 16;
  *
  * Running the words together is what reads `p a y p a l` and `Micro Soft` as the brands they spell, but
  * a match allowed to *start* mid-word reads names that spell nothing: "Miriam Stearns" folds (`rn`→`m`)
- * and joins to `mlrlamsteams`, which contains `msteams`, and a list regular was reported at `high` as
- * Microsoft impersonation. Spacing a brand out starts it at a word; a person's name that happens to
+ * and joins to `mlrlamsteams`, which contains `msteams`, so mail from that person would be reported at
+ * `high` as Microsoft impersonation. Spacing a brand out starts it at a word; a person's name that happens to
  * straddle one does not. Inside a single word anything goes, because `SecurePayPal` is a claim.
  */
 function containsKeyword(source: ClaimSource, folded: string): boolean {
@@ -563,7 +563,7 @@ function containsKeyword(source: ClaimSource, folded: string): boolean {
  * same claim. Since folding strips separators, a match is a substring match (one that may not begin
  * mid-word, see `containsKeyword`): safe for a long keyword and wrong for a short one, because `irs` sits inside "first" and "chairs" and `aws` inside "lawsuit".
  * Short keywords therefore have to be a whole folded word. The cost is missing `I.R.S.`, which no rule
- * relies on; the benefit is that ordinary prose no longer claims to be a tax authority.
+ * relies on; the benefit is that ordinary prose does not claim to be a tax authority.
  */
 function detectBrandClaims(
   sources: readonly ClaimSource[],
@@ -583,10 +583,10 @@ function detectBrandClaims(
  * Ordering matters because the impersonation rules read the first claim, and a display name naming two
  * brands is not unusual: a product can carry one brand's word inside its own name. A name like `Amazon
  * Appstore Team` claims Amazon and, through the `appstore` keyword, Apple, so with the table's own order
- * as the only tiebreak, mail from a domain Amazon owns was reported as Apple impersonation at `high`,
- * with a correlation on top of it. Nothing about such a message is wrong; the answer to "which brand is
- * this?" was decided by which entry happens to be written first in `brands.ts`, which is not a fact
- * about the message at all.
+ * as the only tiebreak, mail from a domain Amazon owns would be reported as Apple impersonation at
+ * `high`, with a correlation on top of it. Nothing about such a message is wrong; the answer to "which
+ * brand is this?" would be decided by which entry happens to be written first in `brands.ts`, which is
+ * not a fact about the message at all.
  *
  * So, after the source that named it: a brand that owns the sending domain wins, because a message from
  * `amazon.com` naming Amazon *is* Amazon and the second name is a product word. Failing that, the

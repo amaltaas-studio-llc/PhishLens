@@ -11,7 +11,7 @@ import { loadAllFixtures } from './fixtures/load.js';
  * A pattern can be valid, compile, sit inside a theme that fires on its fixture, and still contain words
  * that never match anything: `\b(terminat|deactivat)\b` reads as covering "terminated" and matches
  * neither, and `i (have|'ve)` reads as covering "I've" and needs a space before the apostrophe. Both
- * shipped, both behind live alternatives that kept every other test green. The only check that sees this
+ * can sit behind live alternatives that keep every other test green. The only check that sees this
  * is one that asks for each alternative to appear, as itself, inside a real match of its own pattern.
  *
  * So the corpus is deliberately prose a sender would write, not strings built from the regex: a
@@ -151,7 +151,7 @@ const EXAMPLES: readonly string[] = [
   'We hold an unclaimed inheritance for you.',
   'There is unclaimed money waiting for you.',
   'You have an unclaimed balance.',
-  // gaps the first pass of this test found
+  // mixed themes: alternatives nothing above reaches
   'If you do not act, the case will close.',
   "If you don't reply, we will proceed.",
   'Confirm it was you who signed in.',

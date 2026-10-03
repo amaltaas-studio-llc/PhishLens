@@ -43,7 +43,7 @@ describe('welcome page guidance for the on-device model', () => {
 
   /**
    * Chrome can report "downloading" indefinitely, and asking again never moves it along. A page that only
-   * waited for it read as stuck; creating a session with a monitor is what shows progress or resumes it.
+   * waited for it would read as stuck; creating a session with a monitor is what shows progress or resumes it.
    */
   it('gives a download in progress a way forward, not only a wait', () => {
     const guidance = onDeviceGuidance('downloading', 'chrome');

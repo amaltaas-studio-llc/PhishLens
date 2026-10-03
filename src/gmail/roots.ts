@@ -13,7 +13,7 @@
  * would also wake on every advert and chat-roster change, which for the message observer means
  * re-extracting a message.
  *
- * Shared by `observer.ts` and `content/list-marks.ts` because both learned this the same way. The rule is
+ * Shared by `observer.ts` and `content/list-marks.ts` because both are exposed to it. The rule is
  * one rule (watch the region, and watch for the region being replaced), and a second copy of it is the
  * copy that is missing the day Gmail changes shape.
  */

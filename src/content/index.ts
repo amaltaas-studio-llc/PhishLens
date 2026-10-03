@@ -28,9 +28,9 @@ function main(): void {
 
   /*
    * A page restored from the back/forward cache does not run this script again, so without this the tab
-   * came back with every listener removed by `pagehide` and no badge on anything, for as long as it stayed
-   * open. A fresh controller rather than restarting the stopped one: `stop()` is final by design, which is
-   * what lets it be safe against work still in flight from before the page was hidden.
+   * would come back with every listener removed by `pagehide` and no badge on anything, for as long as it
+   * stayed open. A fresh controller rather than restarting the stopped one: `stop()` is final by design,
+   * which is what lets it be safe against work still in flight from before the page was hidden.
    */
   window.addEventListener('pageshow', (event) => {
     if (!event.persisted) return;

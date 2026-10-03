@@ -91,9 +91,9 @@ export class Controller {
    * back/forward cache gets a new one (see `content/index.ts`).
    *
    * Checked after every `await`, because each is a point at which `pagehide` may have run. Without it a
-   * `start()` still waiting on settings went on to register its listeners after `stop()` had removed
-   * them, and a settings reload in flight rebuilt the list observer and warmed the model on a page that
-   * had already been torn down.
+   * `start()` still waiting on settings would go on to register its listeners after `stop()` had removed
+   * them, and a settings reload in flight would rebuild the list observer and warm the model on a page
+   * that had already been torn down.
    */
   #stopped = false;
   #settingsRequest = 0;
@@ -358,8 +358,8 @@ export class Controller {
 
     // An open card is updated in place, the refined score replacing the deterministic one, without
     // re-animating or losing the reader's scroll position. This happens whether or not the badge is
-    // shown: a refinement that lands on "low" hides the badge, and returning early there used to leave
-    // the card displaying the score it had just superseded.
+    // shown: a refinement that lands on "low" hides the badge, and returning early there would leave the
+    // card displaying the score it had just superseded.
     if (this.#panel.isOpen) {
       this.#panel.open(viewOf(active, result, this.#settings));
     }
@@ -463,7 +463,8 @@ export class Controller {
    *
    * The third part is the one that makes a score arguable from a released build. The card already
    * explains the score to the person reading it, but every sentence in it is built around their own
-   * mail, so the only way to report "this check should not have fired" used to be a development build.
+   * mail, so without this the only way to report "this check should not have fired" would be a
+   * development build.
    */
   #report(): string {
     return this.#health.report(
@@ -595,8 +596,8 @@ export class Controller {
        * Repainted rather than re-analysed. `showBadgeWhenLow` decides whether a low verdict is shown at
        * all, and the verdict itself is unchanged, so running the message through the engine again to
        * make the badge appear would reset the AI status to pending, re-record a health sample, and on a
-       * cache miss ask the model a question it has already answered. Without this the switch did nothing
-       * until the reader opened another message, which looks like a setting that does not work.
+       * cache miss ask the model a question it has already answered. Without this the switch would do
+       * nothing until the reader opened another message, which looks like a setting that does not work.
        */
       this.#repaintActive();
     }

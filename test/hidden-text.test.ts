@@ -178,8 +178,8 @@ describe('hidingTechnique', () => {
   /**
    * A box with no height does not erase what is in it (the content overflows and is drawn anyway), which
    * is why the preheader idiom is `max-height:0;overflow:hidden` and never the height alone. Without the
-   * pair, this read a spacer row and any `height:0` layout reset as concealment and removed the visible
-   * paragraphs *inside* them.
+   * pair, this would read a spacer row and any `height:0` layout reset as concealment and remove the
+   * visible paragraphs *inside* them.
    */
   it('does not read a zero dimension as concealment unless it is also clipped', () => {
     for (const style of [
@@ -308,12 +308,11 @@ describe('findHiddenSubtrees', () => {
   });
 
   /**
-   * The bug this file existed to prevent, arriving through the one door it left open: a technique was
-   * judged on an element and then applied to its whole subtree. `font-size:0` on a container is how bulk
-   * mail collapses the whitespace between its tags, and every paragraph inside it names its own size and is
-   * drawn at it. A genuine newsletter built that way had its entire body (a thousand characters the reader
-   * was looking at) removed before scoring, which left the message scored on its subject and sender alone
-   * with nothing on the card to say so.
+   * Over-reporting through a container: a technique judged on an element and then applied to its whole
+   * subtree. `font-size:0` on a container is how bulk mail collapses the whitespace between its tags, and
+   * every paragraph inside it names its own size and is drawn at it. Read that way, a genuine newsletter
+   * would have its entire body (everything the reader is looking at) removed before scoring, leaving the
+   * message scored on its subject and sender alone with nothing on the card to say so.
    */
   it('leaves a zero font size alone when what is inside sets its own', () => {
     const root = element().append(
@@ -326,9 +325,9 @@ describe('findHiddenSubtrees', () => {
   });
 
   /**
-   * The same escape had been all-or-nothing: one descendant naming a size exempted the whole container,
-   * including text the container held itself. An empty override beside a paragraph of filler was enough to
-   * keep the filler in the body the content rules read.
+   * The same escape must not be all-or-nothing: if one descendant naming a size exempted the whole
+   * container, including text the container holds itself, an empty override beside a paragraph of filler
+   * would be enough to keep the filler in the body the content rules read.
    */
   it('does not let an empty override exempt the text beside it', () => {
     const root = element().append(
@@ -354,8 +353,8 @@ describe('findHiddenSubtrees', () => {
 
   /**
    * A size that is a multiple of the parent's is a multiple of zero. `1em` inside `font-size:0` is as
-   * invisible as no size at all, and reading it as an override let a container of hidden filler keep all
-   * of it in the body.
+   * invisible as no size at all, and reading it as an override would let a container of hidden filler keep
+   * all of it in the body.
    */
   it('does not read a size relative to the hidden parent as an override', () => {
     for (const size of ['1em', '100%', '1.2em', '2ex']) {
@@ -388,7 +387,7 @@ describe('findHiddenSubtrees', () => {
     expect(hiddenChars(root).kept).toBe(0);
   });
 
-  /** The concealment case is unchanged: nothing inside asks to be drawn, so nothing is. */
+  /** The concealment case itself: nothing inside asks to be drawn, so nothing is. */
   it('still finds a zero font size whose subtree never overrides it', () => {
     const root = element().append(
       element({ style: 'font-size:0' }).append(element({ style: 'color:#333' })),

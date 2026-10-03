@@ -121,8 +121,9 @@ export function isLocatable(signal: SecuritySignal): boolean {
 /**
  * The evidence block: what kind of thing it is, a label, and the value beneath it.
  *
- * One function so the three cannot disagree. Label and body were separate, with opposite precedence, so
- * a signal carrying both a URL and a value showed the value under the heading for a link.
+ * One function so the three cannot disagree. A separate label and body can end up with opposite
+ * precedence, so a signal carrying both a URL and a value would show the value under the heading for a
+ * link.
  *
  * The kind is what the card styles by, and the distinction is one a reader needs: `quote` is words the
  * sender wrote, while `value` and `url` are things ShoutPhish measured (a domain, a filename, where a

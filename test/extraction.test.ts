@@ -112,8 +112,8 @@ describe('what the card says when nothing was checked', () => {
   });
 
   /**
-   * Asserted by *finding* the emphatic note rather than by position. The card marked one paragraph
-   * emphatic by index, which silently moved onto a cause line as soon as two parts were unread, leaving the
+   * Asserted by *finding* the emphatic note rather than by position. Marking one paragraph emphatic by
+   * index would silently move the emphasis onto a cause line as soon as two parts were unread, leaving the
    * sentence that carries the whole point of this state, unemphasised.
    */
   it.each([[['sender']], [['sender', 'subject']], [[]]] as MessagePart[][][])(
@@ -270,8 +270,8 @@ describe('the session health tally', () => {
   });
 
   /**
-   * Observed in production: a healthy session reported drift in six groups and the popup warned that
-   * Gmail had changed, because a no-match was counted as a fallback. Most of the selector table is
+   * Counting a no-match as a fallback makes a healthy session report drift in several groups and the popup
+   * warn that Gmail has changed. Most of the selector table is
    * *expected* to miss on any given message: nothing collapsed in a single-message thread, no quoted
    * reply, no attachments, no list rows while a message is open, and no unauthenticated-sender avatar
    * exactly when the sender authenticated. A warning that fires on every ordinary session is one nobody
@@ -301,11 +301,11 @@ describe('the session health tally', () => {
   });
 
   /**
-   * The other half of the same production report: `warningBanner` came back as `document #4`, which reads
-   * like a group hanging on by its last candidate and is nothing of the sort. The probe searches the page
-   * once the message comes up empty, and the page of a message with no warning on it always holds
-   * something for `role="alert"` to find. Counting that made the row fire on ordinary mail just as surely
-   * as counting a no-match did.
+   * The other half of the same failure: `warningBanner` reported as `document #4` reads like a group
+   * hanging on by its last candidate and is nothing of the sort. The probe searches the page once the
+   * message comes up empty, and the page of a message with no warning on it always holds something for
+   * `role="alert"` to find. Counting that would make the row fire on ordinary mail just as surely as
+   * counting a no-match.
    */
   it('does not read a page-wide match as drift in a group read from the message', () => {
     const log = new HealthLog();

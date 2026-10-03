@@ -91,7 +91,7 @@ export type TriageSeverity = Extract<Severity, 'high' | 'critical'>;
  * The floor for marking a row at all, and deliberately higher than the floor for reporting a finding in
  * the card.
  *
- * `medium` was tried and is wrong here. The generous half of `identity.unsupported_org_claim` fires on
+ * `medium` would be wrong here. The generous half of `identity.unsupported_org_claim` fires on
  * `"Accounts Receivable" <ar@a-supplier.example>` (a departmental name that shares no word with its own
  * company's domain), which is a reasonable thing to mention beside a full score and a bad thing to put on
  * an inbox row, where it is the *only* thing said about the message. At `high` the marks left are

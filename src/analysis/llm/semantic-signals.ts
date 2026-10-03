@@ -68,7 +68,7 @@ function severityForRisk(analysis: SemanticAnalysis, corroborated: boolean): Sev
  * Multiplying by confidence means a hedged verdict contributes proportionally less, which is the
  * behaviour we want from a component that is explicitly not authoritative. Subtracting the dead zone
  * first is what stops an uncalibrated model from putting a few points on every clean message; see
- * `SEMANTIC_SCORING` for why that mattered enough to change the shape of the function.
+ * `SEMANTIC_SCORING` for why that matters enough to shape the function around it.
  */
 function rawScore(analysis: SemanticAnalysis, corroborated: boolean): number {
   if (analysis.confidence < SEMANTIC_SCORING.minConfidenceForScoring) return 0;

@@ -266,7 +266,7 @@ describe('healthRow', () => {
 /**
  * The copy affordance is deliberately independent of `healthRow` above. That row stays silent while
  * extraction is healthy, and a score someone disagrees with is a bug report about a healthy session,
- * so attaching the only copy button to the row made the report unreachable in the case it is most
+ * so attaching the only copy button to the row would make the report unreachable in the case it is most
  * wanted for.
  */
 describe('reportRow', () => {

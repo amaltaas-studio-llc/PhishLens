@@ -20,8 +20,8 @@
  *     quoted for is not a concern: one mechanism, not two, since a request can be quoted where a tone
  *     cannot, and vocabulary alone is what a small model over-reads. And the model is not *given* domains,
  *     links or file types, rather than merely told not to reason about them: instructed not to and shown
- *     them anyway, it rated a genuine bank notification 85/100 on the grounds that one of its links was
- *     not specific enough to the bank's own site, a guess it had no means to check, about the one thing
+ *     them anyway, it can rate a genuine bank notification 85/100 on the grounds that one of its links is
+ *     not specific enough to the bank's own site, a guess it has no means to check, about the one thing
  *     deterministic code checks properly. Withholding the data removes the failure instead of
  *     forbidding it. What bias survives is contained in `semantic-signals.ts`.
  */
@@ -103,7 +103,7 @@ export const RESPONSE_SCHEMA = {
       /*
        * maxLength is a runaway guard, not the length the card wants. Chrome's response constraint
        * enforces it by ending the string at that character (mid-word, with the JSON still valid), so
-       * at the card's own length it produced reasons stopping at "'n". Set well above that, it only
+       * at the card's own length it would produce reasons stopping at "'n". Set well above that, it only
        * stops a model that never closes the string, which would otherwise run to the inference
        * timeout and lose the whole answer. The card's length is enforced in parse.ts, which cuts on a
        * word or sentence and can tell a cut from a finished sentence.

@@ -1,10 +1,10 @@
 /**
  * The toolbar popup.
  *
- * Exists because clicking the extension's icon used to do nothing, which is the moment a user decides an
- * extension is half-finished. It answers the three questions asked at that moment: is ShoutPhish running
- * on this tab, what did it make of the message, and (the one that used to require a DevTools console)
- * is the AI layer actually working.
+ * Exists because an icon that does nothing when clicked is the moment a user decides an extension is
+ * half-finished. It answers the three questions asked at that moment: is ShoutPhish running on this
+ * tab, what did it make of the message, and (the one that otherwise needs a DevTools console) is the
+ * AI layer actually working.
  *
  * It holds no state and starts no work. Everything shown is read from the tab that already did the
  * analysis, so opening the popup cannot change a score, and closing it cannot cancel anything.

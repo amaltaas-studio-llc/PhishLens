@@ -87,8 +87,8 @@ export function matchingTrustEntry(
  * means Gmail could not verify the sender at all, which overrides anything else read from the page.
  *
  * Liberal about *where* the evidence comes from, which it has to be. Named verdicts (`dkim: pass`) are
- * only ever scraped from a tooltip that most Gmail builds do not have, so requiring one made this
- * function return `false` for every message and the trust feature unreachable. An aligned `signed-by`
+ * only ever scraped from a tooltip that most Gmail builds do not have, so requiring one would make
+ * this function return `false` for every message and the trust feature unreachable. An aligned `signed-by`
  * row is the same proof by another route: Gmail renders it with the DKIM `d=` domain of a signature it
  * verified, and omits it entirely when there is no valid signature. Presence *is* the verdict.
  *

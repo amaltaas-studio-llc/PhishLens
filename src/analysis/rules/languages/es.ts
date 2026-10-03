@@ -64,8 +64,8 @@ export const es: LanguagePack = {
       compile(String.raw`\bpara (evitar|prevenir) (la )?(suspensi[oó]n|desactivaci[oó]n|cierre|eliminaci[oó]n|bloqueo)\b`),
     ],
     mfa_request: [
-      // No bare `de`/`dé`: it is the commonest Spanish preposition and matched "código de verificación"
-      // as a solicitation. Imperative "dénos"/"danos" stays as its own alternative.
+      // No bare `de`/`dé`: it is the commonest Spanish preposition and would match "código de
+      // verificación" as a solicitation. Imperative "dénos"/"danos" stays as its own alternative.
       compile(
         String.raw`\b(comparta|envie|env[ií]e|proporcione|reenv[ií]e|indique|diga|d[eé]nos|danos)\b[^.!?]{0,40}\b(otp|c[oó]digo (de )?(verificaci[oó]n|seguridad|autenticaci[oó]n|acceso)|clave (de )?(un solo uso|temporal)|pin (de )?upi)\b`,
       ),

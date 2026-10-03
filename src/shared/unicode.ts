@@ -290,9 +290,9 @@ export function skeleton(input: string): string {
     .normalize('NFKD')
     .replace(/\p{Mn}/gu, ''); // drop combining marks left behind by NFKD
 
-  // The table is consulted on the character as written, then on its lowercase. Lowercasing first made
-  // every capital entry unreachable and read a Greek `Η` as its lowercase `η`, an n, so `ΗSBC` and
-  // `HSBC` did not compare equal.
+  // The table is consulted on the character as written, then on its lowercase. Lowercasing first would
+  // make every capital entry unreachable and read a Greek `Η` as its lowercase `η`, an n, so `ΗSBC` and
+  // `HSBC` would not compare equal.
   let folded = '';
   for (const ch of normalized) {
     const lower = ch.toLowerCase();

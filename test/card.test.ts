@@ -132,7 +132,7 @@ describe('the rendered card', () => {
     const root = show(await readyResult(PHISH), PHISH, 'ready');
     const quote = root.querySelector('ul.reasons .quote');
     expect(quote?.textContent).toBe('Verify your account immediately');
-    // The explanation above the list no longer repeats the reasons it introduces.
+    // The explanation above the list introduces the reasons without repeating them.
     expect(root.querySelector('.reading .finding-desc')?.textContent).not.toMatch(/Model's reasoning/u);
   });
 
@@ -163,9 +163,9 @@ describe('the rendered card', () => {
 
 /**
  * The card is repainted in place (the model's reading arriving, a trust click, the ask button), and a
- * repaint replaces every node in it. Each of those used to drop keyboard focus to the page and take the
- * live region with it, so a screen-reader user heard nothing when the reading landed and then had to find
- * their way back into the card from the top of Gmail.
+ * repaint replaces every node in it. A repaint that drops keyboard focus to the page takes the live region
+ * with it, so a screen-reader user hears nothing when the reading lands and then has to find their way
+ * back into the card from the top of Gmail.
  */
 describe('the card across repaints', () => {
   function view(semantic: SemanticStatus, over: Partial<ResultView> = {}): ResultView {

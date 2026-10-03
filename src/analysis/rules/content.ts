@@ -70,8 +70,8 @@ interface ContentPattern {
  *
  * "Never share your verification code with anyone" is the advice attached to almost every genuine one-time
  * code, written from the same vocabulary as the request this rule looks for, and it is the single sentence
- * most likely to be mistaken for it. Reading the warning as the attack scored ordinary transactional mail
- * at 50/100.
+ * most likely to be mistaken for it. Reading the warning as the attack would score ordinary transactional
+ * mail at 50/100.
  *
  * Three bounds carry the precision, and each of them has a counter-example behind it:
  *  - The lookbehinds drop the conditional forms. In "if you do not send us the code", "do not" belongs to
@@ -80,8 +80,8 @@ interface ContentPattern {
  *    plain form is the commonest advice there is: "you should never give your code to a caller".
  *  - It has to end where the matched verb begins, so the negation attaches to *that* verb.
  *  - What may stand between them is enumerated rather than bounded, which is the difference between
- *    negating the solicitation and merely preceding it. Any span of up to sixty characters allowed "do
- *    not hesitate to send me your verification code" to suppress itself: "do not" governs "hesitate"
+ *    negating the solicitation and merely preceding it. Any span of up to sixty characters would allow
+ *    "do not hesitate to send me your verification code" to suppress itself: "do not" governs "hesitate"
  *    there, and the request it introduces is as plain as any. So the gap is either nothing at all, or the
  *    one construction in which a negation does reach across a verb ("will never *ask you to* share"),
  *    which needs an asking verb followed by an infinitive to be that construction at all.
@@ -187,7 +187,7 @@ function isConditionalNegation(sentenceBefore: string, packs: readonly LanguageP
  * A wallet address standing alone, spelled the way only an address can be. A legacy address is base58,
  * which never uses `0`, and mixes case freely, so across its length it all but always carries a letter
  * past `f`; a bech32 address uses its own 32-character alphabet. Without those two constraints every MD5
- * checksum and hex Message-ID starting with 1 or 3 read as a ransom demand, since hex has no `g`–`z` and
+ * checksum and hex Message-ID starting with 1 or 3 would read as a ransom demand, since hex has no `g`–`z` and
  * a hash of that length rarely avoids `0`. It must also stand alone: a run of base58-looking characters
  * inside a URL path, a MIME boundary or a base64 signature block is a fragment of a longer token, joined
  * to it by `/`, `+`, `-`, `=` or `.`.
@@ -335,8 +335,8 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
       /\b(transfer|remit|send|release|process|initiate|authori[sz]e)\b[^.!?]{0,40}\b(\$|usd|eur|gbp|€|£)\s?[\d,]{3,}/u,
       /\b(transfer|remit|send|wire)\b[^.!?]{0,30}\b(funds?|payment|money|amount)\b/u,
       // `swift` needs its noun, or the bank code it introduces: alone it is a surname, a company name
-      // and "a swift response", and paired with any "can't talk" in the same trading update it made a
-      // `critical` combination.
+      // and "a swift response", and paired with any "can't talk" in the same trading update it would make
+      // a `critical` combination.
       /\b((swift|bic) (code|number|address)|swift (transfer|credit|payment|wire|copy)|iban|routing (number|code)|sort code|account (number|details))\b/u,
       /\b(swift|bic)( code)? ?: ?[a-z]{6}[a-z0-9]{1,5}\b/u,
       /\b(beneficiary|recipient) (bank|account|details|information)\b/u,
@@ -351,7 +351,7 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
     score: 30,
     // Where money is *sent*, not how the reader pays. "Update your payment information" and "update your
     // account information" are what every subscription says about a card on file, and a `high` finding
-    // there made ordinary billing mail Suspicious; the fraud is a payee announcing a new account to pay
+    // there would make ordinary billing mail Suspicious; the fraud is a payee announcing a new account to pay
     // into, which is spelled with bank, remittance, payee or account-number wording. "Open a new deposit
     // account" is a bank selling one, so the invitation is excluded; "we have opened a new account" is a
     // payee's announcement and is not.
@@ -383,7 +383,7 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
     // First person throughout: the attack is an employee (or someone posing as one) asking for *their*
     // pay to go somewhere new. Payroll's own announcements talk about the same things in the second person
     // or none ("get your payroll information online", "to change the mailstop your paycheck goes to"),
-    // and reading those as the request put ordinary HR mail at `high`.
+    // and reading those as the request would put ordinary HR mail at `high`.
     patterns: [
       /\bmy (payroll|salary|wage|paycheck|pay ?check|direct deposit|dd) (details|information|account|change|update|deposit)\b/u,
       /\b(change|update|switch|redirect|amend)\b[^.!?]{0,30}\bmy\b[^.!?]{0,20}\b(payroll|salary|direct deposit|paycheck|pay ?check|wages)\b/u,
@@ -424,7 +424,7 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
     patterns: [
       // Bare `attach` is the broken English of "find invoice attach", and is kept as that. "Attached"
       // and "enclosed" are deliberately absent: "your statement is attached" is ordinary mail, and
-      // spelling them in moved a plain notice into this theme.
+      // spelling them in would move a plain notice into this theme.
       /\b(invoice|inv\.?\s?#?\d|bill|statement|receipt|purchase order|po\s?#?\d)\b[^.!?]{0,40}\b(attach|overdue|outstanding|unpaid|due|past due|payment|settle)\b/u,
       /\b(overdue|outstanding|unpaid|past due|final demand)\b[^.!?]{0,30}\b(invoice|balance|amount|payment|account)\b/u,
       /\b(payment|amount) (is )?(now )?(due|overdue|required|pending|outstanding)\b/u,
@@ -495,7 +495,7 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
     patterns: [
       /\b(bitcoin|btc|ethereum|eth|usdt|tether|crypto(currency)?|wallet address)\b[^.!?]{0,50}\b(send|transfer|pay|payment|deposit|address)\b/u,
       // The window may cross a decimal point, because the amount sits between the verb and the coin and
-      // is written "send 0.05 BTC"; stopping at every `.` missed the commonest form of the demand.
+      // is written "send 0.05 BTC"; stopping at every `.` would miss the commonest form of the demand.
       /\b(send|transfer|pay|deposit)\b(?:[^.!?]|(?<=\d)\.(?=\d)){0,40}\b(bitcoin|btc|ethereum|eth|usdt|crypto)\b/u,
       WALLET_ADDRESS,
     ],
@@ -509,9 +509,9 @@ const CONTENT_PATTERNS: readonly ContentPattern[] = [
     score: 30,
     // Each claim needs its object: *you*, *your device*, *one of your passwords*. The bare verbs are
     // the commonest first-person sentences in technical mail: "I have installed the package", "I have
-    // captured the transaction", "it tells me the passphrase is correct" were each reported at `high`.
+    // captured the transaction", "it tells me the passphrase is correct" would each be reported at `high`.
     // A contraction joins its word with no space, so it is spelled `i(?: have|'ve)`; `i (have|'ve)` asks
-    // for "i 've" and never saw "I've", the form these letters are written in.
+    // for "i 've" and would never see "I've", the form these letters are written in.
     patterns: [
       /\bi(?: have|'ve) (been )?(recorded|filmed|captured)\b[^.!?]{0,30}\b(you|your)\b/u,
       /\bi(?: have|'ve) installed\b[^.!?]{0,40}\b(on|in|into) your (device|computer|system|phone|pc|laptop|browser|webcam)\b/u,

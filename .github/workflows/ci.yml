@@ -82,7 +82,7 @@ jobs:
         run: npm run check:dist
 
       # Mozilla's validator, the same rules addons.mozilla.org applies on submission. Warnings fail too:
-      # each one so far has been a real gap, such as a minimum version that predates a declared feature.
+      # a warning marks a real gap, such as a minimum version that predates a declared feature.
       - name: Lint the Firefox build
         run: npm run lint:firefox
 

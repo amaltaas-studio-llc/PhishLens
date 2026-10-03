@@ -69,9 +69,9 @@ export const BADGE_CSS = `
 /**
  * The advisory card.
  *
- * Pinned to the bottom-right of the viewport rather than anchored to the badge. Anchoring meant the
- * card was positioned from the badge's viewport rect, so scrolling the message carried it off screen:
- * the explanation disappeared exactly when the user scrolled down to check the thing it described.
+ * Pinned to the bottom-right of the viewport rather than anchored to the badge. Anchoring would
+ * position the card from the badge's viewport rect, so scrolling the message would carry it off screen:
+ * the explanation would disappear exactly when the user scrolled down to check the thing it described.
  * A fixed corner has no such coupling: it needs no scroll listener, no reflow on resize, and it does
  * not fight Gmail's own scroll containers for space.
  *
@@ -187,7 +187,7 @@ export const PANEL_CSS = `
 .brand { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #80868b; }
 
 /*
- * The score as a ring with the number inside, beside the verdict. The ring replaces a flat meter: a
+ * The score as a ring with the number inside, beside the verdict. A ring rather than a flat meter: a
  * bar can say how much, but not what it is made of, and "made of links" is the first thing a reader
  * wants to know after "how bad".
  */
@@ -577,7 +577,7 @@ li.row.floor { grid-template-columns: 8px 1fr auto; }
  *
  * The highlight is applied by adding a single class token to an existing element and removing it
  * afterwards. Nothing is wrapped, re-parented, or replaced, so Gmail's event handlers on those
- * elements are untouched, which is the constraint the brief sets. `!important` is used because Gmail's
+ * elements are untouched; see `highlight.ts` for why that matters. `!important` is used because Gmail's
  * own link styles are specific, and losing the highlight would make the feature silently useless.
  */
 export const HIGHLIGHT_CSS = `

@@ -109,8 +109,8 @@ function toReasons(value: unknown): string[] {
 /**
  * A reason past the word or character cap, cut where a reader can stop.
  *
- * A hard slice is what produced reasons ending mid-word: the cut is inside a statement and looks like
- * the model gave up. Keep the words that fit, then prefer ending on the last complete sentence among
+ * A hard slice would end reasons mid-word: the cut is inside a statement and looks like the model gave
+ * up. Keep the words that fit, then prefer ending on the last complete sentence among
  * them (unmarked, since nothing of that sentence is missing) and otherwise end on a word with `…`.
  * Text without spaces (Japanese, a pasted token) has no words to count, so the character cap decides.
  */

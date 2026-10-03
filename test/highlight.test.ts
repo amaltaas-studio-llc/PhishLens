@@ -3,9 +3,9 @@
  *
  * Locating a finding's excerpt in the message, which runs on every hover and focus of a finding.
  *
- * The search used to read every element's full `textContent`, which re-reads everything beneath it: the
- * body's length times its depth, both of which the message chooses. These assert that the single-pass
- * search still finds the tightest element, that it gives up within its bounds rather than running on, and
+ * Reading every element's full `textContent` would re-read everything beneath it: the body's length
+ * times its depth, both of which the message chooses. These assert that the single-pass search finds the
+ * tightest element, that it gives up within its bounds rather than running on, and
  * that it treats quoted history the way extraction does.
  *
  * Markup is built with `DOMParser`, not `innerHTML`, as everywhere else in this suite.

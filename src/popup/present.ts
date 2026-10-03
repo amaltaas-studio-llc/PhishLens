@@ -232,8 +232,8 @@ export interface ReportRow {
  * The copy-a-report affordance, or `null` when there would be nothing to report about.
  *
  * Offered whether or not `healthRow` fired, and that is the point. The health row is deliberately silent
- * while extraction is working, so attaching the only copy button to it meant the report was unreachable
- * in exactly the case it is now most useful for: a healthy session that scored one message wrongly.
+ * while extraction is working, so attaching the only copy button to it would make the report unreachable
+ * in exactly the case it is most useful for: a healthy session that scored one message wrongly.
  * Disagreeing with a score is a bug report about a *working* install.
  *
  * Absent only when no content script answered, where a report would describe nothing. The note names
@@ -343,9 +343,9 @@ export function aiRow(settings: Settings, state: PopupState): AiRow {
 /**
  * The one line of advice, where there is any worth giving.
  *
- * `no-output` and `error` on a user-run server are the two that sent people to a console in practice
- * (a rejected origin and a reply truncated by a reasoning model both surface as silence), so those are
- * the ones that name the button that explains them.
+ * `no-output` and `error` on a user-run server are the two whose cause is otherwise only visible in a
+ * console (a rejected origin and a reply truncated by a reasoning model both surface as silence), so
+ * those are the ones that name the button that explains them.
  */
 function fixFor(status: SemanticStatus, aiMode: AiMode): string | null {
   if (status === 'unavailable') {

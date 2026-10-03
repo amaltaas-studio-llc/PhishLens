@@ -146,9 +146,9 @@ describe('semantic layer: unavailable', () => {
 
   /**
    * The card renders these four outcomes with four different messages, so the engine has to keep them
-   * apart. Before this existed the UI only knew `semanticSource === 'none'`, which is the same value for
-   * "this browser has no model" (permanent, worth saying) and "that one attempt failed" (transient, says
-   * nothing about the browser), and identical again to the result the UI shows *while still waiting*.
+   * apart. `semanticSource === 'none'` alone is the same value for "this browser has no model"
+   * (permanent, worth saying) and "that one attempt failed" (transient, says nothing about the browser),
+   * and identical again to the result the UI shows *while still waiting*.
    */
   describe('reports how the semantic stage ended', () => {
     it.each([
@@ -174,10 +174,10 @@ describe('semantic layer: unavailable', () => {
     /**
      * Navigating away mid-inference must not be recorded as a conclusion.
      *
-     * This was a real bug with a confusing symptom: opening a message and leaving before the model
-     * answered cancelled the attempt, the engine reported it as "the model returned no usable
-     * assessment", and that non-answer stuck: the card claimed the model had declined to assess the
-     * message, and nothing retried it until Gmail was reloaded.
+     * Recorded as one, it has a confusing symptom: opening a message and leaving before the model
+     * answers cancels the attempt, the engine reports "the model returned no usable assessment", and
+     * that non-answer sticks: the card claims the model declined to assess the message, and nothing
+     * retries it until Gmail is reloaded.
      */
     it.each([
       ['an attempt that resolves to nothing after being cancelled', cancelledSilently],
@@ -358,8 +358,8 @@ describe('semantic layer: containment', () => {
   });
 
   it('scores nothing at all when no deterministic finding corroborates it', () => {
-    // The real-world regression: an on-device model rating an ordinary newsletter 95/100. With
-    // nothing checkable to support it, it must not put a single point on the score.
+    // An on-device model can rate an ordinary newsletter 95/100. With nothing checkable to support
+    // it, it must not put a single point on the score.
     const signals = semanticToSignals(semantic({ risk: 95, confidence: 0.95 }), []);
     expect(signals[0]?.score).toBe(0);
     expect(signals[0]?.severity).toBe('info');
@@ -431,9 +431,9 @@ describe('semantic layer: containment', () => {
   });
 
   /**
-   * Observed on a real auto-reply: risk 10, confidence 0.9, reasons "standard auto-reply", and
-   * `social_engineering` in the categories slot regardless. The panel headlined it as wording that
-   * mildly resembled social engineering, which is the opposite of what the model concluded.
+   * A model can rate an auto-reply risk 10, confidence 0.9, with the reason "standard auto-reply", and
+   * put `social_engineering` in the categories slot regardless. Headlining that as wording that mildly
+   * resembles social engineering says the opposite of what the model concluded.
    */
   it('disregards a category the model tagged while rating the message routine', () => {
     const corroborating = analyzeDeterministic(PHISH, { now: 0 }).signals;
@@ -445,15 +445,15 @@ describe('semantic layer: containment', () => {
     expect(routine[0]?.title).toMatch(/added nothing to the technical findings/u);
     expect(routine[0]?.title).not.toMatch(/social engineering/u);
     expect(routine[0]?.score).toBe(0);
-    // The rating and the model's own words stay visible; only the headline stops overstating them.
+    // The rating and the model's own words stay visible; only the headline does not overstate them.
     expect(routine[0]?.description).toMatch(/10\/100/u);
     // Nothing to explain away, so the dead-zone note is absent.
     expect(routine[0]?.description).not.toMatch(/do not affect the score/u);
   });
 
   /**
-   * Observed with the on-device model on a real phish: an account-blocking threat with a sign-in link,
-   * rated 16/100, under a deterministic verdict of Suspicious. "Found nothing of concern" there reads as
+   * An on-device model can rate a real phish (an account-blocking threat with a sign-in link) 16/100,
+   * under a deterministic verdict of Suspicious. "Found nothing of concern" there reads as
    * the model vouching for the message, which is the one reading of the card that could get a user hurt.
    */
   describe('a routine reading beside the checks', () => {
@@ -804,9 +804,9 @@ describe('prompt construction', () => {
   });
 
   /**
-   * Shown the link domains and told not to reason about them, an on-device model rated a genuine bank
-   * notification 85/100 on the grounds that one of its links was not specific enough to the bank's own
-   * site, a claim it had no way to check, about the one thing `analysis/rules/` checks properly.
+   * Shown the link domains and told not to reason about them, an on-device model will still rate a
+   * genuine bank notification as high risk because one of its links is not specific enough to the bank's
+   * own site: a claim it has no way to check, about the one thing `analysis/rules/` checks properly.
    * Withholding the data is what makes the instruction true rather than merely stated.
    */
   it('withholds the domains, link targets and file types it is told not to judge', () => {
@@ -892,7 +892,7 @@ describe('prompt construction', () => {
 /**
  * The gate on asking the model at all, and the path that reuses the first paint's checks.
  *
- * Both are performance changes whose only acceptable effect is on time: the gate may skip an inference
+ * Both exist for performance, and their only acceptable effect is on time: the gate may skip an inference
  * only where the inference could not have scored, and reusing the checks must produce the result that
  * running them again would.
  */

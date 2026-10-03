@@ -34,9 +34,9 @@ export interface Brand {
    * ICANN's Specification 13 is what makes this a rule rather than a list of guesses: a brand TLD's string
    * must match the operator's registered trademark, and registrations are restricted to the operator, its
    * affiliates, and its trademark licensees. So any name under `.apple` is Apple's without an entry in
-   * `domains`: nobody else can hold one at all. Without this, a genuine notice about a bank product the
-   * brand operates jointly, sent from the brand's own TLD and authenticated, was reported as brand
-   * impersonation because the domain was not one of the handful this file happens to list.
+   * `domains`: nobody else can hold one at all. Without this, genuine mail sent from the brand's own TLD and
+   * authenticated would be reported as brand impersonation whenever the domain was not one of the
+   * handful this file happens to list.
    *
    * Only strings whose Specification 13 request ICANN records as granted belong here. `.office` is the
    * instructive omission: Microsoft's request for it was withdrawn, so it carries no such guarantee even
@@ -418,10 +418,10 @@ export function brandOwningDomain(registrable: string): Brand | undefined {
  *
  * The brand-scoped half of the same question, and the only form callers should use. Asking
  * `brand.domains.includes(registrable)` instead looks equivalent and is not: it cannot see a brand's own
- * top-level domain, so four rules disagreed with `brandOwningDomain` about who owned a name under `.apple`.
- * A brand's genuine mail was then excluded from the alignment that dampens content heuristics, and its own
- * links were read as pointing somewhere else, a disagreement that showed up as unrelated symptoms in
- * unrelated files, which is what having one question answered in five places buys.
+ * top-level domain, so a rule asking it that way disagrees with `brandOwningDomain` about who owns a name
+ * under `.apple`. The brand's genuine mail is then excluded from the alignment that dampens content
+ * heuristics, and its own links read as pointing somewhere else, a disagreement that shows up as
+ * unrelated symptoms in unrelated files, which is what having one question answered in several places buys.
  */
 export function brandOwns(brand: Brand, registrable: string): boolean {
   if (registrable === '') return false;

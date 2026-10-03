@@ -351,9 +351,9 @@ async function viewFor(state: HarnessState): Promise<PanelView> {
  * One header row per classification, to show the badge's range in a single image.
  *
  * The examples are chosen by analysing the corpus rather than by being listed here, so the image can
- * only ever show bands the fixtures genuinely produce: currently three, since nothing in the corpus is
- * designed to land in `caution`. A hardcoded list would quietly start lying the day a fixture's score
- * moved across a threshold.
+ * only ever show bands the fixtures genuinely produce; a band no fixture lands in (often `caution`, which
+ * nothing in the corpus is designed to reach) is simply left out. A hardcoded list would quietly start
+ * lying the day a fixture's score moved across a threshold.
  */
 async function renderBadges(semantic: SemanticStatus): Promise<void> {
   if (stage === null) return;

@@ -1,7 +1,7 @@
 /**
  * Locates the thing in the message that a finding refers to.
  *
- * Constraint from the brief, taken seriously: *do not break Gmail's own event handlers or markup.*
+ * The constraint this file is built around: *do not break Gmail's own event handlers or markup.*
  * That rules out the obvious implementation (wrap matched text in `<mark>` elements), because
  * re-parenting a node inside a Gmail-managed subtree can detach Gmail's listeners and, for anchors,
  * change what a click does. On a security tool, breaking a link's behaviour would be worse than the

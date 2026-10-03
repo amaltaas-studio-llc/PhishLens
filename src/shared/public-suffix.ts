@@ -57,7 +57,7 @@ export const MULTI_LABEL_SUFFIXES: ReadonlySet<string> = new Set([
  *  - **Whole hosts**, where the tenant gets a *path*: `storage.googleapis.com/<bucket>/page.html`.
  *    These are the ones worth being careful about, because the visible domain belongs to Google,
  *    Amazon or Microsoft and reads as impeccable. That is precisely why phishing kits are served from
- *    them, and the reason a suffix-only list had a hole exactly where the most reputable-looking
+ *    them, and why a suffix-only list would have a hole exactly where the most reputable-looking
  *    addresses are.
  *
  * A curated subset, like the rest of this file. Regional forms that cannot be expressed as a suffix
@@ -169,9 +169,9 @@ export interface ClickTracker {
  * This list adds the case that check cannot see: a sender on its own domain whose links are rewritten to
  * the platform's.
  *
- * Matching a registrable domain with every subdomain is what this replaced, and it was a hole: the list
- * carried `google.com`, `substack.com` and `ghost.io`, so a link to a form on `docs.google.com` or a page
- * on anyone's `*.ghost.io` publication was exempt from the anchor-mismatch rules as a "tracker". Only an
+ * Matching a registrable domain with every subdomain would be a hole: listing `google.com`, `substack.com`
+ * and `ghost.io` that way would exempt a link to a form on `docs.google.com` or a page on anyone's
+ * `*.ghost.io` publication from the anchor-mismatch rules as a "tracker". Only an
  * endpoint that does nothing but forward a click may be listed, and a platform that also lets its users
  * publish belongs in `OPEN_HOSTING_SUFFIXES` instead.
  */

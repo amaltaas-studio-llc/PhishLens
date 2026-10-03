@@ -8,8 +8,8 @@
  * for resolves to "unavailable" rather than throwing, hanging, or inventing a verdict.**
  *
  * Each case installs a fake global, so these run in plain Node with no browser. The fakes must match
- * the browser's *shape*, not merely its interface: the modern global is a class, and fakes that were
- * plain objects let a probe bug through that disabled on-device analysis in every real browser.
+ * the browser's *shape*, not merely its interface: the modern global is a class, and a fake that is a
+ * plain object passes a probe that would disable on-device analysis in every real browser.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ChromePromptAnalyzer } from '../src/analysis/llm/chrome-prompt.js';
@@ -55,9 +55,9 @@ afterEach(() => {
  * A factory in the modern shape: static `availability()` + `create()`.
  *
  * Returned as a **class**, because that is what the browser exposes. This matters more than it
- * looks: an earlier version of this suite used an object literal here, which passed happily while
- * the adapter rejected every real browser, since `typeof LanguageModel === 'function'` and the
- * probe was guarding on `typeof === 'object'`. A fake in the wrong shape tests nothing.
+ * looks: an object literal here would pass happily against a probe guarding on `typeof === 'object'`,
+ * which rejects every real browser, since there `typeof LanguageModel === 'function'`. A fake in the
+ * wrong shape tests nothing.
  */
 function modernFactory(options: { availability?: string; promptResult?: unknown } = {}) {
   const prompt = vi.fn((_input: string, _promptOptions?: unknown) =>
@@ -98,8 +98,8 @@ describe('on-device adapter: availability', () => {
 
   it('finds the bare LanguageModel global when it is a class, as browsers ship it', async () => {
     const { factory } = modernFactory();
-    // Regression: the probe once required `typeof === 'object'`, so this returned false on every
-    // browser that had a working model. Keep the fake function-typed.
+    // A probe requiring `typeof === 'object'` returns false on every browser that has a working
+    // model. Keep the fake function-typed.
     expect(typeof factory).toBe('function');
 
     install({ LanguageModel: factory });
@@ -157,7 +157,7 @@ describe('on-device adapter: availability', () => {
     ['a factory whose create is not callable', { availability: () => Promise.resolve('available'), create: 42 }],
     ['a non-object global', 'LanguageModel'],
     ['a null global', null],
-    // Broadening the guard to accept function-typed hosts must not accept *any* function.
+    // A guard that accepts function-typed hosts must not accept *any* function.
     ['a function global with no create', () => undefined],
   ])('fails closed on %s', async (_label, fake) => {
     install({ LanguageModel: fake });
@@ -543,11 +543,12 @@ describe('on-device adapter: one conversation per message', () => {
 /**
  * A session that behaves like the real one: it refuses a prompt while another is outstanding.
  *
- * This is the fake that reproduces the "no AI assessment on the first email after opening Gmail" bug.
- * Gmail renders a thread in stages, so the observer legitimately reports the same first message two or
- * three times as the body fills in; each report started an inference, the later ones were rejected, and
- * the adapter's rejection handler destroyed the session out from under the first, so all of them
- * failed. Later messages arrive in one render, never collide, and always worked.
+ * Without this behaviour a fake cannot show the failure that matters: no AI assessment on the first
+ * email after opening Gmail. Gmail renders a thread in stages, so the observer legitimately reports the
+ * same first message two or three times as the body fills in. If each report starts an inference, the
+ * later ones are rejected, and a rejection handler that destroys the session takes it out from under the
+ * first, so all of them fail. Later messages arrive in one render and never collide, which is why only
+ * the first is affected.
  */
 function singleFlightFactory() {
   let inFlight = 0;

@@ -48,7 +48,7 @@ const MACRO_CAPABLE_EXTENSIONS: ReadonlySet<string> = new Set([
  *
  * No `.xml` or `.xsl`. A double-clicked `.xml` opens as a data tree, not a page, and it is the format
  * structured invoices travel in (national e-invoicing schemes deliver every supplier invoice as one),
- * so listing it reported each of those as a web page and paired it with the word "invoice" into a
+ * so listing it would report each of those as a web page and pair it with the word "invoice" into a
  * `critical`. What actually renders a page from a local file is the rest of this list.
  */
 const SCRIPT_CONTAINER_EXTENSIONS: ReadonlySet<string> = new Set([
@@ -262,8 +262,7 @@ function filenameSpoofingAttachments(context: AnalysisContext): SecuritySignal[]
 
 /**
  * Emitted when there are attachments but none matched a risk rule, so the panel can state the
- * negative finding explicitly. The brief's example explanation includes "No suspicious attachment
- * was detected", and saying so is more useful than silence.
+ * negative finding explicitly: "No suspicious attachment detected" is more useful than silence.
  */
 function benignAttachmentsNote(context: AnalysisContext): SecuritySignal[] {
   if (context.attachments.length === 0) return [];

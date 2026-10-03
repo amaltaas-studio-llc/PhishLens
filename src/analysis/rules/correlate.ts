@@ -90,7 +90,7 @@ function impersonationWithCredentialAsk(
 ): SecuritySignal[] {
   // The medium half of `unsupported_org_claim` is generous by design ("shares no name with the sending
   // domain" is also every recruiting, ticketing and survey platform writing on a customer's behalf), and
-  // "confirm your account" is what those platforms send. Pairing the two made a `critical` of a job
+  // "confirm your account" is what those platforms send. Pairing the two would make a `critical` of a job
   // application. Only the institutional claim, a bank or payment body writing from a personal mailbox,
   // is impersonation certain enough to carry this finding.
   const counted = signals.filter(
@@ -107,9 +107,9 @@ function impersonationWithCredentialAsk(
   // Named only when the signal that fired is one about a claimed brand *and* a claim was identified.
   // Three of the triggers are not: a domain imitating the reader's own employer, an organisation the
   // brand table has never heard of, and a punycode domain all describe impersonation of something this
-  // finding cannot name. Reading the label off `primaryClaim` regardless meant a critical finding could
+  // finding cannot name. Reading the label off `primaryClaim` regardless would let a critical finding
   // announce "presents itself as a known organisation" in exactly the cases where no organisation was
-  // recognised, or name a brand mentioned in the body while the impersonation was of the recipient.
+  // recognised, or name a brand mentioned in the body while the impersonation is of the recipient.
   const brand = BRAND_CLAIM_SIGNALS.has(impersonation)
     ? context.primaryClaim?.brand.label
     : undefined;

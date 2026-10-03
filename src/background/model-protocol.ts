@@ -3,10 +3,9 @@
  *
  * Separate from `index.ts` because it is the part of the model-server path with no `chrome` and no socket
  * in it, and therefore the part that can be tested. That matters more here than the file count: every
- * decision below exists because a real runner behaved in a way the code did not expect, and the next
- * runner update is as likely to move the ground again. A protocol detail nothing asserts is one that
- * regresses silently, and its symptom, as this feature has already demonstrated, is a card politely
- * saying the model returned nothing usable.
+ * decision below answers a way real runners differ from one another, and any runner update can move that
+ * ground. A protocol detail nothing asserts is one that regresses silently, and its symptom is a card
+ * politely saying the model returned nothing usable.
  */
 import { RESPONSE_SCHEMA } from '../analysis/llm/prompt.js';
 
@@ -19,7 +18,7 @@ import { RESPONSE_SCHEMA } from '../analysis/llm/prompt.js';
  *
  *  - `response_format` makes the answer machine-readable at the server instead of by our parsing.
  *  - `reasoning_effort: 'none'` asks a reasoning model not to think aloud first. Worth requesting even
- *    though the token budget now tolerates thinking, because thinking is most of the latency of a local
+ *    though the token budget tolerates thinking, because thinking is most of the latency of a local
  *    model and this is a structured judgement rather than a puzzle that benefits from working out.
  *
  * A rung that fails costs one round trip and no generation, so old servers pay for this and current ones
@@ -42,13 +41,13 @@ export const REQUEST_VARIANTS: readonly Readonly<Record<string, unknown>>[] = Ob
 /**
  * Ceiling on generated tokens. Stops a runaway model streaming indefinitely, and nothing else.
  *
- * The assessment is around 150 tokens and 500 looked generous until a reasoning model met it: a
- * Qwen3-class model spends several hundred tokens thinking *before* answering, the runner counts those
+ * The assessment is around 150 tokens, but a budget sized to the answer is not enough: a Qwen3-class
+ * reasoning model spends several hundred tokens thinking *before* answering, the runner counts those
  * against this budget, and the reply arrives cut off mid-string: `finish_reason: 'length'`, unparseable,
  * reported to the user as a model that returned nothing usable. Nothing in that message points at a token
- * limit, which is what made it expensive to find. So the budget assumes a model thinks at length even
- * though the request asks it not to, because `reasoning_effort` is not honoured everywhere. Unused tokens
- * cost nothing; a truncated answer costs the whole feature.
+ * limit, so the cause is hard to find from the outside. The budget therefore assumes a model thinks at
+ * length even though the request asks it not to, because `reasoning_effort` is not honoured everywhere.
+ * Unused tokens cost nothing; a truncated answer costs the whole feature.
  */
 export const MAX_TOKENS = 2000;
 
@@ -106,7 +105,7 @@ export interface UnusableAnswer {
 /**
  * What was wrong with an answer that could not be used, as fields rather than prose.
  *
- * Recorded because this was the one silent failure in the path and the most confusing to be on the
+ * Recorded because this failure is otherwise silent, and the most confusing in the path to be on the
  * receiving end of: HTTP 200, a model plainly running, and nothing to show. The shape separates a
  * truncated reply from a refusal from prose the parser gave up on, which is the difference between raising
  * a limit, fixing a configuration, and changing a prompt.

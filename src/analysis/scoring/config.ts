@@ -33,11 +33,10 @@ export const SEVERITY_CEILINGS: SeverityCeilings = Object.freeze({
 /**
  * Category weights.
  *
- * These deviate from the brief's table in a documented way (docs/adr/0004-scoring-floors-and-weights.md): the table
- * had no row for `content`, and split identity across two overlapping rows ("Authentication /
- * identity 30" + "Sender/domain 15" = 45). Here that 45 becomes `identity: 21` + `authentication:
- * 14` = 35, `content` gets the 15 it needs, `link` and `attachment` are unchanged at 25 and 10, and
- * `llm` drops from 20 to 15 so the weights sum to exactly 100.
+ * The reasoning is in docs/adr/0004-scoring-floors-and-weights.md. Identity and authentication are two
+ * non-overlapping categories sharing 35 points (`identity: 21` + `authentication: 14`) rather than one
+ * claim counted twice, `content` gets the 15 a content-only attack needs, `link` and `attachment` take
+ * 25 and 10, and `llm` is held to 15 so the weights sum to exactly 100.
  *
  * Summing to exactly 100 matters: if the weights summed to more, the final clamp would fire on
  * ordinary suspicious mail, compressing the top of the scale until 80 and 100 meant the same thing.
@@ -112,9 +111,9 @@ const FLOOR_ELIGIBLE_CATEGORIES: readonly SignalCategory[] = Object.freeze([
  *
  * It is an assertion by another system, not an observation of ours: we cannot show the reasoning behind
  * it, and it is *rendered conditionally on the folder being viewed*: Gmail annotates messages in the
- * spam folder in ways it does not in the inbox. A floor here made the headline verdict a function of
- * where the user happened to be looking rather than of the message, and would have let a manual "mark
- * as spam" turn into ShoutPhish confirming the user's own action.
+ * spam folder in ways it does not in the inbox. A floor here would make the headline verdict a function
+ * of where the user happened to be looking rather than of the message, and would let a manual "mark as
+ * spam" turn into ShoutPhish confirming the user's own action.
  */
 const FLOOR_EXCLUDED_SIGNAL_IDS: readonly string[] = Object.freeze(['authentication.gmail_warning']);
 
@@ -368,8 +367,8 @@ export const DAMPENING: DampeningConfig = Object.freeze({
    * Multiplier applied to a dampened signal's raw score.
    *
    * Low enough that a fully-loaded content category on genuine, sender-aligned mail lands well below
-   * the category weight. At 0.4 a real password-reset notice still saturated `content` and scored 15
-   * on the strength of its wording alone, which is not what "we verified this sender" should mean.
+   * the category weight. At 0.4 a real password-reset notice would still saturate `content` and score
+   * 15 on the strength of its wording alone, which is not what "we verified this sender" should mean.
    */
   alignedSenderScoreFactor: 0.25,
   /**
@@ -383,10 +382,10 @@ export const DAMPENING: DampeningConfig = Object.freeze({
 /**
  * Caps on how much the semantic layer may claim, before category capping.
  *
- * **Why there is a dead zone.** An on-device model is not calibrated. Observed behaviour is that it is
- * accurate on genuinely fraudulent mail and systematically over-suspicious on legitimate mail, where
- * it will rate an ordinary product announcement 50-60/100 with high confidence. Scoring a proportional
- * share of that produced a steady few points on every clean message, which is worse than useless: it
+ * **Why there is a dead zone.** An on-device model is not calibrated. It tends to be accurate on
+ * genuinely fraudulent mail and systematically over-suspicious on legitimate mail, where it will rate
+ * an ordinary product announcement 50-60/100 with high confidence. Scoring a proportional share of that
+ * would produce a steady few points on every clean message, which is worse than useless: it
  * removes the difference between "nothing found" and "something found", and a tool whose floor is
  * never zero teaches users that its numbers mean nothing.
  *
@@ -416,9 +415,9 @@ export const SEMANTIC_SCORING = Object.freeze({
    * Top of the prompt's routine band (no concerning request the wording supports) and the point below
    * which a named category is disregarded when wording the finding.
    *
-   * Models fill the `categories` slot as a matter of form. One rated an auto-reply 10/100 and explained
-   * itself with "standard auto-reply", having tagged it `social_engineering` anyway, which the panel
-   * then headlined as wording that resembled social engineering. The rating is the judgement (it is the
+   * Models fill the `categories` slot as a matter of form. One can rate an auto-reply 10/100, explain
+   * itself with "standard auto-reply", and tag it `social_engineering` anyway, which the panel would
+   * then headline as wording that resembles social engineering. The rating is the judgement (it is the
    * number the prompt defines bands for and the number that is scored), so below this the finding reads
    * as clean regardless of the tag.
    */
@@ -430,7 +429,7 @@ export const SEMANTIC_SCORING = Object.freeze({
    * This costs no detection capability, which is what makes it the right call rather than merely a
    * cautious one. The `llm` weight (15) is already below the `caution` threshold (25), so a verdict
    * with nothing else supporting it could never change the classification even at full weight; the
-   * message reads "Low Risk" either way. All that scoring it achieved was moving the number off zero
+   * message reads "Low Risk" either way. All that scoring it would achieve is moving the number off zero
    * on clean mail, destroying the difference between "we found nothing" and "we found something
    * small". The verdict is still shown in full, with the model's reasons, as an informational finding.
    *
@@ -440,7 +439,7 @@ export const SEMANTIC_SCORING = Object.freeze({
   uncorroboratedFactor: 0,
   /** Risk at or above this is reported as a `high` severity semantic signal. */
   highRiskThreshold: 70,
-  /** Raised to sit inside the scoring band, since nothing below `minRiskForScoring` scores at all. */
+  /** Inside the scoring band, since nothing below `minRiskForScoring` scores at all. */
   mediumRiskThreshold: 55,
   /**
    * Maximum reasons rendered, to bound panel size and prompt-injection payload visibility. The prompt asks

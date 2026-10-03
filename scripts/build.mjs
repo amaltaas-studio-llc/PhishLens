@@ -8,8 +8,8 @@
  * docs/adr/0001-esbuild-not-vite.md.
  *
  * `--target=firefox` builds the same sources into dist-firefox/ with a Firefox manifest: see
- * docs/adr/0012-one-source-per-browser-manifests.md. The Chromium build stays in dist/, so every path
- * that already loads or packages it keeps working.
+ * docs/adr/0012-one-source-per-browser-manifests.md. The Chromium build is in dist/, the directory CI,
+ * the release workflow and the install instructions load and package.
  */
 import * as esbuild from 'esbuild';
 import { readFile, writeFile, mkdir, rm, cp, access } from 'node:fs/promises';

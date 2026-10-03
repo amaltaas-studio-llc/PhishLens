@@ -63,8 +63,8 @@ describe('the request ladder', () => {
 
   /**
    * The budget has to hold a reasoning model's thinking *and* the answer, because runners count thinking
-   * against it and `reasoning_effort` is not honoured everywhere. A 9B Qwen3-class model spent 430 tokens
-   * thinking before answering, which is what made 500 too small.
+   * against it and `reasoning_effort` is not honoured everywhere. A 9B Qwen3-class model can spend over 400
+   * tokens thinking before it answers, so a budget of 500 leaves almost nothing for the answer.
    */
   it('leaves room for a model that thinks before answering', () => {
     expect(MAX_TOKENS).toBeGreaterThanOrEqual(1500);
@@ -138,8 +138,8 @@ describe('completionText', () => {
 
 describe('describeUnusable', () => {
   /**
-   * The diagnosis that took the longest to reach without it: the model answered, in valid JSON, and the
-   * budget ended mid-string. Every other parse failure looks identical from the card, so the shape of the
+   * The failure hardest to diagnose without it: the model answers, in valid JSON, and the budget ends
+   * mid-string. Every other parse failure looks identical from the card, so the shape of the
    * reply is what separates raising a limit from changing a prompt.
    */
   it('recognises an answer cut off by the token budget', () => {

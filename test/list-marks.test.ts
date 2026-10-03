@@ -36,7 +36,7 @@ function render(rows: { email: string; name: string }[]): void {
 
 /**
  * Where the marker is pointed: resolved on every call, the way the controller resolves it from the
- * adapter. Handing over a fixed element is what left the marker watching a region Gmail had replaced.
+ * adapter. A fixed element would leave the marker watching a region Gmail has since replaced.
  */
 function region(): Element {
   const root = document.querySelector('div[role="main"]');
@@ -101,8 +101,8 @@ describe('marking inbox rows', () => {
    * The account address arrives late (the first passes run at `document_idle`, before Gmail has rendered
    * its account chrome), and `identity.lookalike_of_recipient_domain` cannot fire without it. It is the
    * most valuable thing a row can say, because no brand table contains the reader's own employer. Keyed on
-   * the sender alone, every row already on screen when the address resolved kept its "nothing to say" and
-   * was skipped for the life of the tab, so the check only ever ran on mail that arrived afterwards.
+   * the sender alone, every row already on screen when the address resolves would keep its "nothing to
+   * say" and be skipped for the life of the tab, so the check would only ever run on mail arriving later.
    */
   it('re-triages rows already on screen once the account address appears', async () => {
     render([{ email: 'accounts@northwind-Iogistics.com', name: 'Accounts' }]);
@@ -151,8 +151,8 @@ describe('marking inbox rows', () => {
 
   /**
    * Recycling a row does not have to replace anything in it: the same `span` can be given a different
-   * `email` and `name`. Watching structure alone, the mark computed for the message that used to be in the
-   * row stayed beside the one that replaced it: a warning about the wrong sender, which is worse than none.
+   * `email` and `name`. Watching structure alone, the mark computed for the row's previous message would
+   * stay beside the one that replaced it: a warning about the wrong sender, which is worse than none.
    */
   it('re-evaluates a row whose sender attributes were rewritten in place', async () => {
     // Starting from mail with nothing to say about it, so the only thing that can wake the marker is the
@@ -172,8 +172,8 @@ describe('marking inbox rows', () => {
 
   /**
    * Gmail replaces its main region wholesale on a view change, and a `MutationObserver` holds the node it
-   * was given. Pointed at an element, the marker went on watching a region that was no longer in the
-   * document (rows kept arriving and none was ever looked at), and no mark is indistinguishable from mail
+   * was given. Pointed at an element, the marker would go on watching a region that is no longer in
+   * the document (rows keep arriving and none is ever looked at), and no mark is indistinguishable from mail
    * with nothing to say about it. Nothing else restarts it: the message observer reattaches for its own
    * purposes and says nothing to this.
    */
@@ -193,8 +193,9 @@ describe('marking inbox rows', () => {
   /**
    * Opening a marked message and coming back to the list. Gmail keeps the `tr` (same sender, same
    * attributes) and rewrites the cells inside it to draw the row as read, which throws the mark away. A
-   * skip that trusted the recorded sender alone read that as "already handled": the warning vanished from
-   * the one row the reader had just been told to distrust, and never came back for the life of the tab.
+   * skip that trusted the recorded sender alone would read that as "already handled": the warning would
+   * vanish from the one row the reader has just been told to distrust, and never come back for the life of
+   * the tab.
    */
   it('restores a mark Gmail discarded when it redrew the row as read', async () => {
     render([{ email: 'security@paypa1-alerts.example', name: 'PayPal Security' }]);

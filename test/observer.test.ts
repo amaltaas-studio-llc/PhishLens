@@ -6,10 +6,10 @@
  * a production build. That combination is why it needs direct tests rather than coverage via the
  * analysis stack.
  *
- * The regression that motivated these: the staleness guard compared the route's conversation id
- * (`FMfcgz…`) against the DOM's thread perm id (`thread-f:…`). Those are two different Gmail id
- * namespaces for the same thread, so the comparison rejected every message and the extension silently
- * never analysed anything on a real inbox.
+ * The sharpest example: a staleness guard comparing the route's conversation id (`FMfcgz…`) against
+ * the DOM's thread perm id (`thread-f:…`). Those are two different Gmail id namespaces for the same
+ * thread, so such a comparison rejects every message and the extension silently never analyses anything
+ * on a real inbox.
  *
  * Runs without a DOM. The observer touches only `window` events, `MutationObserver` and timers, so
  * those are faked here rather than pulling in jsdom for one test file.
@@ -258,7 +258,7 @@ afterEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// The regression
+// Id namespaces
 // ---------------------------------------------------------------------------
 
 describe('route id and DOM thread id namespaces', () => {
@@ -308,8 +308,8 @@ describe('redundant re-render suppression', () => {
   });
 
   /**
-   * The half that must survive the staleness guard being narrowed to message identity: on the route the
-   * reader is actually on, evidence arriving is the most important re-analysis there is, because Gmail's
+   * The half a staleness guard keyed on message identity must still let through: on the route the reader
+   * is actually on, evidence arriving is the most important re-analysis there is, because Gmail's
    * authentication summary is what several of the highest-severity rules read.
    */
   it('re-emits when evidence arrives on the message already on screen', () => {
@@ -330,8 +330,8 @@ describe('redundant re-render suppression', () => {
    * A signature answers whether the message changed. It cannot answer whether what the consumer drew is
    * still on screen, and those come apart: Gmail redraws the message header with equivalent markup, which
    * takes the injected badge with it and leaves every byte of the extraction identical. Suppressing that
-   * as redundant removed the badge for the rest of the message's time on screen, silently, because from
-   * here nothing had changed.
+   * as redundant would remove the badge for the rest of the message's time on screen, silently, because
+   * from here nothing has changed.
    */
   it('re-emits when the header it reported was replaced by an identical one', () => {
     adapter.route = THREAD_A_HASH;
@@ -421,10 +421,10 @@ describe('staleness guard', () => {
    *
    * Gmail reveals parts of a message after drawing the rest (the `mailed-by` / `signed-by` rows behind
    * the details toggle, attachment chips), and it does so on the thread still in the pane, whether or not
-   * the route has moved on. Comparing the whole rendered *view* made that enrichment read as "Gmail has
-   * re-rendered for the new route", so the previous thread's message was emitted under the new thread's
-   * route: a verdict attributed to a message the reader is no longer looking at, which is the one thing
-   * this guard exists to prevent, and with every id in the comparison agreeing nothing had changed.
+   * the route has moved on. Comparing the whole rendered *view* would make that enrichment read as "Gmail
+   * has re-rendered for the new route", so the previous thread's message would be emitted under the new
+   * thread's route: a verdict attributed to a message the reader is no longer looking at, which is the one
+   * thing this guard exists to prevent, and with every id in the comparison agreeing nothing has changed.
    */
   it('does not emit the previous thread when its evidence is enriched under the new route', () => {
     adapter.route = THREAD_A_HASH;
@@ -449,10 +449,10 @@ describe('staleness guard', () => {
    *
    * Gmail's thread perm id is read from the subject heading, which it renders separately from the
    * conversation and swaps first: for a moment the heading names thread B while the message below it is
-   * still A's. Counting that id as part of *which message is rendered* let a heading update alone satisfy
-   * the guard, so the previous thread's message was emitted under the new route: the same failure the
-   * guard was narrowed to prevent, arriving through the one component of the identity that the message
-   * does not own.
+   * still A's. Counting that id as part of *which message is rendered* would let a heading update alone
+   * satisfy the guard, so the previous thread's message would be emitted under the new route: the same
+   * failure the guard keys on message identity to prevent, arriving through the one component of the
+   * identity that the message does not own.
    */
   it('does not emit the previous thread when only the subject heading has caught up', () => {
     adapter.route = THREAD_A_HASH;
@@ -625,14 +625,14 @@ describe('lifecycle', () => {
 
   /**
    * The badge and the popup are claims about a message on screen. Collapsing the open message, or replying
-   * to it so that the only expanded message is the user's own, leaves nothing readable, and the claim
-   * stood, because the evaluation simply returned. Retracting it needs a delay rather than an immediate
+   * to it so that the only expanded message is the user's own, leaves nothing readable, and an evaluation
+   * that simply returned would leave the claim standing. Retracting it needs a delay rather than an immediate
    * teardown: a momentary absence is exactly what an ordinary Gmail re-render looks like from here.
    */
   /**
    * Gmail changes a message without changing the shape of the page: a class marks it collapsed, a text
    * node carries an attachment's filename, an attribute carries a link's target. None of that is a
-   * child-list mutation, so none of it was ever looked at.
+   * child-list mutation, so a watch on child lists alone never looks at any of it.
    */
   describe('what the browser is asked to report', () => {
     beforeEach(() => {
@@ -739,9 +739,9 @@ describe('lifecycle', () => {
     /**
      * Retraction has to survive the signature being forgotten, because forgetting it is routine: it is how
      * a re-evaluation is forced. Reattaching to a replaced conversation root does it, and a replacement
-     * arriving without a readable message is precisely the case the grace period was added for: Gmail
+     * arriving without a readable message is precisely the case the grace period exists for: Gmail
      * rebuilding the pane around the user's own reply. Reading an empty signature as "nothing was
-     * asserted" cancelled the retraction there, and left the badge on the message underneath.
+     * asserted" would cancel the retraction there, and leave the badge on the message underneath.
      */
     it('still retracts after the conversation root has been replaced', () => {
       adapter.replaceRoot();
@@ -836,10 +836,10 @@ describe('signatures', () => {
   /**
    * Gmail reveals a message in stages, and the stages that arrive late are the ones detection leans on
    * hardest. Expanding the details panel adds Reply-To and the `mailed-by` / `signed-by` rows; attachment
-   * chips render after the body. A signature made only of subject, body length and link count was
-   * identical before and after each of those, so the observer read new evidence as "nothing has changed"
-   * and discarded it, leaving the badge standing on an analysis that could no longer be reproduced from
-   * what was on screen.
+   * chips render after the body. A signature made only of subject, body length and link count would
+   * be identical before and after each of those, so the observer would read new evidence as "nothing has
+   * changed" and discard it, leaving the badge standing on an analysis that can no longer be reproduced
+   * from what is on screen.
    */
   describe('evidence revealed after the first render', () => {
     const base = handle('m1', 't1');

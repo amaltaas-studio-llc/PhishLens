@@ -24,7 +24,7 @@ import type { Detect } from './types.js';
 /** Words that mean "this link leads to a login form". */
 const CREDENTIAL_LINK_TERMS =
   // No `portal`: it names an intranet's front page as often as a sign-in form, and plain-HTTP intranet
-  // portals made a `high` of ordinary internal mail. A portal's sign-in page still says `login`.
+  // portals would make a `high` of ordinary internal mail. A portal's sign-in page still says `login`.
   /\b(sign\s?in|signon|log\s?in|logon|log-on|password|passwd|credential|authenticate|authentication|verify|verification|validate|confirm|secure\s?access|account\s?access|mfa|2fa|otp|sso|webmail|owa|unlock|reactivate|re-?activate)\b/u;
 
 /**
@@ -116,13 +116,14 @@ function displayedUrlMismatch(context: AnalysisContext): SecuritySignal[] {
 
     // One of a brand's own names linking to another of them. A footer reading "report a suspicious email
     // at brand.com/phishing" whose href is a short name under the brand's own TLD is the brand's own
-    // redirector, and the anti-phishing advice in genuine mail is where that shape appears most, so the
-    // rule was at its most confident, `critical`, on the one sentence written to prevent the attack.
+    // redirector, and the anti-phishing advice in genuine mail is where that shape appears most, so without
+    // this the rule would be at its most confident, `critical`, on the one sentence written to prevent the
+    // attack.
     //
     // Scoped to the brand the *displayed* domain names, not to any brand, so it cannot launder a claim:
     // showing one brand's domain while linking to a different brand's is still a mismatch. The
     // destination is checked with `brandOwns`, which counts the brand's top-level domains; comparing
-    // against `domains` alone is what left the gap, since no list of second-level names covers a TLD
+    // against `domains` alone would leave a gap, since no list of second-level names covers a TLD
     // whose every registration is the brand's by registry agreement.
     const agrees = (host: LinkHost): boolean =>
       host.registrable === link.displayedRegistrable || (brand !== undefined && brandOwns(brand, host.registrable));
@@ -159,8 +160,7 @@ function displayedUrlMismatch(context: AnalysisContext): SecuritySignal[] {
 
     // The same rewrite, done by a platform we have not listed: the href points back at the sender's
     // own domain. Newsletter platforms (Substack, beehiiv, Kit) send from and redirect through one
-    // domain, so every outbound link in a newsletter reads as a mismatch: the observed false
-    // positive this guard exists to remove.
+    // domain, so without this guard every outbound link in a newsletter would read as a mismatch.
     //
     // Suppressed rather than downgraded because there is nothing here to report: the sender is not
     // borrowing anyone's reputation, only its own. When the anchor text *is* a brand's domain the
@@ -572,10 +572,10 @@ function misleadingComposition(
     // Match a full brand domain in the subdomain (`microsoft.com.evil.example`) or a distinctive
     // brand token (`paypal.security-login.example`). A short core has to *begin* a token, since an
     // English compound ends in one far more often than a phishing host does: `gmail` ends `bigmail`,
-    // `chase` ends `purchase`, `apple` ends `pineapple`, and names like these were `critical` on
-    // ordinary mail. What phishing hosts do is lead with the brand (`chasesecure.`, `apple7.`),
-    // and that stays reported. The cost is a short brand fused after a word (`securechase.`); the
-    // hyphenated form is still caught. A long core may appear anywhere (`securepaypal.example`).
+    // `chase` ends `purchase`, `apple` ends `pineapple`, and matching anywhere would make names like
+    // these `critical` on ordinary mail. What phishing hosts do is lead with the brand (`chasesecure.`,
+    // `apple7.`), and that stays reported. The cost is a short brand fused after a word (`securechase.`);
+    // the hyphenated form is still caught. A long core may appear anywhere (`securepaypal.example`).
     const domainHit = domains.some((f) => f.length >= 6 && foldedPrefix.includes(f));
     const tokenHit =
       !domainHit &&
@@ -717,7 +717,7 @@ function insecureCredentialLinks(context: AnalysisContext): SecuritySignal[] {
  * `javascript:`, `data:` and the Windows handlers run code or open a remote resource on click, and a
  * `file:` link *to another machine* (`file://host/share`, or a UNC path, which the parser turns into a path
  * beginning `//`) makes Windows offer the reader's credentials to that machine. Those are `critical`. Two
- * are not, and both were `critical` on ordinary technical mail: `ftp:` is a file download Chrome no longer
+ * are not, and both are common in ordinary technical mail: `ftp:` is a file download Chrome no longer
  * handles itself (it can hand a file to another program but cannot run anything or show a sign-in page),
  * and a `file:` link with no host names a path on the reader's own disk, a pasted local path or a
  * `file:///C` left behind by a word processor, which nothing remote can be fetched through.
@@ -828,9 +828,8 @@ function excessiveSubdomains(context: AnalysisContext): SecuritySignal[] {
 }
 
 /**
- * A credential-related destination on a domain that has nothing to do with the claimed brand: the
- * cross-signal case the brief calls out: "credentials/login terminology combined with unrelated
- * domains".
+ * A credential-related destination on a domain that has nothing to do with the claimed brand: sign-in
+ * wording combined with an unrelated domain.
  */
 function credentialTermsOnUnrelatedDomain(context: AnalysisContext): SecuritySignal[] {
   const claim = context.primaryClaim;
@@ -913,7 +912,7 @@ function describeOpenHost(hostname: string, openHosting: string): string {
  * The link opens a web page that is a **file in a public storage bucket** rather than a page on
  * anybody's website.
  *
- * This is the shape that defeats every other link rule at once, and it is now the common one. The
+ * This is the shape that defeats every other link rule at once, and it is a common one. The
  * destination is `storage.googleapis.com`, `s3.amazonaws.com` or a sibling: a real domain, owned by
  * Google or Amazon, with valid HTTPS and no lookalike spelling, no shortener, no redirect and no
  * punycode. Nothing about the *host* is wrong. What is wrong is that the host identifies the storage

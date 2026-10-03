@@ -192,8 +192,8 @@ function declarationFor(technique: string): HidingDeclaration | undefined {
  * not readable from here. The consequence is the safe one: a subtree whose override lives in a stylesheet
  * is still treated as hidden, which under-reports the body rather than inventing concealment.
  *
- * An override with no text in it frees nothing anyone could read. Counting it was how one empty
- * `<span style="font-size:14px">` beside a paragraph of filler exempted the filler too.
+ * An override with no text in it frees nothing anyone could read. Counting it would let one empty
+ * `<span style="font-size:14px">` beside a paragraph of filler exempt the filler too.
  */
 function escapesFrom(element: Element, declaration: HidingDeclaration): Element[] {
   const escapedBy = declaration.escapedBy;
@@ -222,8 +222,8 @@ function escapesFrom(element: Element, declaration: HidingDeclaration): Element[
 /**
  * Whether something between an override and its candidate hides it in a way the override does not undo.
  *
- * `font-size:14px` inside `display:none` inside `font-size:0` is not drawn, and reading it as visible put
- * text that nobody can see back into the body. A repeat of the candidate's own declaration is the one
+ * `font-size:14px` inside `display:none` inside `font-size:0` is not drawn, and reading it as visible would
+ * put text that nobody can see back into the body. A repeat of the candidate's own declaration is the one
  * thing in between that the override does undo.
  */
 function hiddenBetween(descendant: Element, candidate: Element, declaration: HidingDeclaration): boolean {
@@ -247,10 +247,10 @@ export function countContentChars(text: string): number {
 /**
  * The attributes this scan reads, named so that whatever *triggers* extraction can watch them.
  *
- * Neither appears in any selector, which is how the message observer came to ignore both: it derives the
- * attributes it watches from `selectors.ts`, and a watch list built only from what is used to *find*
+ * Neither appears in any selector, so the message observer, which derives the attributes it watches from
+ * `selectors.ts`, would otherwise ignore both: a watch list built only from what is used to *find*
  * elements misses what is used to *read* them. Removing `display:none` from a paragraph changes the
- * extracted body (the concealed text moves from `hiddenText` into it) and produced no re-assessment.
+ * extracted body (the concealed text moves from `hiddenText` into it) and must produce a re-assessment.
  */
 export const VISIBILITY_ATTRIBUTES: readonly string[] = ['style', 'hidden'];
 
@@ -313,7 +313,7 @@ export function findHiddenSubtrees(root: Element): HiddenScan {
     /*
      * Everything readable inside escaped, which is the newsletter wrapper this exists for. Not a root, so
      * its descendants are still scanned on their own account. Only when an escape was found: a hidden
-     * element with no text and nothing escaping it is still reported, as it always was.
+     * element with no text and nothing escaping it is still reported.
      */
     if (visible.length > 0 && chars <= 0) continue;
 

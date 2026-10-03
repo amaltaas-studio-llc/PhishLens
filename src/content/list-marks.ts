@@ -13,11 +13,11 @@
  * skips rows whose sender is unchanged *and* whose mark is still where it was put, so the steady state costs
  * an attribute read or two per row. Both halves are needed: Gmail rewrites a row's cells when the message
  * becomes read, which discards the mark without disturbing the row, and a skip that trusted the sender alone
- * made that loss permanent.
+ * would make that loss permanent.
  *
- * The mark itself is inline-styled rather than given a stylesheet or a shadow root. Both alternatives
- * were tried: a stylesheet in the page is a global we do not want, and a shadow host per row is dozens
- * of extra roots for one glyph. Inline properties beat Gmail's own CSS without either.
+ * The mark itself is inline-styled rather than given a stylesheet or a shadow root. Neither alternative
+ * fits: a stylesheet in the page is a global we do not want, and a shadow host per row is dozens of extra
+ * roots for one glyph. Inline properties beat Gmail's own CSS without either.
  */
 import { triageSender, type TriageSeverity, type TriageVerdict } from '../analysis/triage.js';
 import type { ListPassCounts } from '../gmail/diagnostics.js';
@@ -33,8 +33,9 @@ const MARKED_FOR = 'data-shoutphish-row';
  *
  * Recorded because the sender key alone cannot tell a row that has nothing to say from one whose mark has
  * been thrown away. Gmail keeps the `tr` and rewrites the cells inside it when a message becomes read, so
- * opening a marked message and coming back left the row's key intact with its mark gone: skipped on every
- * later pass, and a warning silently absent from exactly the row a reader had just been told to distrust.
+ * opening a marked message and coming back leaves the row's key intact with its mark gone: without this it
+ * would be skipped on every later pass, a warning silently absent from exactly the row a reader had just
+ * been told to distrust.
  */
 const MARK_STATE = 'data-shoutphish-mark';
 const MARK_CLASS = 'shoutphish-row-mark';
@@ -77,8 +78,8 @@ export class ListMarks {
    * How to find the region to watch, asked again rather than resolved once.
    *
    * Gmail replaces its main region wholesale on a view change, and a `MutationObserver` holds the node it
-   * was given. Started with an element, the marker stayed attached to a region that was no longer in the
-   * document: rows kept arriving, none of them was ever looked at, and the absence of a mark is
+   * was given. Started with an element, the marker would stay attached to a region no longer in the
+   * document: rows would keep arriving, none of them would ever be looked at, and the absence of a mark is
    * indistinguishable from mail with nothing to say about it. Nothing else restarts it either; the message
    * observer's own reattachment is about the conversation pane and says nothing to this.
    */
@@ -193,8 +194,8 @@ export class ListMarks {
        * first passes run at `document_idle` with no account address, and `identity.lookalike_of_recipient_
        * domain` (a `high` mark on a domain imitating the reader's own employer, which is the most valuable
        * thing a row can say) cannot fire without it. Keyed on the sender alone, every row already on
-       * screen when the address resolved kept its "nothing to say here" and was skipped for the life of
-       * the tab, so the check only ever ran on mail that arrived later.
+       * screen when the address resolved would keep its "nothing to say here" and be skipped for the life
+       * of the tab, so the check would only ever run on mail that arrived later.
        */
       const key = `${recipient.recipientEmail ?? ''}|${sender.senderEmail}|${sender.senderName}`;
       if (row.getAttribute(MARKED_FOR) === key && markIntact(row)) continue;
@@ -215,7 +216,7 @@ export class ListMarks {
      * All three counts, every pass, and not just the marks.
      *
      * An unmarked inbox is the expected result (the floor is `high`, so ordinary mail earns nothing), and
-     * a stale row selector produces exactly the same silence. Logging only the marks made the two
+     * a stale row selector produces exactly the same silence. Logging only the marks would make the two
      * indistinguishable from outside, which is the question anyone debugging this actually has: rows at
      * zero means the selectors no longer match Gmail's markup, and rows with addresses but no marks means
      * the feature is working and has nothing to say.
@@ -279,8 +280,8 @@ function removeMark(row: Element): void {
  *
  * A row that earned nothing is intact by definition: there is nothing Gmail could have removed. A row that
  * earned a mark is intact only while the mark is in it, which is what turns a re-render into a re-mark
- * instead of permanent silence. An unrecorded state is treated as not intact, so a row marked by an earlier
- * version of this file is recomputed rather than trusted.
+ * instead of permanent silence. An unrecorded state is treated as not intact, so a row carrying a key but
+ * no recorded state is recomputed rather than trusted.
  */
 function markIntact(row: Element): boolean {
   const state = row.getAttribute(MARK_STATE);

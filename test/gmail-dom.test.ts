@@ -4,16 +4,17 @@
  * The adapter against markup, rather than around it.
  *
  * Everything else in this suite runs in plain Node, and for the detection engine that is a feature: the
- * rules are pure, so they need no DOM and the suite stays fast enough to run on every save. But it left
- * `src/gmail/` (the layer that decides whether any of it happens at all) asserted only through helpers
- * reached via `__testables`. Two bugs walked straight through that gap:
+ * rules are pure, so they need no DOM and the suite stays fast enough to run on every save. But on its own
+ * it would leave `src/gmail/` (the layer that decides whether any of it happens at all) asserted only
+ * through helpers reached via `__testables`, and two kinds of bug pass straight through that gap:
  *
- *  - The trust gate required a named `dkim: pass`, which is only ever scraped from a tooltip most Gmail
- *    builds do not render. Every fixture supplies `auth` as a JSON block, so nothing noticed that the
- *    condition was unsatisfiable against what `extractAuth` can actually read. The feature was
+ *  - A condition the DOM can never satisfy. A trust gate requiring a named `dkim: pass`, which is only
+ *    ever scraped from a tooltip most Gmail builds do not render, looks fine because every fixture
+ *    supplies `auth` as a JSON block, and is unsatisfiable against what `extractAuth` can actually read:
  *    unreachable in production and green in CI.
- *  - `extractBody` strips quoted replies and `extractLinks` did not, because no test ever ran both over
- *    one tree. (They still disagree, now on purpose and asserted here: see "quoted content".)
+ *  - Extractors that disagree about one tree. `extractBody` strips quoted replies; whether `extractLinks`
+ *    does too is only visible when a test runs both over the same markup. (They do disagree, on purpose,
+ *    as asserted here: see "quoted content".)
  *
  * **What these tests do and do not prove.** They prove the adapter's logic: that a details table becomes
  * an `EmailAuthInfo`, that a quoted reply is excluded, that an unread part is reported as unread rather
@@ -225,9 +226,9 @@ describe('reading an ordinary message out of the page', () => {
 
   /**
    * A container of `font-size:0` around a newsletter, which is how bulk mail collapses the whitespace
-   * between its tags while every paragraph inside names its own size. Removing the subtree took the whole
-   * body with it, and an empty body is not reported as a missing part (the element was there), so the
-   * message was scored on its subject and sender alone with nothing on the card to say what had happened.
+   * between its tags while every paragraph inside names its own size. Removing the subtree would take the
+   * whole body with it, and an empty body is not reported as a missing part (the element was there), so the
+   * message would be scored on its subject and sender alone with nothing on the card to say what happened.
    */
   it('keeps body text whose container sets a zero font size its contents override', () => {
     render({
@@ -301,8 +302,9 @@ describe('reading an ordinary message out of the page', () => {
 describe('quoted content', () => {
   /**
    * Gmail prefixes a sender's classes, so `pull-quote` arrives as `m_42pull-quote`, which a substring
-   * match on "quote" still found. Wrapping a whole message in one emptied its body, the observer read the
-   * empty message as one still loading, and it was never assessed at all: no score and no badge.
+   * match on "quote" would still find. Wrapping a whole message in one would then empty its body, the
+   * observer reads an empty message as one still loading, and it would never be assessed at all: no score
+   * and no badge.
    */
   it('reads a body wrapped in a sender class that merely contains "quote"', () => {
     render({
@@ -385,10 +387,11 @@ describe('copies of message content', () => {
 });
 
 /**
- * The gate that was unsatisfiable. Gmail renders `signed-by` with the domain of a signature it verified
- * and omits the row when there is none, so the row's presence is the verdict, but the named verdicts the
- * gate used to demand are scraped from a details tooltip that most builds do not carry. Asserted here,
- * through the DOM, because asserting it on a hand-written `auth` block is what hid the bug.
+ * The trust gate against what the DOM can actually supply. Gmail renders `signed-by` with the domain of a
+ * signature it verified and omits the row when there is none, so the row's presence is the verdict; named
+ * verdicts are scraped from a details tooltip that most builds do not carry, so a gate demanding them could
+ * never pass. Asserted here, through the DOM, because a hand-written `auth` block can satisfy a gate that
+ * real markup never does.
  */
 describe('authentication read from the details table', () => {
   it('reads mailed-by and signed-by as the domains they name', () => {
@@ -525,11 +528,11 @@ describe('choosing a message when the markup is inconsistent', () => {
    * The thread history, read from the same rows selection is made from, and it has to be the same rows,
    * or the assessed message cannot be located among them.
    *
-   * Reading them separately, from the first candidate selector that matched anything, put the two at
+   * Reading them separately, from the first candidate selector that matched anything, puts the two at
    * different depths: a `.adn.ads` wrapper enclosing a `[data-message-id]` element is one message twice,
-   * and selection keeps the wrapper while the history listed the rows inside. Locating the wrapper among
-   * those rows failed, so the history came back empty, and an empty history is indistinguishable from an
-   * ordinary one-message thread, which is to say every thread-hijack rule quietly stopped firing.
+   * and selection keeps the wrapper while such a history would list the rows inside. Locating the wrapper
+   * among those rows fails, so the history comes back empty, and an empty history is indistinguishable
+   * from an ordinary one-message thread, which is to say every thread-hijack rule quietly stops firing.
    */
   describe('the thread history behind the assessed message', () => {
     const FIRST = 'enquiries@northwind-suppliers.example';

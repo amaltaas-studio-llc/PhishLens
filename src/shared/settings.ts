@@ -136,8 +136,8 @@ export const MAX_ENTRY_CHARS = 254;
  * that fails, taking every other setting in the same item with it.
  *
  * Reaching this needs deliberately absurd addresses; the realistic fifty-entry list is well under 2 KB.
- * It is here because a quota error is the worst way to discover an arithmetic slip, and because the
- * comment above claimed a guarantee the numbers did not provide.
+ * It is here because a quota error is the worst way to discover an arithmetic slip, and because the two
+ * limits above look as if they guarantee a fit that the numbers do not provide.
  */
 const MAX_TRUST_LIST_CHARS = 6000;
 
@@ -253,8 +253,8 @@ export function settingsImpact(previous: Settings, next: Settings): SettingsImpa
   /*
    * The endpoint and model name count as much as the mode does. A different server is a different judge:
    * its reasons and its risk number differ, and it may be a large model where the last was a small one.
-   * Leaving them out meant switching model and seeing the previous one's verdicts replayed from cache for
-   * the life of the tab, which reads as the new setting having been ignored.
+   * Leaving them out would replay the previous model's verdicts from cache for the life of the tab after
+   * a switch, which reads as the new setting having been ignored.
    */
   const remodel =
     previous.aiMode !== next.aiMode ||

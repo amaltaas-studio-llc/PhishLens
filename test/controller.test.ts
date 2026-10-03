@@ -9,7 +9,7 @@
  * indistinguishable, on screen, from a verdict that is correct.
  *
  * The model runs through `aiMode: 'server'`, whose round trip is a message to the service worker. That
- * makes the inference a promise this file resolves by hand, which is the whole point, since the bug being
+ * makes the inference a promise this file resolves by hand, which is the whole point, since the failure being
  * asserted lives in the window between asking a model something and no longer wanting the answer.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -271,9 +271,9 @@ describe('a message opened with a model configured', () => {
 
   /**
    * A header Gmail has redrawn from the same data takes the badge with it, and says nothing about it: every
-   * byte the extraction reads is identical, so the view signature matches and the event that would put the
-   * badge back was suppressed as redundant. The message then spent the rest of its time on screen with no
-   * badge, and on a `showBadgeWhenLow: false` install, no badge is also what a clean message looks like.
+   * byte the extraction reads is identical, so the view signature matches. Suppressing the event that would
+   * put the badge back as redundant leaves the message with no badge for the rest of its time on screen,
+   * and on a `showBadgeWhenLow: false` install, no badge is also what a clean message looks like.
    *
    * The model answer must be reused while the checks are recomputed. Redrawing a header is not new
    * evidence, and a round trip per redraw would be one per scroll on a slow connection.
@@ -311,8 +311,8 @@ const AUTHENTICATED: EmailMessage = {
 /**
  * Gmail draws the authentication summary a moment after the body, and each part it finishes is a new view
  * of the message. The model is never shown authentication, so its reading of the new view is the one
- * already under way, and restarting it cost the on-device model its whole inference, on nearly every
- * message, for a question whose text had not changed.
+ * already under way, and restarting it would cost the on-device model its whole inference, on nearly
+ * every message, for a question whose text has not changed.
  */
 describe('when Gmail finishes drawing a message the model is already reading', () => {
   it('joins the reading in flight instead of asking again', async () => {
@@ -460,9 +460,9 @@ describe('with the default gate on asking the model', () => {
 });
 
 /**
- * `pagehide` can arrive while the controller is waiting on the service worker, and everything after that
- * `await` used to run as though it had not: listeners registered after `stop()` removed them, and a settings
- * reload rebuilt the list observer on a page that had been torn down.
+ * `pagehide` can arrive while the controller is waiting on the service worker, and nothing after that
+ * `await` may run as though it had not: listeners registered after `stop()` removed them would outlive the
+ * page, and a settings reload would rebuild the list observer on a page that has been torn down.
  */
 describe('when the page is hidden while work is in flight', () => {
   /** A list row worth marking, so a list observer that should not exist leaves something to see. */

@@ -67,7 +67,7 @@ export function probeSelectors(handle: MessageHandle): SelectorProbe[] {
  * Whether a probe describes a selector that has decayed: a later candidate matched, in the scope the
  * code reads that group from.
  *
- * Both halves are load-bearing, and each was learned by getting it wrong. A group that matched *nothing*
+ * Both halves are load-bearing. A group that matched *nothing*
  * is not drift, because most of the table is expected to miss on an ordinary message: no attachments, no
  * quoted reply, nothing collapsed, and no unverified-sender avatar precisely when the sender
  * authenticated. And a group found on the page after missing inside the message is not drift either: it
@@ -146,8 +146,8 @@ export interface CheckSummary {
  * This is the half of a bug report the selector probes cannot give. A selector that stopped matching is
  * visible in the probe list; a check that fired when it should not have is visible only in the card,
  * whose every sentence is built around a value from the reader's mail and therefore cannot be pasted
- * into a public issue. Without this, disagreeing with a score meant installing a development build, a
- * toolchain, for a bug the person reporting it can see and we cannot.
+ * into a public issue. Without this, disagreeing with a score would mean installing a development build,
+ * a toolchain, for a bug the person reporting it can see and we cannot.
  *
  * What it holds: rule ids, severities, scores, and counts. What it must never hold: `title`,
  * `description` or `evidence`, each of which is a sentence assembled around a domain, a filename or an
@@ -172,9 +172,10 @@ export interface ScoringSummary {
   /**
    * What each category added after its cap, largest first, and what a severity floor added on top.
    *
-   * The per-check scores are raw, before the caps, so a check reading "23" in a category worth 15 looked
-   * like the cap had failed. Contributions are per category rather than per check because that is where
-   * the caps apply: two findings sharing a capped category have no individual share to report.
+   * The per-check scores are raw, before the caps, so on their own a check reading "23" in a category
+   * worth 15 would look like the cap had failed. Contributions are per category rather than per check
+   * because that is where the caps apply: two findings sharing a capped category have no individual share
+   * to report.
    */
   contributions: readonly (readonly [SignalCategory, number])[];
   floorPoints: number;
@@ -338,7 +339,6 @@ function scoringLines(scoring: ScoringSummary | null): string[] {
   return lines;
 }
 
-/** Whole milliseconds; finer precision is noise in a report pasted by hand. */
 /** `identity 21 + llm 15 + floor 14 = 50`, so a floor deciding the score is visible as such. */
 function describeContributions(scoring: ScoringSummary): string {
   const parts = scoring.contributions.map(([category, points]) => `${category} ${String(points)}`);
@@ -347,6 +347,7 @@ function describeContributions(scoring: ScoringSummary): string {
   return `${parts.join(' + ')} = ${String(scoring.score)}`;
 }
 
+/** Whole milliseconds; finer precision is noise in a report pasted by hand. */
 function describeTiming(timing: AnalysisTiming | null): string {
   if (timing === null) return 'not measured';
   const checks = `checks ${String(Math.round(timing.checksMs))}ms`;

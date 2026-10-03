@@ -1,6 +1,6 @@
 {
   "name": "legitimate-substack-newsletter",
-  "description": "False-positive regression, observed in production: an independent newsletter sent from a platform domain, where every outbound link is rewritten to the platform's own redirector while the anchor text still reads as the destination site. Before the onSenderDomain guard this produced several 'high' displayed-vs-actual mismatches, maxed the link category, and floored the message at 50/100 'Suspicious'. Anchor text naming third-party sites is the whole point of a link roundup and must not be read as deception. Publication, author and linked sites are invented; the platform, link shapes and authentication are as observed.",
+  "description": "False-positive resistance: an independent newsletter sent from a platform domain, where every outbound link is rewritten to the platform's own redirector while the anchor text still reads as the destination site. Without the onSenderDomain guard this would be several 'high' displayed-vs-actual mismatches, saturating the link category and flooring the message at 'Suspicious'. Anchor text naming third-party sites is the whole point of a link roundup and must not be read as deception. Publication, author and linked sites are invented; the platform, link shapes and authentication are as observed.",
   "email": {
     "senderName": "NWBREW",
     "senderEmail": "nwbrew-the-brew-notes@substack.com",

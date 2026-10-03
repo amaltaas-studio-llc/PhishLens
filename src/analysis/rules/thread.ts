@@ -168,7 +168,7 @@ export function findParticipantLookalike(
  * two companies both answer from a desk called "Support".
  *
  * Stored as skeletons, because that is what they are compared with: `skeleton('info')` is `lnfo`, so a
- * plain-spelled set never matched any name with an `i` in it: "Info", "Billing", "Admin", "IT".
+ * plain-spelled set would never match any name with an `i` in it: "Info", "Billing", "Admin", "IT".
  */
 const ROLE_NAMES: ReadonlySet<string> = new Set(
   [

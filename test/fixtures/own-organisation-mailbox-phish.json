@@ -1,6 +1,6 @@
 {
   "name": "own-organisation-mailbox-phish",
-  "description": "A mailbox-quota credential lure that names no brand: the display name is the recipient's own domain followed by a department, sent from an unrelated domain the attacker authenticated themselves. The commonest shape in a recent public phishing corpus, and invisible to every rule keyed on the brand table.",
+  "description": "A mailbox-quota credential lure that names no brand: the display name is the recipient's own domain followed by a department, sent from an unrelated domain the attacker authenticated themselves. The commonest shape in a public phishing corpus, and invisible to every rule keyed on the brand table.",
   "email": {
     "senderName": "northwind-logistics.com IT Support",
     "senderEmail": "it-support@mailbox-quota-notice.com",

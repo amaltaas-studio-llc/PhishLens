@@ -40,7 +40,7 @@ export class CloudAnalyzer implements SemanticAnalyzer {
 
   /**
    * Requires *both* an explicit `cloud` choice and a configured backend. Absent either, this
-   * analyzer does nothing, which is the MVP's state.
+   * analyzer does nothing, which is the state the extension ships in.
    */
   isAvailable(): Promise<boolean> {
     return Promise.resolve(isCloudConfigured(this.#settings));

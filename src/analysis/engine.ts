@@ -236,8 +236,8 @@ export function assessmentSignals(result: AnalysisResult): SecuritySignal[] {
  * Dampened findings count despite scoring zero: something *was* found and then softened because a
  * verified sender explains it, which is why the card still lists it.
  *
- * Exported because the badge's label and the popup's count must agree. They were computed separately
- * and did not.
+ * Exported because the badge's label and the popup's count must agree, which two separate computations
+ * would not guarantee.
  */
 export function countedFindings(result: AnalysisResult): SecuritySignal[] {
   return result.signals.filter((s) => s.score > 0 || s.dampened === true);

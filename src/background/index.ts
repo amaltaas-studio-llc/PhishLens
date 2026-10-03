@@ -120,7 +120,7 @@ const NOT_GRANTED = 'access to this address has not been granted; press Connect 
 /**
  * The single egress point.
  *
- * Inert in the MVP: without `aiMode: 'cloud'` *and* a configured `backendBaseUrl` this returns an
+ * Inert by design: without `aiMode: 'cloud'` *and* a configured `backendBaseUrl` this returns an
  * error without touching the network, and there is no default backend URL. When it is enabled it
  * talks only to our own backend (never to a model vendor) and carries no API key, because an API
  * key shipped inside an extension is a public API key.
@@ -274,10 +274,11 @@ async function postCompletion(
     const analysis =
       content === null ? null : parseSemanticAnalysis(content, 'server', settings.modelName);
 
-    // The one failure in this function that used to be silent, and the most confusing: HTTP 200 with an
-    // answer nothing can be done with. `scrub` reduces the text itself to a length, so what is recorded
-    // is its *shape*: enough to tell a truncated reply from a refusal from prose the parser gave up on,
-    // which is the difference between raising a limit and changing a prompt.
+    // The most confusing failure in this function, and the one with no error to report it: HTTP 200 with
+    // an answer nothing can be done with. Unlogged, it would be indistinguishable from a model that found
+    // nothing. `scrub` reduces the text itself to a length, so what is recorded is its *shape*: enough
+    // to tell a truncated reply from a refusal from prose the parser gave up on, which is the difference
+    // between raising a limit and changing a prompt.
     if (analysis === null) {
       logger.debug('model server returned no usable assessment', describeUnusable(body, content));
     }

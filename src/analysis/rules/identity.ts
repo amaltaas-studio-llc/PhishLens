@@ -81,14 +81,14 @@ function displayNameImpersonation(context: AnalysisContext): SecuritySignal[] {
  *
  * Class-action and settlement notices name the defendant in the sender line and are sent by a claims
  * administrator from its own domain, so the impersonation rule's premise (the name claims to *be* the
- * brand) is false for them, and at `high` its floor put every genuine notice at Suspicious. The mismatch
+ * brand) is false for them, and at `high` its floor would put every genuine notice at Suspicious. The mismatch
  * is still reported, because a fake settlement is a real scam and looks the same at the string level;
  * what changes is the wording and a `medium` severity that sets no floor.
  *
  * The role has to be spelled out in full. A bare "Settlement" or "Claims" is ordinary vocabulary for a
  * payments sender, and "PayPal Claims" is exactly how a dispute phish would name itself. Nor does the
  * phrase buy an attacker anything past the floor: the finding still counts as an impersonation for the
- * credential correlation, so "PayPal Claims Administrator" asking for a password is critical as before.
+ * credential correlation, so "PayPal Claims Administrator" asking for a password is still critical.
  */
 const LEGAL_NOTICE_ROLE =
   /\b(?:class action|settlement|claims|litigation|notice) administrator\b/u;
@@ -171,12 +171,12 @@ export interface LookalikeMatch {
 /**
  * The brand a domain is *named after* while not being one the brand is known to own.
  *
- * The third answer to "does this brand own this domain", between the two the code used to have. A brand
- * runs one name across the suffixes of every market it sells in (`paypal.it`, `hsbc.fr`,
- * `netflix.com.br`), and the table lists a handful of them, so every other one was a domain the brand did
- * not own, which the lookalike rule then reported as a `critical` imitation of the `.com`: 45 points and a
- * floor, High Risk, on authentic mail. Thirty-odd brands against two hundred country suffixes is not a list
- * anyone can finish, which is the argument for answering the question structurally instead.
+ * The third answer to "does this brand own this domain", between "it does" and "it is an imitation". A
+ * brand runs one name across the suffixes of every market it sells in (`paypal.it`, `hsbc.fr`,
+ * `netflix.com.br`), and the table lists a handful of them. With only two answers, every other one would be
+ * a domain the brand did not own, which the lookalike rule would report as a `critical` imitation of the
+ * `.com`: 45 points and a floor, High Risk, on authentic mail. Thirty-odd brands against two hundred country
+ * suffixes is not a list anyone can finish, which is the argument for answering the question structurally.
  *
  * The name must be *literally* identical, not merely identical after confusable folding: `pаypal.it` spelled
  * with a Cyrillic а is a homoglyph domain and stays with the lookalike rule, which is what that rule is for.
@@ -189,7 +189,7 @@ export interface LookalikeMatch {
  * A suffix a brand would run a market under: a country code, or a country's own second level beneath one
  * (`com.br`, `co.jp`, `org.uk`). Generic suffixes are not markets. Nobody localises to `.support`,
  * `.secure` or `.online`, and those are what a phishing kit registers the brand's exact name under, so
- * reading them as "perhaps the brand's" handed the kit an `unverified` instead of a lookalike.
+ * reading them as "perhaps the brand's" would hand the kit an `unverified` instead of a lookalike.
  */
 const MARKET_SUFFIX = /^(?:(?:com?|net|org|gov|gob|edu|ac|or|ne|go|ltd|plc)\.)?[a-z]{2}$/u;
 
@@ -586,7 +586,7 @@ const EXECUTIVE_TITLE = new RegExp(`\\b(${EXECUTIVE_TITLES})\\b`, 'u');
 /**
  * The writer giving themselves the title, which is what the body has to do to count.
  *
- * A title anywhere in the opening was enough before, and the opening is where ordinary mail *mentions*
+ * A title anywhere in the opening is not enough, because the opening is where ordinary mail *mentions*
  * one: "our president announced", "the founder of a bakery I like". The fraud states it of the sender:
  * "this is your CEO", or a sign-off with the name and the title after it.
  */
@@ -638,7 +638,7 @@ function externalExecutiveClaim(context: AnalysisContext): SecuritySignal[] {
  * The display name asserts an *institutional* identity that the sending domain does not support.
  *
  * Every other impersonation rule is gated on `BRANDS`, and no table will ever hold every insurer, bank,
- * utility and agency, so `"Northwind Life Offer" <…@kv38mailer.com>` scored zero on identity. This asks
+ * utility and agency, so `"Northwind Life Offer" <…@kv38mailer.com>` would score zero on identity. This asks
  * a brand-list-free question: does the display name share any name with the domain that sent it?
  * `"Kestrel Coffee Roasters" <hello@kestrelcoffee.co.uk>` does; the life-offer example does not.
  *
@@ -1041,9 +1041,9 @@ function alertNamedSharedItem(context: AnalysisContext): SecuritySignal[] {
  * The recipient's own name, spelled identically, under a suffix that does not misspell theirs.
  *
  * An organisation's staff write from its `.net` and its `.com`, and a colleague abroad from its `.fr`,
- * all day, so reporting `example.net` to someone at `example.com` as a `critical` imitation put one
- * company's internal mail at High Risk, hundreds of messages at a time. The thread rule reached the same
- * conclusion for the same reason. What this keeps is the one suffix change that *is* a trap: the reader's
+ * all day, so reporting `example.net` to someone at `example.com` as a `critical` imitation would put an
+ * organisation's whole internal correspondence at High Risk. The thread rule makes the same exception for
+ * the same reason. What this keeps is the one suffix change that *is* a trap: the reader's
  * own suffix with characters dropped (`.co`, `.cm`, `.om` against `.com`), judged the way the brand rule
  * judges it. A multi-label suffix is never read as a typo of a single one, or `example.com` would be a
  * trap for everyone at `example.com.au`.

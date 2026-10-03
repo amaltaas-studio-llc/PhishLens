@@ -161,8 +161,8 @@ describe('isSenderProven', () => {
   });
 
   /**
-   * The shape the DOM adapter actually produces, and the reason this gate once rejected every message
-   * in existence: named `dkim`/`dmarc` verdicts are scraped from a tooltip most Gmail builds do not
+   * The shape the DOM adapter actually produces, and the reason a gate demanding more would reject every
+   * message in existence: named `dkim`/`dmarc` verdicts are scraped from a tooltip most Gmail builds do not
    * carry, so a real message arrives with a `signed-by` row and no verdict at all. Gmail only renders
    * that row for a signature it verified, so its presence is the verdict.
    */
@@ -357,8 +357,8 @@ describe('trustState', () => {
  *
  * `gmail.com` belongs to Google, which is why `gmai1.com` can be reported as a lookalike, and it is also
  * where a billion individuals keep their mail. Reading ownership as "this sender is a verified brand"
- * therefore handed brand dampening to every personal account at every consumer provider, quartering the
- * one category that carries "send me your code" and zeroing its combinations. Asserted through scores
+ * would therefore hand brand dampening to every personal account at every consumer provider, quartering
+ * the one category that carries "send me your code" and zeroing its combinations. Asserted through scores
  * rather than through the flag, because the flag is not what the user sees.
  */
 describe('a consumer mailbox at a brand-owned domain', () => {
@@ -412,8 +412,8 @@ describe('a consumer mailbox at a brand-owned domain', () => {
   });
 
   /**
-   * The direction this change could have gone wrong. Removing dampening makes every personal message
-   * score on its wording alone, so ordinary correspondence has to stay quiet on its own merits.
+   * The other direction. Without brand dampening every personal message scores on its wording alone, so
+   * ordinary correspondence has to stay quiet on its own merits.
    */
   it('leaves ordinary personal mail alone', () => {
     const result = analyzeDeterministic(
@@ -439,14 +439,14 @@ describe('a consumer mailbox at a brand-owned domain', () => {
  * Brand dampening needs the same proof of origin that trust needs.
  *
  * A From header is a claim, not evidence, and forging a famous one is the attack this whole extension is
- * about. Dampening on the domain alone therefore rewarded exactly the mail it should punish: "send me your
- * verification code" from a `paypal.com` address that nothing tied to PayPal came out at 8/100 and Low Risk,
+ * about. Dampening on the domain alone would therefore reward exactly the mail it should punish: "send me
+ * your verification code" from a `paypal.com` address that nothing ties to PayPal would come out Low Risk,
  * the most reassuring thing the extension can say, on a message whose sender is unverified and whose request
  * is the request no real organisation makes.
  *
  * Asserted through the score and through `dampened`, in both directions, because the useful half is that
  * genuine brand mail still gets the benefit: a gate this easy to over-tighten would quietly make the
- * feature unreachable, which is how the trust gate broke once already.
+ * feature unreachable, as a trust gate demanding named verdicts does.
  */
 describe('brand dampening and proof of origin', () => {
   const impersonation: EmailMessage = {

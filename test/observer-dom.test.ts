@@ -7,7 +7,7 @@
  * the reconciliation logic: it can move the route and the DOM apart, which no real page will do on
  * command. What it cannot assert is the part that decides whether that logic ever runs: which mutations
  * the browser is asked to report. A fake observer is told `attributes: false` and dutifully calls the
- * callback anyway, so every test in that file passed while the real one sat waiting for a structural
+ * callback anyway, so every test in that file can pass while the real one sits waiting for a structural
  * change that Gmail, collapsing a message by adding a class, never makes.
  *
  * So these few tests wire the real `GmailObserver` to the real `GmailDomAdapter` over jsdom's own
@@ -104,9 +104,9 @@ describe('a message changed in place', () => {
 
   /**
    * Collapsing a message adds a class to the container Gmail already rendered. Nothing is inserted and
-   * nothing is removed, so a structural watch sees no reason to look, and the badge went on asserting a
-   * verdict about a message the reader could no longer see, which is the case the disappearance grace
-   * exists for and was never reachable from.
+   * nothing is removed, so a structural watch sees no reason to look, and the badge would go on asserting
+   * a verdict about a message the reader can no longer see: the case the disappearance grace exists for,
+   * and one a structural watch never reaches.
    */
   it('is retracted when the open message is collapsed in place', async () => {
     message().classList.add('kv');
@@ -134,8 +134,8 @@ describe('a message changed in place', () => {
   /**
    * Revealing text that was hidden changes what the engine is given (hidden text is extracted separately
    * and removed from the body), and it arrives as an inline style, which no selector mentions. Deriving the
-   * watched attributes from the selectors alone therefore missed the one attribute extraction reads
-   * directly, and a solicitation becoming visible produced no new assessment.
+   * watched attributes from the selectors alone would therefore miss the one attribute extraction reads
+   * directly, and a solicitation becoming visible would produce no new assessment.
    */
   it('is re-read when hidden text in the body is revealed', async () => {
     const hidden = document.querySelector('div.a3s p[style]');
@@ -206,8 +206,8 @@ describe('navigation and partially rendered bodies', () => {
 
   /**
    * A body hidden in full is waited on briefly, because Gmail draws bodies hidden while building the view,
-   * and then reported as unreadable, because waiting on it for good meant a message that never emitted
-   * and so never got a badge, which on a quiet install is what a clean message looks like.
+   * and then reported as unreadable, because waiting on it for good would mean a message that never
+   * emits and so never gets a badge, which on a quiet install is what a clean message looks like.
    */
   it.each(['style', 'hidden'])('watches %s before the first readable extraction', async (attribute) => {
     observer.stop();

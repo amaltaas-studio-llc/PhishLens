@@ -7,9 +7,9 @@
  * follow Gmail exactly is a place a corpus result can differ from a user's, and is named below.
  *
  * - **The HTML part wins.** Gmail renders `text/html` from a `multipart/alternative` whenever one exists.
- *   Preferring `text/plain` was the first version, and it measured something no user sees: plenty of
- *   senders put markup, hidden preheaders included, in the plain part, so the "body" was tag soup with
- *   a handful of links and bulk mail stopped looking like bulk mail.
+ *   Preferring `text/plain` would measure something no user sees: plenty of senders put markup, hidden
+ *   preheaders included, in the plain part, so the "body" would be tag soup with a handful of links and
+ *   bulk mail would stop looking like bulk mail.
  * - **Authentication comes from headers.** The adapter reads Gmail's details table; the first
  *   `Authentication-Results` header is what that table is drawn from, but Gmail's banner, `via`
  *   annotation and unauthenticated avatar have no header and are never set.

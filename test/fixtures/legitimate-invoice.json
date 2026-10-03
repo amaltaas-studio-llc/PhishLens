@@ -1,6 +1,6 @@
 {
   "name": "legitimate-invoice",
-  "description": "False-positive resistance: a real invoice from an established supplier with a PDF attachment and payment language. Business-as-usual mail must not be flagged. It is also sent through a billing platform, so Gmail annotates it `via` a host that is not the sender's domain and is not on any list of recognised bulk-mail services. That is the shape a large share of legitimate commercial mail has, and the one that turned a dormant rule into points on ordinary mail once the extraction of that annotation was fixed.",
+  "description": "False-positive resistance: a real invoice from an established supplier with a PDF attachment and payment language. Business-as-usual mail must not be flagged. It is also sent through a billing platform, so Gmail annotates it `via` a host that is not the sender's domain and is not on any list of recognised bulk-mail services. That is the shape a large share of legitimate commercial mail has, so a rule that scores an unrecognised `via` host on its own would put points on ordinary mail.",
   "email": {
     "senderName": "Brightline Supplies Accounts",
     "senderEmail": "accounts@brightline-supplies.co.uk",

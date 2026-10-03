@@ -1,8 +1,8 @@
 /**
  * Authentication detectors, based on what Gmail chooses to render.
  *
- * Important caveat, and the reason the `authentication` weight is 15 rather than the 30 the brief
- * suggested: a content script sees the DOM, not RFC 5322 headers. There is no way to read
+ * Important caveat, and the reason the `authentication` weight is 15 rather than the 30 or so that reading
+ * the headers directly would justify: a content script sees the DOM, not RFC 5322 headers. There is no way to read
  * `Authentication-Results` directly. Everything here is inferred from Gmail's own surfaces (the
  * "mailed-by"/"signed-by" details table, the `via` annotation, the unauthenticated-sender indicator,
  * and Gmail's red warning banner), all of which are frequently absent.
@@ -39,8 +39,8 @@ function authenticationFailure(context: AnalysisContext): SecuritySignal[] {
 
   // DMARC passing means the From domain was proven by whichever mechanism *did* align, so a failed SPF or
   // DKIM beside it is the trace of a forwarder or a list rewriting the message, not of a forged sender.
-  // At `high` it put an ordinary forwarded message at Suspicious on the strength of a check the verdict
-  // that matters had already overruled.
+  // At `high` it would put an ordinary forwarded message at Suspicious on the strength of a check the
+  // verdict that matters has already overruled.
   if (auth.dmarc === 'pass') {
     return [
       signal({
@@ -91,7 +91,7 @@ function signingDomainMismatch(context: AnalysisContext): SecuritySignal[] {
   if (fromOwner !== undefined && fromOwner.id === signerOwner?.id) return [];
 
   // A brand's own domain sending through a recognised bulk-mail platform, which signs with its own
-  // domain by design. The mismatch carries no information here, and reporting it at `medium` used to be
+  // domain by design. The mismatch carries no information here, and reporting it at `medium` would be
   // enough to block the false-positive dampening on exactly the mail that dampening exists for.
   if (fromOwner !== undefined && isKnownSendingPlatform(signedBy)) return [];
 
@@ -128,10 +128,6 @@ function signingDomainMismatch(context: AnalysisContext): SecuritySignal[] {
  * that brand's own domains), because there the relay contradicts a specific claim rather than merely
  * existing. Recognised bulk-mail platforms are dropped entirely in the non-claim case; naming the ESP of
  * every newsletter is noise even at zero.
- *
- * The rule was written long before it ever ran: `readVia` looked for the annotation inside the sender
- * element, which holds the display name and nothing else. Fixing the extraction is what revealed that the
- * weighting had never been tested against real mail.
  */
 function sentViaUnrelatedHost(context: AnalysisContext): SecuritySignal[] {
   const via = normalizeDomain(context.email.auth?.via ?? '');

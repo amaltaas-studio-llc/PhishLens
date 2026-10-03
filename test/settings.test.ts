@@ -1,12 +1,11 @@
 /**
  * What a changed setting asks of the message already on screen.
  *
- * The content script needs a DOM and the Chrome APIs, so this decision was extracted from it to be
- * assertable here, and because it is the kind of decision that is wrong silently. Two failures the review
- * found were both of this shape: pointing the extension at a different model left the previous model's
- * verdicts in the cache for the life of the tab, and toggling the badge's visibility changed nothing on
- * screen until the reader opened another message. Neither looks like a bug from the outside; both look like
- * a setting that does not work.
+ * The content script needs a DOM and the Chrome APIs, so this decision lives outside it to be assertable
+ * here, and because it is the kind of decision that is wrong silently. Two failures of this shape: pointing
+ * the extension at a different model while the previous model's verdicts stay in the cache for the life of
+ * the tab, and toggling the badge's visibility with nothing changing on screen until the reader opens
+ * another message. Neither looks like a bug from the outside; both look like a setting that does not work.
  */
 import { describe, expect, it } from 'vitest';
 
