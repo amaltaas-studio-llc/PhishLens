@@ -6,6 +6,7 @@
 
 <a href="https://github.com/amaltaas-studio-llc/ShoutPhish/releases/latest"><img alt="Download the latest release" src="https://img.shields.io/github/v/release/amaltaas-studio-llc/ShoutPhish?label=download&color=6366f1&style=for-the-badge"></a>
 <img alt="Works in Chrome and Microsoft Edge, version 120 and later" src="https://img.shields.io/badge/Chrome%20%7C%20Edge-120%2B-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white">
+<img alt="Works in Firefox, version 140 and later" src="https://img.shields.io/badge/Firefox-140%2B-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white">
 <img alt="No network requests in the default configuration" src="https://img.shields.io/badge/uploads-none%20by%20default-3b1f8c?style=for-the-badge">
 <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-blue?style=for-the-badge"></a>
 
@@ -18,7 +19,7 @@
 
 <br>
 
-ShoutPhish is a free, open-source extension for Chrome and Edge that puts a risk score beside the sender of every email
+ShoutPhish is a free, open-source extension for Chrome, Edge and Firefox that puts a risk score beside the sender of every email
 you open in Gmail. Click it and ShoutPhish shows you **what looks unusual, why it matters, and the exact
 evidence**, down to the letter in an address that does not belong. It runs on your computer, needs no
 account, and sends your mail nowhere.
@@ -166,9 +167,12 @@ An extension that reads your email should be completely clear about what it does
 
 ## Install in two minutes
 
-**You need:** Gmail on a computer, in Chrome or Microsoft Edge 120 or later. Other browsers built on the same
-engine, such as Brave, Opera and Vivaldi, should accept the same download but are not tested yet. Firefox
-and Safari are not supported yet. ShoutPhish does not run in the Gmail phone apps or in other email programs.
+**You need:** Gmail on a computer, in Chrome or Microsoft Edge 120 or later, or Firefox 140 or later. Other
+browsers built on the same engine as Chrome, such as Brave, Opera and Vivaldi, should accept the Chrome
+download but are not tested yet. Safari is not supported yet. ShoutPhish does not run in the Gmail phone apps
+or in other email programs.
+
+**In Chrome or Edge:**
 
 1. Open the **[latest release](https://github.com/amaltaas-studio-llc/ShoutPhish/releases/latest)** and, under
    **Assets**, download `shoutphish-<version>.zip`. (Not the **Source code** downloads.)
@@ -177,6 +181,16 @@ and Safari are not supported yet. ShoutPhish does not run in the Gmail phone app
    **Developer mode** (top right in Chrome, in the left-hand panel in Edge).
 4. Click **Load unpacked** and choose the unzipped folder, the one containing `manifest.json`.
 5. Open or refresh Gmail and open an email you received. Look for the badge beside the sender. 🎉
+
+**In Firefox:**
+
+1. From the same **[latest release](https://github.com/amaltaas-studio-llc/ShoutPhish/releases/latest)**,
+   download `shoutphish-firefox-<version>.zip`. There is no need to unzip it.
+2. Type `about:debugging#/runtime/this-firefox` into the address bar and click **Load Temporary Add-on**.
+3. Choose the downloaded zip, then open or refresh Gmail.
+
+Firefox removes an add-on installed this way when it restarts, because it only keeps add-ons that Mozilla
+has approved, and ShoutPhish has not been submitted yet. Until it is, repeat the three steps after a restart.
 
 Nothing else to configure: every core check works straight away. Pin ShoutPhish from the browser's
 Extensions menu (the puzzle-piece icon) to keep its score and settings one click away.
@@ -187,7 +201,8 @@ Extensions menu (the puzzle-piece icon) to keep its score and settings one click
 <br>
 
 Download and unzip the newer release over the same folder, click **Reload** on ShoutPhish at
-`chrome://extensions` (or `edge://extensions`), then refresh Gmail. Manual installs do not update themselves.
+`chrome://extensions` (or `edge://extensions`), then refresh Gmail. In Firefox, load the newer zip the same
+way you installed it. Manual installs do not update themselves.
 
 </details>
 
@@ -230,7 +245,7 @@ never silences a warning about identity, links or attachments, so trusting `payp
 
 **✨ Add optional AI.** AI is off until you turn it on. Where Chrome offers its built-in on-device model,
 ShoutPhish can use it to add a view on the message's wording, and the welcome page walks you through
-switching it on. Edge does not offer one to extensions today. The AI is deliberately kept on a short leash: it can add at most 15 of the 100 points, it
+switching it on. Edge and Firefox do not offer one to extensions today. The AI is deliberately kept on a short leash: it can add at most 15 of the 100 points, it
 cannot remove a finding, and it cannot raise a score that the checks do not already support. To save time
 and battery it is only asked about messages where a check has already found something; the card tells you
 when it was not asked and offers to ask anyway. Advanced users can connect their own model server.

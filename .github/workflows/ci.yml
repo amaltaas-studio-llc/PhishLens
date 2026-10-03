@@ -25,8 +25,8 @@ jobs:
       # Report every version's result; knowing it fails only on the floor is the useful part.
       fail-fast: false
       matrix:
-        # The floor declared in package.json engines, and the current LTS.
-        node: ['22.13.0', '24']
+        # The floor declared in package.json engines, pinned exactly, and the newest release line.
+        node: ['24.0.0', '26']
     steps:
       # No token left in .git/config: `npm ci` runs dev-dependency install scripts, and nothing after the
       # checkout needs to talk to GitHub as this repository.

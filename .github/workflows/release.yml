@@ -1,4 +1,5 @@
-# Publishes a release when a v* tag is pushed, with the packaged extension attached.
+# Publishes a release when a v* tag is pushed, with the packaged extension attached: one zip for Chromium
+# browsers and one for Firefox.
 #
 #   npm version patch    # or minor / major; writes package.json and creates the tag
 #   git push --follow-tags
@@ -61,23 +62,29 @@ jobs:
         run: npm run verify
 
       - name: Build
-        run: npm run build
+        run: npm run build && npm run build:firefox
 
       # A published asset cannot be quietly replaced the way an artifact can, so it is checked before the
-      # zip exists rather than after someone reports that Chrome refused it.
+      # zip exists rather than after someone reports that a browser refused it.
       - name: Check the build is loadable
         run: npm run check:dist
 
-      # Zipped from inside dist/ so manifest.json sits at the archive root, which is what both "Load
-      # unpacked" and the Web Store dashboard expect.
+      - name: Lint the Firefox build
+        run: npm run lint:firefox
+
+      # Zipped from inside each build directory so manifest.json sits at the archive root, which is what
+      # "Load unpacked", Firefox's "Load Temporary Add-on", and both stores' upload forms expect. One
+      # Chromium package serves every Chromium browser on every operating system and processor: an
+      # extension is JavaScript and HTML, with nothing compiled per platform.
       - name: Package
         run: |
           set -euo pipefail
           mkdir -p release
-          cd dist
-          zip -qr "../release/shoutphish-${{ steps.meta.outputs.version }}.zip" .
-          cd ..
-          unzip -l "release/shoutphish-${{ steps.meta.outputs.version }}.zip"
+          version='${{ steps.meta.outputs.version }}'
+          (cd dist && zip -qr "../release/shoutphish-${version}.zip" .)
+          (cd dist-firefox && zip -qr "../release/shoutphish-firefox-${version}.zip" .)
+          unzip -l "release/shoutphish-${version}.zip"
+          unzip -l "release/shoutphish-firefox-${version}.zip"
 
       # Commit subjects only. They lead with an imperative summary of why the change was needed, which is
       # already the sentence a reader of the release wants; the bodies are for someone reading the history,
@@ -101,16 +108,28 @@ jobs:
           cat >> release/notes.md <<'NOTES'
           ### Install
 
-          ShoutPhish is not on the Chrome Web Store or Edge Add-ons. To install this build in Chrome or Edge:
+          ShoutPhish is not on the Chrome Web Store, Edge Add-ons or addons.mozilla.org yet.
+
+          **Chrome or Edge**
 
           1. Download `shoutphish-${{ steps.meta.outputs.version }}.zip` below and unzip it.
           2. Open `chrome://extensions` (or `edge://extensions` in Edge) and turn on **Developer mode**.
           3. Choose **Load unpacked** and select the unzipped folder.
           4. Open a message in Gmail. The risk score appears beside the sender's address.
 
+          **Firefox 140 or later**
+
+          1. Download `shoutphish-firefox-${{ steps.meta.outputs.version }}.zip` below. Do not unzip it.
+          2. Open `about:debugging#/runtime/this-firefox` and choose **Load Temporary Add-on**.
+          3. Select the downloaded zip, then open a message in Gmail.
+
+          Firefox keeps an add-on loaded this way only until it restarts, because release Firefox installs
+          only add-ons Mozilla has signed. Repeat the steps after a restart.
+
           Analysis runs entirely in your browser and no API key is required. AI analysis is off by default;
           the deterministic checks produce a full score without it. You can turn it on in the options to use
-          Chrome's on-device model, where your Chrome provides one, or a model server you run yourself.
+          the browser's on-device model, where it provides one (Chrome does, on devices that qualify), or a
+          model server you run yourself.
 
           ShoutPhish is advisory. It does not block links, downloads or replies.
           NOTES
@@ -143,6 +162,7 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" \
             "release/shoutphish-${VERSION}.zip" \
+            "release/shoutphish-firefox-${VERSION}.zip" \
             --repo "${{ github.repository }}" \
             --title "ShoutPhish $GITHUB_REF_NAME" \
             --notes-file release/notes.md

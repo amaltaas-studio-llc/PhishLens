@@ -2,7 +2,7 @@
 
 ## Requirements
 
-Node.js **≥ 22.13.0** (declared in `package.json` `engines` and tested in CI), and Chrome or Edge
+Node.js **≥ 24** (declared in `package.json` `engines` and tested in CI), and Chrome or Edge
 **≥ 120** or Firefox **≥ 140**.
 
 ```bash
@@ -262,8 +262,8 @@ under an invented `northwind-*` name, never as the message (see [AGENTS.md](../A
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs `lint`, `typecheck` and `test` on Node 22.13.0 (the `engines` floor,
-because an untested promise is a guess) as well as the current LTS. It then builds and uploads the
+`.github/workflows/ci.yml` runs `lint`, `typecheck` and `test` on Node 24.0.0 (the `engines` floor, pinned
+exactly, because an untested promise is a guess) and on Node 26, the newest release line. It then builds and uploads the
 extension as an artifact, so every commit has an installable package attached. Before uploading, it runs
 `npm run check:dist` (`scripts/check-dist.mjs`), which catches what a broken build would otherwise ship
 silently: a file the manifest names but the build did not produce, a `<script>` in `options.html` pointing
@@ -277,7 +277,7 @@ touching the build. It checks both packages; for `dist-firefox/` it also pins `b
 `src/manifest.firefox.json`. CI then runs `npm run lint:firefox`, Mozilla's own validator, which knows
 Firefox's rules better than any check written here.
 
-The build and the dist check run once, on the current LTS: the bundle is the same bytes whichever Node
+The build and the dist check run once, on Node 24 (the LTS line): the bundle is the same bytes whichever Node
 produced it, and the floor is already exercised by lint, typecheck and test.
 
 A separate job runs the [browser smoke test](#browser-smoke-test) against the stable Chrome, Edge and
@@ -300,8 +300,12 @@ npm version patch      # writes package.json and creates the tag
 git push --follow-tags
 ```
 
-`.github/workflows/release.yml` verifies, builds, runs `check:dist`, zips `dist/`, and publishes a GitHub
-Release with install instructions. It refuses to publish when the tag disagrees with `package.json`, because
+`.github/workflows/release.yml` verifies, builds both targets, runs `check:dist` and Mozilla's validator,
+zips `dist/` and `dist-firefox/` separately, and publishes a GitHub Release carrying both zips and install
+instructions for each. There is no per-platform or per-processor build: an extension contains no compiled
+code, so one Chromium zip serves Chrome, Edge and the other Chromium browsers everywhere. The Firefox zip is
+unsigned, so release Firefox loads it only as a temporary add-on; a permanent install needs Mozilla's
+signature, which this pipeline does not request. It refuses to publish when the tag disagrees with `package.json`, because
 the manifest version is generated from that field and a release whose contents contradict its label is worse
 than no release.
 
@@ -328,8 +332,8 @@ Status checks are deliberately **not** required. A commit cannot have passing ch
 requiring them would block direct pushes to `main` and force every change through a pull request: friction
 that buys little on a single-maintainer repository, given `npm run verify` runs before every commit anyway.
 
-If that changes, do not require the matrix jobs by name: they are called `Verify (Node 22.13.0)` and
-`Verify (Node 24)`, so the floor is baked into the string, and the ruleset would silently demand a check that
+If that changes, do not require the matrix jobs by name: they are called `Verify (Node 24.0.0)` and
+`Verify (Node 26)`, so the floor is baked into the string, and the ruleset would silently demand a check that
 no longer runs the next time the floor moves. Add an aggregate job with a stable name and require that.
 
 ## Conventions
