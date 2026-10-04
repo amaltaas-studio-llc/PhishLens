@@ -36,8 +36,9 @@ browser.
 
 - One codebase, one test suite. The detection engine never learns which browser it runs in.
 - `npm run verify` builds and checks both packages.
-- Firefox users cannot keep an unsigned build installed on release Firefox, so distribution waits on
-  signing through addons.mozilla.org. The gecko ID is permanent once the first version is signed.
+- Firefox users cannot keep an unsigned build installed on release Firefox, so releases carry a build
+  signed through addons.mozilla.org ([0013](0013-firefox-signed-unlisted.md)). The gecko ID is permanent
+  once the first version is signed.
 
 ## Rejected alternatives
 

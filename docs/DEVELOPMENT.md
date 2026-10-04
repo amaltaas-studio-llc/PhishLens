@@ -301,17 +301,26 @@ git push --follow-tags
 ```
 
 `.github/workflows/release.yml` verifies, builds both targets, runs `check:dist` and Mozilla's validator,
-zips `dist/` and `dist-firefox/` separately, and publishes a GitHub Release carrying both zips and install
-instructions for each. There is no per-platform or per-processor build: an extension contains no compiled
-code, so one Chromium zip serves Chrome, Edge and the other Chromium browsers everywhere. The Firefox zip is
-unsigned, so release Firefox loads it only as a temporary add-on; a permanent install needs Mozilla's
-signature, which this pipeline does not request. It refuses to publish when the tag disagrees with `package.json`, because
+zips `dist/` and `dist-firefox/` separately, has Mozilla sign the Firefox zip, and publishes a GitHub Release
+carrying the Chromium zip, the signed `.xpi` and install instructions for each. There is no per-platform or
+per-processor build: an extension contains no compiled code, so one Chromium zip serves Chrome, Edge and the
+other Chromium browsers everywhere.
+
+Signing uses addons.mozilla.org's unlisted channel, which signs for self-distribution without a store
+listing ([adr/0013](adr/0013-firefox-signed-unlisted.md)). It needs two repository secrets, `AMO_JWT_ISSUER`
+and `AMO_JWT_SECRET`, the "JWT issuer" and "JWT secret" from the API-key page of the account that owns the
+add-on. Each upload carries a `git archive` of the tag, because the bundles are minified and Mozilla's
+reviewers rebuild from source with `npm ci && npm run build:firefox`. Mozilla accepts a version number once,
+so a release that fails after its upload was accepted is fixed by releasing the next patch version, not by
+re-running the job. It refuses to publish when the tag disagrees with `package.json`, because
 the manifest version is generated from that field and a release whose contents contradict its label is worse
 than no release.
 
-It is two jobs. The build job installs and runs project code with read-only access; the publish job holds
-the only `contents: write` token and runs nothing but `gh release create` on the build job's artifact. Keep
-it that way: in a single job, any dev dependency's install script could publish a release.
+It is three jobs. The build job installs and runs project code with read-only access and no secrets; the
+sign job is the only one with the Mozilla key, installs with `--ignore-scripts`, and runs nothing but
+`web-ext sign`; the publish job holds the only `contents: write` token and runs nothing but
+`gh release create` on the other two jobs' artifacts. Keep it that way: merged, any dev dependency's install
+script could publish a release or sign as ShoutPhish.
 
 A `v*` tag cannot be deleted or moved once pushed (see below), so a mistagged release is corrected by
 releasing the next patch version, never by repointing the tag. Someone may already have downloaded the asset,

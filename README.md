@@ -185,12 +185,12 @@ or in other email programs.
 **In Firefox:**
 
 1. From the same **[latest release](https://github.com/amaltaas-studio-llc/ShoutPhish/releases/latest)**,
-   download `shoutphish-firefox-<version>.zip`. There is no need to unzip it.
-2. Type `about:debugging#/runtime/this-firefox` into the address bar and click **Load Temporary Add-on**.
-3. Choose the downloaded zip, then open or refresh Gmail.
+   download `shoutphish-firefox-<version>.xpi`.
+2. Type `about:addons` into the address bar, click the gear icon, and choose **Install Add-on From File**.
+3. Choose the downloaded file and click **Add** when Firefox asks, then open or refresh Gmail.
 
-Firefox removes an add-on installed this way when it restarts, because it only keeps add-ons that Mozilla
-has approved, and ShoutPhish has not been submitted yet. Until it is, repeat the three steps after a restart.
+The Firefox download is signed by Mozilla, so it stays installed when Firefox restarts. It is not listed in
+Mozilla's add-on store, which is why it comes from the release page instead.
 
 Nothing else to configure: every core check works straight away. Pin ShoutPhish from the browser's
 Extensions menu (the puzzle-piece icon) to keep its score and settings one click away.
@@ -201,8 +201,9 @@ Extensions menu (the puzzle-piece icon) to keep its score and settings one click
 <br>
 
 Download and unzip the newer release over the same folder, click **Reload** on ShoutPhish at
-`chrome://extensions` (or `edge://extensions`), then refresh Gmail. In Firefox, load the newer zip the same
-way you installed it. Manual installs do not update themselves.
+`chrome://extensions` (or `edge://extensions`), then refresh Gmail. In Firefox, install the newer `.xpi` the
+same way you installed the first one; it replaces the old version and keeps your settings. Manual installs
+do not update themselves.
 
 </details>
 
@@ -213,8 +214,9 @@ way you installed it. Manual installs do not update themselves.
 
 ```bash
 npm install
-npm run build     # unpacked extension in dist/, ready for "Load unpacked"
-npm run verify    # lint, typecheck, test, build, distribution check
+npm run build          # unpacked extension in dist/, ready for "Load unpacked"
+npm run build:firefox  # the Firefox package, in dist-firefox/
+npm run verify         # lint, typecheck, test, build, distribution check
 ```
 
 The [development guide](docs/DEVELOPMENT.md) covers the project layout, the UI harness and releases.
